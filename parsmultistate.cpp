@@ -24,7 +24,6 @@
 #include "alignment.h"
 
 void doParsMultiState(Params &params) {
-	cout << "Here\n";
     Alignment alignment(params.aln_file, params.sequence_type, params.intype);
     TinaTree tree;
     tree.readTree(params.user_file, params.is_rooted);

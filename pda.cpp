@@ -2320,7 +2320,6 @@ int main(int argc, char *argv[])
 
 	cout.precision(3);
 	cout.setf(ios::fixed);
-
 	// call the main function
 	if (params.tree_gen != NONE) {
 		generateRandomTree(params);
@@ -2330,6 +2329,10 @@ int main(int argc, char *argv[])
 		doParsMultiState(params);
 	} else if(params.test_mode){
 		test(params);
+	} else if(params.spr_test){
+		testSPROnUserTree(params);
+	} else if(params.tbr_test){
+		testTBROnUserTree(params);
 	} else if(params.print_site_pars_user_tree){
 		printSiteParsimonyUserTree(params);
 	} else if (params.compute_parsimony) {

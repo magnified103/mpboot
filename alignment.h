@@ -23,7 +23,7 @@ const char STATE_INVALID = 127;
 const int NUM_CHAR = 256;
 
 enum SeqType {
-    SEQ_DNA, SEQ_PROTEIN, SEQ_BINARY, SEQ_MORPH, SEQ_MULTISTATE, SEQ_CODON, SEQ_UNKNOWN
+    SEQ_DNA, SEQ_PROTEIN, SEQ_BINARY, SEQ_MORPH, SEQ_MULTISTATE, SEQ_CODON, SEQ_UNKNOWN, SEQ_DNA5
 };
 
 
@@ -58,7 +58,7 @@ public:
             @param sequence_type type of the sequence, either "BIN", "DNA", "AA", or NULL
             @param intype (OUT) input format of the file
      */
-    Alignment(char *filename, char *sequence_type, InputType &intype);
+    Alignment(char *filename, char *sequence_type, InputType &intype, bool dna5 = false);
 
     /**
             destructor
@@ -91,7 +91,7 @@ public:
      */
     int readNexus(char *filename);
 
-    int buildPattern(StrVector &sequences, char *sequence_type, int nseq, int nsite);
+    int buildPattern(StrVector &sequences, char *sequence_type, int nseq, int nsite, bool dna5 = false);
 
     /**
             read the alignment in PHYLIP format
@@ -99,7 +99,7 @@ public:
             @param sequence_type type of the sequence, either "BIN", "DNA", "AA", or NULL
             @return 1 on success, 0 on failure
      */
-    int readPhylip(char *filename, char *sequence_type);
+    int readPhylip(char *filename, char *sequence_type, bool dna5 = false);
 
     /**
             read the alignment in FASTA format
@@ -138,7 +138,7 @@ public:
     /****************************************************************************
             output alignment 
      ****************************************************************************/
-    SeqType detectSequenceType(StrVector &sequences);
+    SeqType detectSequenceType(StrVector &sequences, bool dna5 = false);
 
     void computeUnknownState();
 

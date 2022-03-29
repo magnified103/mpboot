@@ -510,6 +510,7 @@ void reportPhyloAnalysis(Params &params, string &original_model,
 				case SEQ_MORPH: out << "MORPH"; break;
 				case SEQ_MULTISTATE: out << "TINA"; break;
 				case SEQ_PROTEIN: out << "AA"; break;
+				case SEQ_DNA5: out << "DNA5!!!!!!!!!!!!!!!!!!!!!!!!!!!"; break;
 				case SEQ_UNKNOWN: out << "???"; break;
 				}
 				out.width(5);
@@ -1149,13 +1150,13 @@ void computeInitialTree(Params &params, IQTree &iqtree, string &dist_file, int &
 		cout << "Create initial parsimony tree by phylogenetic likelihood library (PLL)... ";
 		// generate a parsimony tree for model optimization
 		iqtree.pllInst->randomNumberSeed = params.ran_seed;
-
 		if(params.maximum_parsimony){
 			_pllComputeRandomizedStepwiseAdditionParsimonyTree(iqtree.pllInst, iqtree.pllPartitions, params.sprDist, &iqtree);
 		}
-		else
+		else 
+		{
 			pllComputeRandomizedStepwiseAdditionParsimonyTree(iqtree.pllInst, iqtree.pllPartitions, params.sprDist);
-
+		}
 		resetBranches(iqtree.pllInst);
 		pllTreeToNewick(iqtree.pllInst->tree_string, iqtree.pllInst, iqtree.pllPartitions, iqtree.pllInst->start->back,
 				PLL_TRUE, PLL_TRUE, PLL_FALSE, PLL_FALSE, PLL_FALSE, PLL_SUMMARIZE_LH, PLL_FALSE, PLL_FALSE);
@@ -1169,6 +1170,7 @@ void computeInitialTree(Params &params, IQTree &iqtree, string &dist_file, int &
 		iqtree.fixNegativeBranch(true);
 
 		cout << getCPUTime() - start << " seconds" << endl;
+		// cout << "HERE~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 		numInitTrees = params.numParsTrees;
         if (numInitTrees > params.min_iterations && params.stop_condition == SC_FIXED_ITERATION)
             numInitTrees = params.min_iterations;
@@ -1205,6 +1207,7 @@ void computeInitialTree(Params &params, IQTree &iqtree, string &dist_file, int &
 }
 
 void initializeParams(Params &params, IQTree &iqtree, vector<ModelInfo> &model_info) {
+	cout << "Go to initializeParams\n";
     iqtree.curScore = -DBL_MAX;
     bool test_only = params.model_name.substr(0, 8) == "TESTONLY";
     /* initialize substitution model */
@@ -1647,7 +1650,7 @@ void printFinalSearchInfo(Params &params, IQTree &iqtree, double search_cpu_time
  *  MAIN TREE RECONSTRUCTION
  ***********************************************************/
 void runTreeReconstruction(Params &params, string &original_model, IQTree &iqtree, vector<ModelInfo> &model_info) {
-
+	cout << "Go to runTreeReconstruction\n";
     string dist_file;
     params.startCPUTime = getCPUTime();
     params.start_real_time = getRealTime();
@@ -1656,7 +1659,6 @@ void runTreeReconstruction(Params &params, string &original_model, IQTree &iqtre
     if (params.pll) {
         iqtree.deleteAllPartialLh();
     }
-
     // Temporary fix since PLL only supports DNA/Protein: switch to IQ-TREE parsimony kernel
     if (params.start_tree == STT_PLL_PARSIMONY) {
 		if (iqtree.isSuperTree()) {
@@ -1664,10 +1666,9 @@ void runTreeReconstruction(Params &params, string &original_model, IQTree &iqtre
 			for (PhyloSuperTree::iterator it = stree->begin(); it != stree->end(); it++)
 				if ((*it)->aln->seq_type != SEQ_DNA && (*it)->aln->seq_type != SEQ_PROTEIN)
 					params.start_tree = STT_PARSIMONY;
-		} else if (iqtree.aln->seq_type != SEQ_DNA && iqtree.aln->seq_type != SEQ_PROTEIN)
+		} else if (iqtree.aln->seq_type != SEQ_DNA && iqtree.aln->seq_type != SEQ_PROTEIN && iqtree.aln->seq_type != SEQ_DNA5)
 			params.start_tree = STT_PARSIMONY;
     }
-
     /***************** Initialization for PLL and sNNI ******************/
     if (params.start_tree == STT_PLL_PARSIMONY || params.pll) {
         /* Initialized all data structure for PLL*/
@@ -1675,7 +1676,6 @@ void runTreeReconstruction(Params &params, string &original_model, IQTree &iqtre
 //        verbose_mode = VB_MAX;
     	iqtree.initializePLL(params);
     }
-
 
     /********************* Compute pairwise distances *******************/
     if (params.start_tree == STT_BIONJ || params.iqp || params.leastSquareBranch) {
@@ -1808,6 +1808,7 @@ void runTreeReconstruction(Params &params, string &original_model, IQTree &iqtre
 		// prune stable taxa
 		pruneTaxa(params, iqtree, pattern_lh, pruned_taxa, linked_name);
 	}
+	cout << "It started doing tree search 1814\n";
 
 	/****************** Do tree search ***************************/
 	if (params.min_iterations > 1) {
@@ -1829,6 +1830,7 @@ void runTreeReconstruction(Params &params, string &original_model, IQTree &iqtre
 		}
 	}
 
+	cout << "It went here 1836\n";
 
 	// restore pruned taxa
 	if(!params.maximum_parsimony)
@@ -1843,6 +1845,7 @@ void runTreeReconstruction(Params &params, string &original_model, IQTree &iqtre
 		cout << (params.maximum_parsimony ? "Scores" : "Log-likelihoods") << " of best " << params.popSize << " trees: " << endl;
 		iqtree.printBestScores(iqtree.candidateTrees.popSize);
 	}
+	// cout << "It went here 1851\n";
 
 	/******** Performs final model parameters optimization ******************/
 	if (params.min_iterations) {
@@ -1856,6 +1859,7 @@ void runTreeReconstruction(Params &params, string &original_model, IQTree &iqtre
 	} else {
         iqtree.setBestScore(iqtree.curScore);
     }
+	// cout << "It went here 1865\n";
 
 	if (iqtree.isSuperTree())
 		((PhyloSuperTree*) &iqtree)->computeBranchLengths();
@@ -2117,7 +2121,7 @@ void convertAlignment(Params &params, IQTree *iqtree) {
 void runPhyloAnalysis(Params &params) {
 	Alignment *alignment;
 	IQTree *tree;
-
+	cout << "Run in to runPhyloAnalysis\n";
 	/****************** read in alignment **********************/
 	if (params.partition_file) {
 		// Partition model analysis
@@ -2136,11 +2140,11 @@ void runPhyloAnalysis(Params &params) {
 		// this alignment will actually be of type SuperAlignment
 		alignment = tree->aln;
 	} else if(params.maximum_parsimony && params.sankoff_cost_file){
-		alignment = new Alignment(params.aln_file, params.sequence_type, params.intype);
+		alignment = new Alignment(params.aln_file, params.sequence_type, params.intype, params.dna5);
 		tree = new ParsTree(alignment);
 		dynamic_cast<ParsTree *>(tree)->initParsData(&params);
 	}else {
-		alignment = new Alignment(params.aln_file, params.sequence_type, params.intype);
+		alignment = new Alignment(params.aln_file, params.sequence_type, params.intype, params.dna5);
 		if (params.maximum_parsimony && !params.sankoff_cost_file && params.condense_parsimony_equiv_sites) {
 			Alignment *aln = new Alignment();
 			aln->condenseParsimonyEquivalentSites(alignment);
@@ -2260,6 +2264,22 @@ void runPhyloAnalysis(Params &params) {
 
 	delete tree;
 	delete alignment;
+
+	// // Replace all '0' with '-' to return the old aln_file
+	// // IMPORTANT: '0' must not in aln_file before (as supposed to DNA type)
+	// if (params.dna5 == true) {
+    //     fstream fs(params.aln_file, fstream::in | fstream::out);
+    //     if (fs.is_open()) {
+    //         while (!fs.eof()) {
+    //             if (fs.get() == '0') {
+    //                 fs.seekp((fs.tellp() - static_cast<streampos> (1)));
+    //                 fs.put('-');
+    //                 fs.seekp(fs.tellp());
+    //             }
+    //         }
+    //         fs.close();
+    //     } 
+    // }
 }
 
 void printSiteParsimonyUserTree(Params &params) {

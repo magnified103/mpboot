@@ -397,7 +397,7 @@ void Alignment::checkGappySeq(bool force_error) {
     }
 }
 
-Alignment::Alignment(char *filename, char *sequence_type, InputType &intype) : vector<Pattern>() {
+Alignment::Alignment(char *filename, char *sequence_type, InputType &intype, bool dna5) : vector<Pattern>() {
     num_states = 0;
     frac_const_sites = 0.0;
     codon_table = NULL;
@@ -418,7 +418,7 @@ Alignment::Alignment(char *filename, char *sequence_type, InputType &intype) : v
             readFasta(filename, sequence_type);
         } else if (intype == IN_PHYLIP) {
             cout << "Phylip format detected" << endl;
-            readPhylip(filename, sequence_type);
+            readPhylip(filename, sequence_type, dna5);
         } else {
             outError("Unknown sequence format, please use PHYLIP, FASTA, or NEXUS format");
         }
@@ -511,6 +511,7 @@ int Alignment::readNexus(char *filename) {
 void Alignment::computeUnknownState() {
     switch (seq_type) {
     case SEQ_DNA: STATE_UNKNOWN = 18; break;
+    case SEQ_DNA5: STATE_UNKNOWN = 36; break;
     case SEQ_PROTEIN: STATE_UNKNOWN = 22; break;
     default: STATE_UNKNOWN = num_states; break;
     }
@@ -744,16 +745,17 @@ void Alignment::condenseParsimonyEquivalentSites(Alignment *aln) {
 	@param sequences vector of strings
 	@return the data type of the input sequences
 */
-SeqType Alignment::detectSequenceType(StrVector &sequences) {
+SeqType Alignment::detectSequenceType(StrVector &sequences, bool dna5) {
     int num_nuc = 0;
     int num_ungap = 0;
     int num_bin = 0;
     int num_alpha = 0;
     int num_digit = 0;
-
     for (StrVector::iterator it = sequences.begin(); it != sequences.end(); it++)
         for (string::iterator i = it->begin(); i != it->end(); i++) {
             if ((*i) != '?' && (*i) != '-' && (*i) != '.' && *i != 'N' && *i != 'X') num_ungap++;
+            if ((*i) == 'Z' && dna5 == true) 
+                num_nuc++;
             if ((*i) == 'A' || (*i) == 'C' || (*i) == 'G' || (*i) == 'T' || (*i) == 'U')
                 num_nuc++;
             if ((*i) == '0' || (*i) == '1')
@@ -762,7 +764,10 @@ SeqType Alignment::detectSequenceType(StrVector &sequences) {
             if (isdigit(*i)) num_digit++;
         }
     if (((double)num_nuc) / num_ungap > 0.9)
+    {
+        if (dna5) return SEQ_DNA5;
         return SEQ_DNA;
+    }
     if (((double)num_bin) / num_ungap > 0.9)
         return SEQ_BINARY;
     if (((double)num_alpha) / num_ungap > 0.9)
@@ -791,18 +796,38 @@ void Alignment::buildStateMap(char *map, SeqType seq_type) {
         map[(unsigned char)'G'] = 2;
         map[(unsigned char)'T'] = 3;
         map[(unsigned char)'U'] = 3;
-        map[(unsigned char)'R'] = 1+4+3; // A or G, Purine
-        map[(unsigned char)'Y'] = 2+8+3; // C or T, Pyrimidine
+        map[(unsigned char)'R'] = 1+4+3; // A or G, Purine (8)
+        map[(unsigned char)'Y'] = 2+8+3; // C or T, Pyrimidine (13)
         map[(unsigned char)'N'] = STATE_UNKNOWN;
         map[(unsigned char)'X'] = STATE_UNKNOWN;
-        map[(unsigned char)'W'] = 1+8+3; // A or T, Weak
-        map[(unsigned char)'S'] = 2+4+3; // G or C, Strong
-        map[(unsigned char)'M'] = 1+2+3; // A or C, Amino
-        map[(unsigned char)'K'] = 4+8+3; // G or T, Keto
-        map[(unsigned char)'B'] = 2+4+8+3; // C or G or T
-        map[(unsigned char)'H'] = 1+2+8+3; // A or C or T
-        map[(unsigned char)'D'] = 1+4+8+3; // A or G or T
-        map[(unsigned char)'V'] = 1+2+4+3; // A or G or C
+        map[(unsigned char)'W'] = 1+8+3; // A or T, Weak (12)
+        map[(unsigned char)'S'] = 2+4+3; // G or C, Strong (9)
+        map[(unsigned char)'M'] = 1+2+3; // A or C, Amino (6)
+        map[(unsigned char)'K'] = 4+8+3; // G or T, Keto (15)
+        map[(unsigned char)'B'] = 2+4+8+3; // C or G or T (17)
+        map[(unsigned char)'H'] = 1+2+8+3; // A or C or T (14)
+        map[(unsigned char)'D'] = 1+4+8+3; // A or G or T (16)
+        map[(unsigned char)'V'] = 1+2+4+3; // A or G or C (10)
+        return;
+    case SEQ_DNA5:
+        map[(unsigned char)'A'] = 0;
+        map[(unsigned char)'C'] = 1;
+        map[(unsigned char)'G'] = 2;
+        map[(unsigned char)'T'] = 3;
+        map[(unsigned char)'U'] = 3;
+        map[(unsigned char)'Z'] = 4; // '-' in DNA5 (convert to 'Z')
+        map[(unsigned char)'R'] = 1+4+4; // A or G, Purine (9)
+        map[(unsigned char)'Y'] = 2+8+4; // C or T, Pyrimidine (14)
+        map[(unsigned char)'N'] = STATE_UNKNOWN;
+        map[(unsigned char)'X'] = STATE_UNKNOWN;
+        map[(unsigned char)'W'] = 1+8+4; // A or T, Weak (13)
+        map[(unsigned char)'S'] = 2+4+4; // G or C, Strong (10)
+        map[(unsigned char)'M'] = 1+2+4; // A or C, Amino (7)
+        map[(unsigned char)'K'] = 4+8+4; // G or T, Keto (16)
+        map[(unsigned char)'B'] = 2+4+8+4; // C or G or T (18)
+        map[(unsigned char)'H'] = 1+2+8+4; // A or C or T (15)
+        map[(unsigned char)'D'] = 1+4+8+4; // A or G or T (19)
+        map[(unsigned char)'V'] = 1+2+4+4; // A or G or C (11)
         return;
     case SEQ_PROTEIN: // Protein
         for (int i = 0; i < 20; i++)
@@ -889,6 +914,46 @@ char Alignment::convertState(char state, SeqType seq_type) {
             return STATE_INVALID; // unrecognize character
         }
         return state;
+    case SEQ_DNA5: // DNA
+        switch (state) {
+        case 'A':
+            return 0;
+        case 'C':
+            return 1;
+        case 'G':
+            return 2;
+        case 'T':
+            return 3;
+        case 'U':
+            return 3;
+        case 'Z':
+            return 4;
+        case 'R':
+            return 1+4+4; // A or G, Purine
+        case 'Y':
+            return 2+8+4; // C or T, Pyrimidine
+        case 'N':
+            return STATE_UNKNOWN;
+        case 'W':
+            return 1+8+4; // A or T, Weak
+        case 'S':
+            return 2+4+4; // G or C, Strong
+        case 'M':
+            return 1+2+4; // A or C, Amino
+        case 'K':
+            return 4+8+4; // G or T, Keto
+        case 'B':
+            return 2+4+8+4; // C or G or T
+        case 'H':
+            return 1+2+8+4; // A or C or T
+        case 'D':
+            return 1+4+8+4; // A or G or T
+        case 'V':
+            return 1+2+4+4; // A or G or C
+        default:
+            return STATE_INVALID; // unrecognize character
+        }
+        return state;
     case SEQ_PROTEIN: // Protein
 //		if (state == 'B') return 4+8+19;
 //		if (state == 'Z') return 32+64+19;
@@ -962,6 +1027,42 @@ char Alignment::convertStateBack(char state) {
         case 1+4+8+3:
             return 'D'; // A or G or T
         case 1+2+4+3:
+            return 'V'; // A or G or C
+        default:
+            return '?'; // unrecognize character
+        }
+        return state;
+    case SEQ_DNA5: // DNA
+        switch (state) {
+        case 0:
+            return 'A';
+        case 1:
+            return 'C';
+        case 2:
+            return 'G';
+        case 3:
+            return 'T';
+        case 4:
+            return 'Z';
+        case 1+4+4:
+            return 'R'; // A or G, Purine
+        case 2+8+4:
+            return 'Y'; // C or T, Pyrimidine
+        case 1+8+4:
+            return 'W'; // A or T, Weak
+        case 2+4+4:
+            return 'S'; // G or C, Strong
+        case 1+2+4:
+            return 'M'; // A or C, Amino
+        case 4+8+4:
+            return 'K'; // G or T, Keto
+        case 2+4+8+4:
+            return 'B'; // C or G or T
+        case 1+2+8+4:
+            return 'H'; // A or C or T
+        case 1+4+8+4:
+            return 'D'; // A or G or T
+        case 1+2+4+4:
             return 'V'; // A or G or C
         default:
             return '?'; // unrecognize character
@@ -1076,14 +1177,14 @@ int getMaxObservedStates(StrVector &sequences) {
 	return 0;
 }
 
-int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq, int nsite) {
+int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq, int nsite, bool dna5) {
     int seq_id;
     ostringstream err_str;
     codon_table = NULL;
     genetic_code = NULL;
     non_stop_codon = NULL;
 
-
+    cout << "DNA5 : " << dna5 << '\n';
     if (nseq != seq_names.size()) throw "Different number of sequences than specified";
 
     /* now check that all sequence names are correct */
@@ -1117,7 +1218,7 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
         throw err_str.str();
 
     /* now check data type */
-    seq_type = detectSequenceType(sequences);
+    seq_type = detectSequenceType(sequences, dna5);
     switch (seq_type) {
     case SEQ_BINARY:
         num_states = 2;
@@ -1126,6 +1227,10 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
     case SEQ_DNA:
         num_states = 4;
         cout << "Alignment most likely contains DNA/RNA sequences" << endl;
+        break;
+    case SEQ_DNA5:
+        num_states = 5;
+        cout << "Alignment most likely contains 5 states DNA/RNA sequences" << endl;
         break;
     case SEQ_PROTEIN:
         num_states = 20;
@@ -1148,6 +1253,9 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
         } else if (strcmp(sequence_type, "DNA") == 0) {
             num_states = 4;
             user_seq_type = SEQ_DNA;
+        } else if (strcmp(sequence_type, "DNA5") == 0) {
+            num_states = 5;
+            user_seq_type = SEQ_DNA5;
         } else if (strcmp(sequence_type, "AA") == 0 || strcmp(sequence_type, "PROT") == 0) {
             num_states = 20;
             user_seq_type = SEQ_PROTEIN;
@@ -1231,7 +1339,7 @@ int Alignment::buildPattern(StrVector &sequences, char *sequence_type, int nseq,
     return 1;
 }
 
-int Alignment::readPhylip(char *filename, char *sequence_type) {
+int Alignment::readPhylip(char *filename, char *sequence_type, bool dna5) {
 
     StrVector sequences;
     ostringstream err_str;
@@ -1287,6 +1395,8 @@ int Alignment::readPhylip(char *filename, char *sequence_type) {
             } else
                 for (string::iterator it = line.begin(); it != line.end(); it++) {
                     if ((*it) <= ' ') continue;
+                    if (dna5 && (*it) == '-') 
+                        (*it) = 'Z';
                     if (isalnum(*it) || (*it) == '-' || (*it) == '?'|| (*it) == '.')
                         sequences[seq_id].append(1, toupper(*it));
                     else {
@@ -1312,7 +1422,7 @@ int Alignment::readPhylip(char *filename, char *sequence_type) {
     in.exceptions(ios::failbit | ios::badbit);
     in.close();
 
-    return buildPattern(sequences, sequence_type, nseq, nsite);
+    return buildPattern(sequences, sequence_type, nseq, nsite, dna5);
 }
 
 int Alignment::readFasta(char *filename, char *sequence_type) {

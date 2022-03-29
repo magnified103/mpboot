@@ -412,6 +412,27 @@ extern int NNI_MAX_NR_STEP;
  */
 struct Params {
 
+        /**
+         *  Whether to consider '-' in DNA data as the 5-th distinct character 
+         */
+        bool dna5;
+
+        /**
+         *  Test SPR once on a user tree 
+         */
+        bool spr_test;
+
+        /**
+         *  Test TBR once on a user tree 
+         */
+        bool tbr_test;
+        
+
+        /**
+         *  rearrangeParsimony only take the first better SPR and return
+         */
+        bool spr_better;
+
 	/**
 	 *  Number of starting parsimony trees
 	 */

@@ -41,7 +41,8 @@ const char dnaStateNames[4]      = {'A', 'C', 'G', 'T'};
 const char protStateNames[20]    = {'A','R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 
 				    'I', 'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 
 				    'Y', 'V'};
-
+const char dna5StateNames[5]      = {'A', 'C', 'G', 'T', 'Z'};
+const char inverseMeaningDNA5[17] = {'_', 'A', 'C', 'M', 'G', 'R', 'S', 'V', 'T', 'W', 'Y', 'H', 'K', 'D', 'B', '-', 'Z'};
 const char inverseMeaningBINARY[4] = {'_', '0', '1', '-'};
 const char inverseMeaningDNA[16]   = {'_', 'A', 'C', 'M', 'G', 'R', 'S', 'V', 'T', 'W', 'Y', 'H', 'K', 'D', 'B', '-'};
 const char inverseMeaningPROT[23]  = {'A','R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S', 
@@ -100,7 +101,7 @@ const unsigned int bitVector32[33] = {1,     2,    4,    8,   16,   32,    64,  
                                       65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608,
                                       16777216, 33554432, 67108864, 134217728, 268435456, 536870912, 1073741824, 2147483648u, 
 				      4294967295u};
-
+const unsigned int bitVectorDNA5[5] = {1, 2, 4, 8, 16};
 /*const unsigned int bitVector64[65] = {};*/
 /** @brief Array for setting bits 0 .. 31 in a bit vector, used in saveMemory technique for the gapVector */
 const unsigned int mask32[32] = {1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 
@@ -137,7 +138,10 @@ const partitionLengths pLengths[PLL_MAX_MODEL] = {
   {1024, 1024, 32, 1024, 1024, 496, 32, 1056, 496, 32, PLL_FALSE, PLL_FALSE, 32, inverseMeaningGeneric32, 32, PLL_TRUE, bitVector32},
   
   /* 64 states */
-  {4096, 4096, 64, 4096, 4096, 2016, 64, 4160, 64, 2016, PLL_FALSE, PLL_FALSE, 64, (char*)NULL, 64, PLL_TRUE, (unsigned int*)NULL}
+  {4096, 4096, 64, 4096, 4096, 2016, 64, 4160, 64, 2016, PLL_FALSE, PLL_FALSE, 64, (char*)NULL, 64, PLL_TRUE, (unsigned int*)NULL},
+
+  /* DNA5 states */
+  {25, 25, 5, 25, 25, 10, 5, 1056, 10, 5, PLL_FALSE, PLL_FALSE, 31, inverseMeaningDNA5, 5, PLL_FALSE, bitVectorIdentity},
 };
 
 

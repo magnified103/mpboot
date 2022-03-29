@@ -487,6 +487,9 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
             case 4:
                 newviewSankoffParsimonyIterativeFastSIMD<Vec16us, parsimonyNumberShort, 4>(tr, pr);
                 break;
+            case 5:
+                newviewSankoffParsimonyIterativeFastSIMD<Vec16us, parsimonyNumberShort, 5>(tr, pr);
+                break;
             case 20:
                 newviewSankoffParsimonyIterativeFastSIMD<Vec16us, parsimonyNumberShort, 20>(tr, pr);
                 break;
@@ -499,6 +502,9 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
             switch (pr->partitionData[0]->states) {
             case 4:
                 newviewSankoffParsimonyIterativeFastSIMD<Vec8ui, parsimonyNumber, 4>(tr, pr);
+                break;
+            case 5:
+                newviewSankoffParsimonyIterativeFastSIMD<Vec8ui, parsimonyNumber, 5>(tr, pr);
                 break;
             case 20:
                 newviewSankoffParsimonyIterativeFastSIMD<Vec8ui, parsimonyNumber, 20>(tr, pr);
@@ -871,6 +877,8 @@ static unsigned int evaluateParsimonyIterativeFast(pllInstance *tr, partitionLis
             switch (pr->partitionData[0]->states) {
             case 4:
                 return evaluateSankoffParsimonyIterativeFastSIMD<Vec16us, parsimonyNumberShort, 4,true>(tr, pr, perSiteScores);
+            case 5:
+                return evaluateSankoffParsimonyIterativeFastSIMD<Vec16us, parsimonyNumberShort, 5,true>(tr, pr, perSiteScores);
             case 20:
                 return evaluateSankoffParsimonyIterativeFastSIMD<Vec16us, parsimonyNumberShort, 20,true>(tr, pr, perSiteScores);
             default:
@@ -881,6 +889,8 @@ static unsigned int evaluateParsimonyIterativeFast(pllInstance *tr, partitionLis
             switch (pr->partitionData[0]->states) {
             case 4:
                 return evaluateSankoffParsimonyIterativeFastSIMD<Vec8ui, parsimonyNumber, 4,true>(tr, pr, perSiteScores);
+            case 5:
+                return evaluateSankoffParsimonyIterativeFastSIMD<Vec16us, parsimonyNumberShort, 5,true>(tr, pr, perSiteScores);
             case 20:
                 return evaluateSankoffParsimonyIterativeFastSIMD<Vec8ui, parsimonyNumber, 20,true>(tr, pr, perSiteScores);
             default:
@@ -944,7 +954,7 @@ static unsigned int evaluateParsimonyIterativeFast(pllInstance *tr, partitionLis
         states = pr->partitionData[model]->states,
         width  = pr->partitionData[model]->parsimonyLength,
         i;
-
+        // cout << "Num states = " << states << '\n';
        switch(states)
          {
          case 2:
@@ -1097,7 +1107,7 @@ static unsigned int evaluateParsimonyIterativeFast(pllInstance *tr, partitionLis
  */
 static void newviewSankoffParsimonyIterativeFast(pllInstance *tr, partitionList * pr, int perSiteScores)
 {
-//	cout << "newviewSankoffParsimonyIterativeFast...";
+	cout << "newviewSankoffParsimonyIterativeFast...";
   int
     model,
     *ti = tr->ti,
@@ -1269,7 +1279,7 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
     *ti = tr->ti,
     count = ti[0],
     index;
-
+  cout << "newhere\n";
   for(index = 4; index < count; index += 4)
     {
       unsigned int
@@ -1354,7 +1364,16 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
                    t_G,
                    t_T,
                    t_N;
+                /*
+                left[0][i]  = 1100
+                right[0][i] = 0101
+                t_A         = 0100
+                o_A         = 1101
+                t_N         = 1010
+                cur[0][i]   = 0100 | (1010 & 1101) = 1100
 
+                left[0][i] = 1101010101..0101
+                */
                 for(i = 0; i < width; i++)
                   {
                     t_A = left[0][i] & right[0][i];
@@ -1464,11 +1483,12 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
 
       tr->parsimonyScore[pNumber] = totalScore + tr->parsimonyScore[rNumber] + tr->parsimonyScore[qNumber];
     }
+  cout << "newhere1\n";
 }
 
 static unsigned int evaluateSankoffParsimonyIterativeFast(pllInstance *tr, partitionList * pr, int perSiteScores)
 {
-//	cout << "evaluateSankoffParsimonyIterativeFast ...";
+	cout << "evaluateSankoffParsimonyIterativeFast ...";
   size_t
     pNumber = (size_t)tr->ti[1],
     qNumber = (size_t)tr->ti[2];
@@ -1493,7 +1513,6 @@ static unsigned int evaluateSankoffParsimonyIterativeFast(pllInstance *tr, parti
 			states = pr->partitionData[model]->states,
 			patterns  = pr->partitionData[model]->parsimonyLength,
 			i;
-
 		if(states != 2 && states != 4 && states != 20) states = 32;
 
 		parsimonyNumber
@@ -1600,8 +1619,9 @@ static unsigned int evaluateSankoffParsimonyIterativeFast(pllInstance *tr, parti
 
 static unsigned int evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr, int perSiteScores)
 {
+  // cout << "evaluateParsimonyIterativeFast\n";
 	if(pllCostMatrix) return evaluateSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
-
+  // cout << "Don't go to CostMatrix\n";
   size_t
     pNumber = (size_t)tr->ti[1],
     qNumber = (size_t)tr->ti[2];
@@ -1794,9 +1814,7 @@ static unsigned int evaluateParsimony(pllInstance *tr, partitionList *pr, nodept
 	}
 
 	ti[0] = counter;
-
 	result = evaluateParsimonyIterativeFast(tr, pr, perSiteScores);
-
 	return result;
 }
 
@@ -1809,7 +1827,6 @@ static void newviewParsimony(pllInstance *tr, partitionList *pr, nodeptr  p, int
   {
     int
       counter = 4;
-
     computeTraversalInfoParsimony(p, tr->ti, &counter, tr->mxtips, PLL_FALSE, perSiteScores);
     tr->ti[0] = counter;
 
@@ -1831,7 +1848,6 @@ static void insertParsimony (pllInstance *tr, partitionList *pr, nodeptr p, node
 
   hookupDefault(p->next,       q);
   hookupDefault(p->next->next, r);
-
   newviewParsimony(tr, pr, p, perSiteScores);
 }
 
@@ -2071,6 +2087,92 @@ static void testInsertParsimony (pllInstance *tr, partitionList *pr, nodeptr p, 
   return;
 }
 
+static void testInsertParsimony (pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q, pllBoolean saveBranches, int perSiteScores, bool &found_better)
+{
+  if (found_better)
+    return;
+  unsigned int
+    mp;
+
+  nodeptr
+    r = q->back;
+
+  pllBoolean
+    doIt = PLL_TRUE;
+
+  int numBranches = pr->perGeneBranchLengths?pr->numberOfPartitions:1;
+
+  if(tr->grouped)
+    {
+      int
+        rNumber = tr->constraintVector[r->number],
+        qNumber = tr->constraintVector[q->number],
+        pNumber = tr->constraintVector[p->number];
+
+      doIt = PLL_FALSE;
+
+      if(pNumber == -9)
+        pNumber = checkerPars(tr, p->back);
+      if(pNumber == -9)
+        doIt = PLL_TRUE;
+      else
+        {
+          if(qNumber == -9)
+            qNumber = checkerPars(tr, q);
+
+          if(rNumber == -9)
+            rNumber = checkerPars(tr, r);
+
+          if(pNumber == rNumber || pNumber == qNumber)
+            doIt = PLL_TRUE;
+        }
+    }
+
+  if(doIt)
+    {
+      double
+        *z = (double *)rax_malloc(numBranches*sizeof(double)); // Diep: copy from the latest pllrepo (fastDNAparsimony.c)
+
+      if(saveBranches)
+        {
+          int i;
+
+          for(i = 0; i < numBranches; i++)
+            z[i] = q->z[i];
+        }
+
+      insertParsimony(tr, pr, p, q, perSiteScores);
+
+      mp = evaluateParsimony(tr, pr, p->next->next, PLL_FALSE, perSiteScores);
+
+//		if(globalParam->gbo_replicates > 0 && perSiteScores){
+		if(perSiteScores){
+			// If UFBoot is enabled ...
+			pllSaveCurrentTreeSprParsimony(tr, pr, mp); // run UFBoot
+		}
+
+		if(mp < tr->bestParsimony) bestTreeScoreHits = 1;
+		else if(mp == tr->bestParsimony) bestTreeScoreHits++;
+
+		if((mp < tr->bestParsimony) ||
+			((mp == tr->bestParsimony) && (random_double() <= 1.0 / bestTreeScoreHits))){
+			tr->bestParsimony = mp;
+			tr->insertNode = q;
+			tr->removeNode = p;
+      found_better = true;
+		}
+
+      if(saveBranches)
+        hookup(q, r, z, numBranches);
+      else
+        hookupDefault(q, r);
+
+      p->next->next->back = p->next->back = (nodeptr) NULL;
+      rax_free(z); // Diep: copy from the latest pllrepo (fastDNAparsimony.c)
+    }
+
+  return;
+}
 
 static void restoreTreeParsimony(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q, int perSiteScores)
 {
@@ -2101,6 +2203,19 @@ static void addTraverseParsimony (pllInstance *tr, partitionList *pr, nodeptr p,
     }
 }
 
+static void addTraverseParsimony (pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q, int mintrav, int maxtrav, pllBoolean doAll, pllBoolean saveBranches, int perSiteScores, bool &found_better)
+{
+  if (found_better)
+    return;
+  if (doAll || (--mintrav <= 0))
+    testInsertParsimony(tr, pr, p, q, saveBranches, perSiteScores, found_better);
+
+  if (((q->number > tr->mxtips)) && ((--maxtrav > 0) || doAll))
+    {
+      addTraverseParsimony(tr, pr, p, q->next->back, mintrav, maxtrav, doAll, saveBranches, perSiteScores, found_better);
+      addTraverseParsimony(tr, pr, p, q->next->next->back, mintrav, maxtrav, doAll, saveBranches, perSiteScores, found_better);
+    }
+}
 
 static void makePermutationFast(int *perm, int n, pllInstance *tr)
 {
@@ -2128,6 +2243,7 @@ static void makePermutationFast(int *perm, int n, pllInstance *tr)
 //static nodeptr  removeNodeParsimony (nodeptr p, tree *tr)
 static nodeptr  removeNodeParsimony (nodeptr p)
 {
+  assert(p != NULL);
   nodeptr  q, r;
 
   q = p->next->back;
@@ -2259,12 +2375,156 @@ static int rearrangeParsimony(pllInstance *tr, partitionList *pr, nodeptr p, int
   return 1;
 }
 
+static int rearrangeParsimony(pllInstance *tr, partitionList *pr, nodeptr p, int mintrav, int maxtrav, pllBoolean doAll, int perSiteScores, bool spr_better)
+{
+  if (spr_better == false)
+    return rearrangeParsimony(tr, pr, p, mintrav, maxtrav, doAll, perSiteScores);
+	nodeptr
+		p1,
+		p2,
+		q,
+		q1,
+		q2;
+
+  int
+    mintrav2;
+
+  pllBoolean
+    doP = PLL_TRUE,
+    doQ = PLL_TRUE;
+
+  if (maxtrav > tr->ntips - 3)
+    maxtrav = tr->ntips - 3;
+
+  assert(mintrav == 1);
+
+  if(maxtrav < mintrav)
+    return 0;
+
+  q = p->back;
+
+	unsigned int mp = evaluateParsimony(tr, pr, p, PLL_FALSE, perSiteScores); // Diep: This is VERY important to make sure SPR is accurate*****
+	if(perSiteScores){
+		// If UFBoot is enabled ...
+		pllSaveCurrentTreeSprParsimony(tr, pr, mp); // run UFBoot
+	}
+
+  if(tr->constrained)
+    {
+      if(! tipHomogeneityCheckerPars(tr, p->back, 0))
+        doP = PLL_FALSE;
+
+      if(! tipHomogeneityCheckerPars(tr, q->back, 0))
+        doQ = PLL_FALSE;
+
+      if(doQ == PLL_FALSE && doP == PLL_FALSE)
+        return 0;
+    }
+  bool found_better = false;
+  if((p->number > tr->mxtips) && doP)
+    {
+      p1 = p->next->back;
+      p2 = p->next->next->back;
+
+      if ((p1->number > tr->mxtips) || (p2->number > tr->mxtips))
+        {
+          //removeNodeParsimony(p, tr);
+          removeNodeParsimony(p);
+
+          if ((p1->number > tr->mxtips))
+            {
+              addTraverseParsimony(tr, pr, p, p1->next->back, mintrav, maxtrav, doAll, PLL_FALSE, perSiteScores, found_better);
+              if (found_better == false)
+                addTraverseParsimony(tr, pr, p, p1->next->next->back, mintrav, maxtrav, doAll, PLL_FALSE, perSiteScores, found_better);
+            }
+
+          if (((p2->number > tr->mxtips)) && (found_better == false))
+            {
+              addTraverseParsimony(tr, pr, p, p2->next->back, mintrav, maxtrav, doAll, PLL_FALSE, perSiteScores, found_better);
+              if (found_better == false)
+                addTraverseParsimony(tr, pr, p, p2->next->next->back, mintrav, maxtrav, doAll, PLL_FALSE, perSiteScores, found_better);
+            }
+
+
+          hookupDefault(p->next,       p1);
+          hookupDefault(p->next->next, p2);
+
+          newviewParsimony(tr, pr, p, perSiteScores);
+        }
+    }
+  if (found_better == true)
+    return 1;
+  if ((q->number > tr->mxtips) && (maxtrav > 0) && doQ)
+    {
+      q1 = q->next->back;
+      q2 = q->next->next->back;
+
+      if (
+          (
+           (q1->number > tr->mxtips) &&
+           ((q1->next->back->number > tr->mxtips) || (q1->next->next->back->number > tr->mxtips))
+           )
+          ||
+          (
+           (q2->number > tr->mxtips) &&
+           ((q2->next->back->number > tr->mxtips) || (q2->next->next->back->number > tr->mxtips))
+           )
+          )
+        {
+
+          //removeNodeParsimony(q, tr);
+          removeNodeParsimony(q);
+
+          mintrav2 = mintrav > 2 ? mintrav : 2;
+
+          if ((q1->number > tr->mxtips))
+            {
+              addTraverseParsimony(tr, pr, q, q1->next->back, mintrav2 , maxtrav, doAll, PLL_FALSE, perSiteScores, found_better);
+              if (found_better == false)
+                addTraverseParsimony(tr, pr, q, q1->next->next->back, mintrav2 , maxtrav, doAll, PLL_FALSE, perSiteScores, found_better);
+            }
+
+          if (((q2->number > tr->mxtips)) && found_better == false)
+            {
+              addTraverseParsimony(tr, pr, q, q2->next->back, mintrav2 , maxtrav, doAll, PLL_FALSE, perSiteScores, found_better);
+              if (found_better == false)
+                addTraverseParsimony(tr, pr, q, q2->next->next->back, mintrav2 , maxtrav, doAll, PLL_FALSE, perSiteScores, found_better);
+            }
+
+          hookupDefault(q->next,       q1);
+          hookupDefault(q->next->next, q2);
+
+          newviewParsimony(tr, pr, q, perSiteScores);
+        }
+    }
+
+  return 1;
+}
 
 static void restoreTreeRearrangeParsimony(pllInstance *tr, partitionList *pr, int perSiteScores)
 {
   removeNodeParsimony(tr->removeNode);
   //removeNodeParsimony(tr->removeNode, tr);
   restoreTreeParsimony(tr, pr, tr->removeNode, tr->insertNode, perSiteScores);
+}
+
+static bool restoreTreeRearrangeParsimonyTBR(pllInstance *tr, partitionList *pr, int perSiteScores)
+{
+  nodeptr q, r, freeBranch, pb, qb;
+  q = tr->TBR_removeBranch->next->back;
+  r = tr->TBR_removeBranch->back->next->back;
+  if (!pllTbrRemoveBranch (tr, pr, tr->TBR_removeBranch))
+    {
+      return PLL_FALSE;
+    }
+  if (!pllTbrConnectSubtrees (tr, tr->TBR_insertBranch1,
+                              tr->TBR_insertBranch2, &freeBranch, &pb, &qb))
+    {
+      /* Undo remove branch. This operation should be done without errors. */
+      // assert(pllTbrConnectSubtreesML (tr, pr, q, r));
+      return PLL_FALSE;
+    }
+  return PLL_TRUE;
 }
 
 /*
@@ -3013,7 +3273,6 @@ static void _pllMakeParsimonyTreeFast(pllInstance *tr, partitionList *pr, int sp
   f = tr->start;
 
   bestTreeScoreHits = 1;
-
   while(tr->ntips < tr->mxtips)
     {
       nodeptr q;
@@ -3089,6 +3348,114 @@ static void _pllMakeParsimonyTreeFast(pllInstance *tr, partitionList *pr, int sp
   rax_free(perm);
 }
 
+static void _pllMakeParsimonyTreeFast(pllInstance *tr, partitionList *pr, int sprDist, bool spr_better)
+{
+  if (spr_better == false)
+    {
+      _pllMakeParsimonyTreeFast(tr, pr, sprDist);
+      return;
+    }
+  nodeptr
+    p,
+    f;
+
+  int
+    i,
+    nextsp,
+    *perm        = (int *)rax_malloc((size_t)(tr->mxtips + 1) * sizeof(int));
+
+  unsigned int
+    randomMP,
+    startMP;
+
+  assert(!tr->constrained);
+
+  makePermutationFast(perm, tr->mxtips, tr);
+
+  tr->ntips = 0;
+
+  tr->nextnode = tr->mxtips + 1;
+
+  buildSimpleTree(tr, pr, perm[1], perm[2], perm[3]);
+
+  f = tr->start;
+
+  bestTreeScoreHits = 1;
+  while(tr->ntips < tr->mxtips)
+    {
+      nodeptr q;
+
+      tr->bestParsimony = INT_MAX;
+      nextsp = ++(tr->ntips);
+      p = tr->nodep[perm[nextsp]];
+      q = tr->nodep[(tr->nextnode)++];
+      p->back = q;
+      q->back = p;
+
+      if(tr->grouped)
+        {
+          int
+            number = p->back->number;
+
+          tr->constraintVector[number] = -9;
+        }
+
+      stepwiseAddition(tr, pr, q, f->back);
+//      cout << "tr->ntips = " << tr->ntips << endl;
+
+      {
+        nodeptr
+          r = tr->insertNode->back;
+
+        int counter = 4;
+
+        hookupDefault(q->next,       tr->insertNode);
+        hookupDefault(q->next->next, r);
+
+        computeTraversalInfoParsimony(q, tr->ti, &counter, tr->mxtips, PLL_FALSE, 0);
+        tr->ti[0] = counter;
+
+        newviewParsimonyIterativeFast(tr, pr, 0);
+      }
+    }
+
+  nodeRectifierPars(tr);
+//  cout << "DONE stepwise addition" << endl;
+
+  randomMP = tr->bestParsimony;
+
+//	int * hill_climbing_perm = (int *)rax_malloc((size_t)(tr->mxtips + tr->mxtips - 1) * sizeof(int));
+	int j;
+//	makePermutationFast(hill_climbing_perm, tr->mxtips + tr->mxtips - 2, tr);
+
+	unsigned int bestIterationScoreHits = 1;
+
+	do
+	{
+		startMP = randomMP;
+		nodeRectifierPars(tr);
+		for(i = 1; i <= tr->mxtips + tr->mxtips - 2; i++)
+//		for(j = 1; j <= tr->mxtips + tr->mxtips - 2; j++)
+		{
+//			i = hill_climbing_perm[j];
+			tr->removeNode = tr->insertNode = NULL;
+			bestTreeScoreHits = 1;
+			rearrangeParsimony(tr, pr, tr->nodep[i], 1, sprDist, PLL_FALSE, 0, true);
+			if(tr->bestParsimony == randomMP) bestIterationScoreHits++;
+			if(tr->bestParsimony < randomMP) bestIterationScoreHits = 1;
+			if(((tr->bestParsimony < randomMP) ||
+				((tr->bestParsimony == randomMP) && (random_double() <= 1.0 / bestIterationScoreHits))) &&
+					tr->removeNode && tr->insertNode)
+			{
+				restoreTreeRearrangeParsimony(tr, pr, 0);
+				randomMP = tr->bestParsimony;
+			}
+		}
+	}while(randomMP < startMP);
+
+  rax_free(perm);
+}
+
 /** @brief Compute a randomized stepwise addition oder parsimony tree
 
     Implements the RAxML randomized stepwise addition order algorithm
@@ -3108,7 +3475,12 @@ void _pllComputeRandomizedStepwiseAdditionParsimonyTree(pllInstance * tr, partit
 	iqtree = _iqtree; // update pointer to IQTree
 	_allocateParsimonyDataStructures(tr, partitions, PLL_FALSE);
 //	cout << "DONE allocate..." << endl;
-	_pllMakeParsimonyTreeFast(tr, partitions, sprDist);
+  if (iqtree->params->spr_better == true)
+  {
+	  _pllMakeParsimonyTreeFast(tr, partitions, sprDist, true);
+  }
+	else
+    _pllMakeParsimonyTreeFast(tr, partitions, sprDist);
 //	cout << "DONE make...." << endl;
 	_pllFreeParsimonyDataStructures(tr, partitions);
 	doing_stepwise_addition = false;
@@ -3184,6 +3556,93 @@ int pllOptimizeSprParsimony(pllInstance * tr, partitionList * pr, int mintrav, i
 			bestTreeScoreHits = 1;
 
 			rearrangeParsimony(tr, pr, tr->nodep[i], mintrav, maxtrav, PLL_FALSE, perSiteScores);
+			if(tr->bestParsimony == randomMP) bestIterationScoreHits++;
+			if(tr->bestParsimony < randomMP) bestIterationScoreHits = 1;
+			if(((tr->bestParsimony < randomMP) ||
+					((tr->bestParsimony == randomMP) &&
+						(random_double() <= 1.0 / bestIterationScoreHits))) &&
+					tr->removeNode && tr->insertNode){
+				restoreTreeRearrangeParsimony(tr, pr, perSiteScores);
+				randomMP = tr->bestParsimony;
+			}
+		}
+	}while(randomMP < startMP);
+
+	return startMP;
+}
+
+/**
+ * DTH: optimize whatever tree is stored in tr by parsimony SPR
+ * @param tr: the tree instance :)
+ * @param partition: the data partition :)
+ * @param mintrav, maxtrav are PLL limitations for SPR radius
+ * @param spr_better: take the first better or take the best
+ * @return best parsimony score found
+ */
+int pllOptimizeSprParsimony(pllInstance * tr, partitionList * pr, int mintrav, int maxtrav, IQTree *_iqtree, bool spr_better){
+	if (spr_better == false)
+    return pllOptimizeSprParsimony(tr, pr, mintrav, maxtrav, _iqtree);
+  int perSiteScores = globalParam->gbo_replicates > 0;
+
+	iqtree = _iqtree; // update pointer to IQTree
+
+	if(globalParam->ratchet_iter >= 0 && (iqtree->on_ratchet_hclimb1 || iqtree->on_ratchet_hclimb2)){
+		// oct 23: in non-ratchet iteration, allocate is not triggered
+		_updateInternalPllOnRatchet(tr, pr);
+		_allocateParsimonyDataStructures(tr, pr, perSiteScores); // called once if not running ratchet
+	}else if(first_call || (iqtree && iqtree->on_opt_btree))
+		_allocateParsimonyDataStructures(tr, pr, perSiteScores); // called once if not running ratchet
+
+	if(first_call){
+		first_call = false;
+	}
+
+//	if(((globalParam->ratchet_iter >= 0 || globalParam->optimize_boot_trees) && (!globalParam->hclimb1_nni)) || (!iqtree)){
+//		iqtree = _iqtree;
+//		// consider updating tr->yVector, then tr->aliaswgt (similar as in pllLoadAlignment)
+//		if((globalParam->ratchet_iter >= 0  || globalParam->optimize_boot_trees) && (!globalParam->hclimb1_nni))
+//			_updateInternalPllOnRatchet(tr, pr);
+//		_allocateParsimonyDataStructures(tr, pr, perSiteScores); // called once if not running ratchet
+//	}
+
+	int i;
+	unsigned int
+		randomMP,
+		startMP;
+
+	assert(!tr->constrained);
+
+	nodeRectifierPars(tr);
+	tr->bestParsimony = UINT_MAX;
+	tr->bestParsimony = evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
+
+	assert(-iqtree->curScore == tr->bestParsimony);
+
+//	cout << "\ttr->bestParsimony (initial tree) = " << tr->bestParsimony << endl;
+	/*
+	// Diep: to be investigated
+	tr->bestParsimony = -iqtree->logl_cutoff;
+	evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
+	*/
+
+	int j;
+    // *perm        = (int *)rax_malloc((size_t)(tr->mxtips + tr->mxtips - 1) * sizeof(int));
+//	makePermutationFast(perm, tr->mxtips + tr->mxtips - 2, tr);
+
+	unsigned int bestIterationScoreHits = 1;
+	randomMP = tr->bestParsimony;
+	tr->ntips = tr->mxtips;
+	do{
+		startMP = randomMP;
+		nodeRectifierPars(tr);
+		for(i = 1; i <= tr->mxtips + tr->mxtips - 2; i++){
+//		for(j = 1; j <= tr->mxtips + tr->mxtips - 2; j++){
+//			i = perm[j];
+			tr->insertNode = NULL;
+			tr->removeNode = NULL;
+			bestTreeScoreHits = 1;
+
+			rearrangeParsimony(tr, pr, tr->nodep[i], mintrav, maxtrav, PLL_FALSE, perSiteScores, true);
 			if(tr->bestParsimony == randomMP) bestIterationScoreHits++;
 			if(tr->bestParsimony < randomMP) bestIterationScoreHits = 1;
 			if(((tr->bestParsimony < randomMP) ||
@@ -3477,13 +3936,13 @@ void computeUserTreeParsimomy(Params &params) {
     	ptree = new IQTree(&alignment);
 
 
-//	cout << "Read user tree... 1st time";
+	cout << "Read user tree... 1st time";
     ptree->readTree(params.user_file, params.is_rooted);
 
 	ptree->setAlignment(&alignment); // IMPORTANT: Always call setAlignment() after readTree()
 	optimizeAlignment(ptree, params);
 
-//	cout << "Read user tree... 2nd time";
+	cout << "Read user tree... 2nd time\n";
     ptree->readTree(params.user_file, params.is_rooted);
 
 	ptree->setAlignment(ptree->aln); // IMPORTANT: Always call setAlignment() after readTree()
@@ -3762,6 +4221,564 @@ pllSortedAlignmentRemoveDups (pllAlignmentData * alignmentData, partitionList * 
   rax_free (memptr);
 }
 
+/**
+ * @brief Creates a bisection in the tree in the branch defined by the node p
+ *
+ * Splits the tree in two subtrees by removing the branch b(p<->p.back).
+ *
+ * @param tr, the tree
+ * @param pr, the partitions
+ * @param p, the node defining the branch to remove
+ *
+ * @return PLL_TRUE if OK, PLL_FALSE and sets errno in case of error
+ */
+int
+pllTbrRemoveBranch (pllInstance * tr, partitionList * pr, nodeptr p)
+{
+  int i;
+  nodeptr p1, p2, q1, q2;
+  nodeptr tmpNode;
+  // double * nextZP, * nextZQ;
+  // int numBranchLengths;
+
+  // Evaluate pre-conditions
+  // P1 : ( p in tr )
+  for (tmpNode = tr->start->next->back; tmpNode != tr->start && tmpNode != p;
+      tmpNode = tmpNode->next->back)
+    ;
+  if(tmpNode != p) {
+      // errno = PLL_TBR_INVALID_NODE;
+      cout << "p is not in tr\n";
+      return PLL_FALSE;
+  }
+  // P2 : ( p is an inner branch )
+  if (!(p->number > tr->mxtips && p->back->number > tr->mxtips))
+  {
+      // errno = PLL_TBR_NOT_INNER_BRANCH;
+      cout << "p is not an inner branch\n";
+      return PLL_FALSE;
+  }
+
+  p1 = p->next->back;
+  p2 = p->next->next->back;
+  q1 = p->back->next->back;
+  q2 = p->back->next->next->back;
+
+  // // Connect p neighbors (sum branches)
+  // numBranchLengths = pr->perGeneBranchLengths ? pr->numberOfPartitions : 1;
+  // nextZP = (double *) rax_malloc ( (size_t) numBranchLengths * sizeof(double));
+  // if (!nextZP) {
+  //     return PLL_FALSE;
+  // }
+  // nextZQ = (double *) rax_malloc ( (size_t) numBranchLengths * sizeof(double));
+  // if (!nextZQ) {
+  //     free(nextZP);
+  //     return PLL_FALSE;
+  // }
+
+  // for (i = 0; i < numBranchLengths; i++)
+  // {
+  //     nextZP[i] = exp(log(p1->z[i]) + log(p2->z[i]));
+  //     nextZQ[i] = exp(log(q1->z[i]) + log(q2->z[i]));
+  // 
+  hookupDefault (p1, p2);
+  hookupDefault (q1, q2);
+
+  // free(nextZP);
+  // free(nextZQ);
+
+  // Disconnect p->p* branch
+  p->next->back = 0;
+  p->next->next->back = 0;
+  p->back->next->back = 0;
+  p->back->next->next->back = 0;
+
+  // Evaluate post-conditions?
+
+  return PLL_TRUE;
+}
+
+
+static int pllTbrConnectSubtrees(pllInstance * tr, nodeptr p,
+                                 nodeptr q, nodeptr * freeBranch, nodeptr * pb, nodeptr * qb) {
+  int i;
+  nodeptr tmpNode;
+
+  *freeBranch = 0;
+  *pb = 0;
+  *qb = 0;
+
+  // Evaluate preconditions
+
+  // p and q must be connected and independent branches
+  if (!(p && q && (p != q) && p->back && q->back && (p->back != q)
+      && (q->back != p)))
+    {
+      // errno = PLL_TBR_INVALID_NODE;
+      return PLL_FALSE;
+    }
+
+  // p and q must belong to different subtrees. We check that we cannot reach q starting from p
+  for (tmpNode = p->next->back; tmpNode != p && tmpNode != q;
+      tmpNode = tmpNode->next->back)
+    ;
+  if (tmpNode == q)
+    {
+      // p and q are in the same subtree
+      // errno = PLL_TBR_INVALID_NODE;
+      return PLL_FALSE;
+    }
+
+  (*pb) = p->back;
+  (*qb) = q->back;
+  tmpNode = 0;
+
+  // Must exist an unconnected branch
+  for (i = 1; i <= (2 * tr->mxtips - 3); i++)
+    {
+      if (!(tr->nodep[i]->back && tr->nodep[i]->next->back))
+        {
+          tmpNode = tr->nodep[i];
+
+          // It should have one and only one connected node
+          if (tmpNode->next->back
+              && !(tmpNode->back || tmpNode->next->next->back))
+            {
+              tmpNode = tmpNode->next->back;
+            }
+          else if (tmpNode->next->next->back
+              && !(tmpNode->back || tmpNode->next->back))
+            {
+              tmpNode = tmpNode->next->next->back;
+            }
+          else if (!(tmpNode->back || tmpNode->next->back
+              || tmpNode->next->next->back))
+            {
+              // There is no missing branch
+              // errno = PLL_TBR_INVALID_NODE;
+              return PLL_FALSE;
+            }
+          break;
+        }
+    }
+
+  if (!tmpNode)
+    {
+      // There is no missing branch
+      // errno = PLL_TBR_MISSING_FREE_BRANCH;
+      return PLL_FALSE;
+    }
+
+  (*freeBranch) = tmpNode;
+
+
+  // Join subtrees
+  hookupDefault (p, (*freeBranch)->next);
+  hookupDefault ((*pb), (*freeBranch)->next->next);
+  hookupDefault (q, (*freeBranch)->back->next);
+  hookupDefault ((*qb), (*freeBranch)->back->next->next);
+
+  return PLL_TRUE;
+}
+
+
+
+/** @ingroup rearrangementGroup
+ @brief Internal function for testing and saving a TBR move
+
+ Checks the likelihood of the placement of the pruned subtree specified by \a p
+ to node \a q. If the likelihood is better than some in the sorted list
+ \a bestList, or if there is still free space in \a bestList, then the TBR
+ move is recorded (in \a bestList)
+
+ @param tr
+ PLL instance
+
+ @param pr
+ List of partitions
+
+ @param branch1
+ Branch on one detached subtree
+
+ @param branch2
+ Branch on the other detached subtree
+
+ @param bestList
+ Where to store the TBR move
+
+ @note Internal function which is not part of the PLL API and therefore should not be
+ called by the user
+
+ @return
+ */
+static int
+pllTestTBRMove (pllInstance * tr, partitionList * pr, nodeptr branch1,
+                nodeptr branch2)
+{
+  int i;
+  // double b1z[PLL_NUM_BRANCHES], b2z[PLL_NUM_BRANCHES];
+  // int numPartitions = pr->perGeneBranchLengths ? pr->numberOfPartitions : 1;
+  // pllRearrangeInfo rearr;
+
+  // for (i = 0; i < numPartitions; i++)
+  //   {
+  //     b1z[i] = branch1->z[i];
+  //     b2z[i] = branch2->z[i];
+  //   }
+  nodeptr tmpNode = branch1->back;
+  nodeptr pb, qb, freeBranch;
+  // TODO: We can make here two types of insertions in function of tr->thoroughInsertion
+  if (!pllTbrConnectSubtrees (tr, branch1, branch2, &freeBranch, &pb, &qb))
+    {
+      cout << "Can't connect subtrees in test\n";
+      return PLL_FALSE;
+    }
+
+  //pllEvaluateLikelihood (tr, pr, tr->start, PLL_TRUE, PLL_FALSE);
+
+  unsigned int mp = evaluateParsimony(tr, pr, tr->start, PLL_TRUE, PLL_FALSE);
+  nodeptr TBR_removeBranch = NULL;
+  // if (mp != tr->bestParsimony)
+  // {
+    if (branch1->back->next->back == tmpNode)
+      {
+        TBR_removeBranch = branch1->back->next->next;
+      }
+    else
+      {
+        TBR_removeBranch = branch1->back->next;
+      }
+  // }
+  if (mp < tr->bestParsimony)
+  {
+    tr->bestParsimony = mp;
+    cout << "Score: " << mp << '\n';
+    cout << "Update\n";
+    tr->TBR_insertBranch1 = branch1;
+    tr->TBR_insertBranch2 = branch2;
+    tr->TBR_removeBranch = TBR_removeBranch;
+
+  }
+
+  // memcpy (rearr.TBR.zp, rearr.TBR.insertBranch1->z, numPartitions * sizeof(double));
+  // memcpy (rearr.TBR.zpb, rearr.TBR.insertBranch1->back->z, numPartitions * sizeof(double));
+  // memcpy (rearr.TBR.zq, rearr.TBR.insertBranch2->z, numPartitions * sizeof(double));
+  // memcpy (rearr.TBR.zqb, rearr.TBR.insertBranch2->back->z, numPartitions * sizeof(double));
+  // memcpy (rearr.TBR.zr, rearr.TBR.removeBranch->z, numPartitions * sizeof(double));
+
+  // pllStoreRearrangement (bestList, &rearr);
+
+  /* restore */
+  int restoreTopologyOK = pllTbrRemoveBranch (tr, pr, TBR_removeBranch);
+
+  assert(restoreTopologyOK);
+
+  // for (i = 0; i < numPartitions; i++)
+  //   {
+  //     branch1->z[i] = branch1->back->z[i] = b1z[i];
+  //     branch2->z[i] = branch2->back->z[i] = b2z[i];
+  //   }
+
+  return PLL_TRUE;
+}
+
+
+/** @ingroup rearrangementGroup
+ @brief Internal function for recursively traversing a tree and testing a possible subtree insertion
+
+ Recursively traverses the tree rooted at \a q in the direction of \a q->next->back and \a q->next->next->back
+ and at each node tests the placement of the pruned subtree rooted at \a p by calling the function
+ \a pllTestInsertBIG, which in turn saves the computed SPR in \a bestList if a) there is still space in
+ the \a bestList or b) if the likelihood of the SPR is better than any of the ones in \a bestList.
+
+ Tests a TBR move between branches 'p' and 'q'.
+
+ @note This function is not part of the API and should not be called by the user.
+ */
+static void
+pllTraverseUpdateTBR (pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q,
+                      int mintravP, int maxtravP, int mintravQ, int maxtravQ)
+{
+  cout << "Traverse\n";
+  if (mintravP <= 1 && mintravQ <= 1)
+    {
+      cout << "Test now\n";
+      assert((pllTestTBRMove (tr, pr, p, q)));
+    }
+
+  /* traverse q subtree */
+  if ((!isTip (q->number, tr->mxtips)) && (--maxtravQ > 0))
+    {
+      pllTraverseUpdateTBR (tr, pr, p, q->next->back, mintravP, 0, mintravQ - 1,
+                            maxtravQ);
+      pllTraverseUpdateTBR (tr, pr, p, q->next->next->back, mintravP, 0,
+                            mintravQ - 1, maxtravQ);
+    }
+
+  /* last, we traverse the p subtree */
+  if ((!isTip (p->number, tr->mxtips)) && (--maxtravP > 0))
+    {
+      pllTraverseUpdateTBR (tr, pr, p->next->back, q, mintravP - 1, maxtravP,
+                            mintravQ, maxtravQ);
+      pllTraverseUpdateTBR (tr, pr, p->next->next->back, q, mintravP - 1,
+                            maxtravP, mintravQ, maxtravQ);
+    }
+}
+
+
+/** @ingroup rearrangementGroup
+ @brief Compute a list of possible TBR moves
+
+ Iteratively tries all possible TBR moves that can be performed by
+ pruning the branch at \a p and testing all possible placements
+ in a radius of at least \a mintrav nodes and at most \a maxtrav nodes from
+ \a p. Note that \a tr->thoroughInsertion affects the behaviour of the function (see note).
+
+ @param tr
+ PLL instance
+
+ @param pr
+ List of partitions
+
+ @param p
+ Node specifying the pruned branch.
+
+ @param mintrav
+ Minimum distance from \a p where to try inserting the pruned branch
+
+ @param maxtrav
+ Maximum distance from \a p where to try inserting the pruned branch
+
+//  @param[out] bestList
+//  Sorted list of the best rearrangements
+ */
+static int
+pllComputeTBR (pllInstance * tr, partitionList * pr, nodeptr p, int mintrav,
+               int maxtrav)
+{
+
+  // tr->startLH = tr->endLH = tr->likelihood;
+
+  // /* TODO: Add cutoff code */
+
+  // tr->bestOfNode = PLL_UNLIKELY;
+
+  nodeptr p1, p2, q, q1, q2;
+  // double p1z[PLL_NUM_BRANCHES], p2z[PLL_NUM_BRANCHES], q1z[PLL_NUM_BRANCHES],
+  //     q2z[PLL_NUM_BRANCHES], rz[PLL_NUM_BRANCHES];
+  int i, numPartitions;
+
+  q = p->back;
+
+  if (isTip (p->number, tr->mxtips) || isTip (q->number, tr->mxtips))
+    {
+      // errno = PLL_TBR_NOT_INNER_BRANCH;
+      cout << "Why tips?\n";
+      return PLL_FALSE;
+    }
+
+  // numPartitions = pr->perGeneBranchLengths ? pr->numberOfPartitions : 1;
+
+  p1 = p->next->back;
+  p2 = p->next->next->back;
+  q1 = q->next->back;
+  q2 = q->next->next->back;
+
+  // /* save branch lengths before splitting the tree in two components */
+  // for (i = 0; i < numPartitions; ++i)
+  //   {
+  //     p1z[i] = p1->z[i];
+  //     p2z[i] = p2->z[i];
+  //     q1z[i] = q1->z[i];
+  //     q2z[i] = q2->z[i];
+  //     rz[i] = p->z[i];
+  //   }
+
+  if (maxtrav < 1 || mintrav > maxtrav)
+    return PLL_BADREAR;
+  q = p->back;
+
+  if (!isTip (p1->number, tr->mxtips) || !isTip (p2->number, tr->mxtips))
+    {
+
+      /* split the tree in two components */
+      if (!pllTbrRemoveBranch (tr, pr, p))
+        return PLL_BADREAR;
+      cout << "Removed\n";
+      /* p1 and p2 are now connected */
+      assert(p1->back == p2 && p2->back == p1);
+
+      /* recursively traverse and perform TBR */
+      pllTraverseUpdateTBR (tr, pr, p1, q1, mintrav, maxtrav, mintrav, maxtrav);
+      if (!isTip (q2->number, tr->mxtips))
+        {
+          pllTraverseUpdateTBR (tr, pr, q2->next->back, p1, mintrav - 1,
+                                maxtrav - 1, mintrav, maxtrav);
+          pllTraverseUpdateTBR (tr, pr, q2->next->next->back, p1, mintrav - 1,
+                                maxtrav - 1, mintrav, maxtrav);
+        }
+
+      if (!isTip (p2->number, tr->mxtips))
+        {
+          pllTraverseUpdateTBR (tr, pr, p2->next->back, q1, mintrav - 1,
+                                maxtrav - 1, mintrav, maxtrav);
+          pllTraverseUpdateTBR (tr, pr, p2->next->next->back, q1, mintrav - 1,
+                                maxtrav - 1, mintrav, maxtrav);
+          if (!isTip (q2->number, tr->mxtips))
+            {
+              pllTraverseUpdateTBR (tr, pr, p2->next->back, q2->next->back,
+                                    mintrav - 1, maxtrav - 1, mintrav - 1,
+                                    maxtrav - 1);
+              pllTraverseUpdateTBR (tr, pr, p2->next->back,
+                                    q2->next->next->back, mintrav - 1,
+                                    maxtrav - 1, mintrav - 1, maxtrav - 1);
+              pllTraverseUpdateTBR (tr, pr, p2->next->next->back,
+                                    q2->next->back, mintrav - 1, maxtrav - 1,
+                                    mintrav - 1, maxtrav - 1);
+              pllTraverseUpdateTBR (tr, pr, p2->next->next->back,
+                                    q2->next->next->back, mintrav - 1,
+                                    maxtrav - 1, mintrav - 1, maxtrav - 1);
+            }
+        }
+      nodeptr pb, qb, freeBranch;
+      /* restore the topology as it was before the split */
+      int restoreTopoOK = pllTbrConnectSubtrees (tr, p1, q1, &freeBranch, &pb, &qb);
+      assert(restoreTopoOK);
+
+    }
+
+  return PLL_TRUE;
+}
+
+void testSPROnUserTree(Params &params)
+{
+	Alignment alignment(params.aln_file, params.sequence_type, params.intype);
+
+  IQTree * ptree = new IQTree(&alignment);
+  (ptree->params) = &params;
+  ofstream out("spr_test.txt");
+
+	cout << "Read user tree... 1st time";
+  ptree->readTree(params.user_file, params.is_rooted);
+
+	ptree->setAlignment(&alignment); // IMPORTANT: Always call setAlignment() after readTree()
+	optimizeAlignment(ptree, params);
+
+	cout << "Read user tree... 2nd time\n";
+  // ptree->readTree(params.user_file, params.is_rooted);
+
+	// ptree->setAlignment(ptree->aln); // IMPORTANT: Always call setAlignment() after readTree()
+  ptree->initializeAllPartialPars();
+  ptree->clearAllPartialLH();
+	ptree->initializePLL(params);
+	string tree_string = ptree->getTreeString();
+	pllNewickTree *pll_tree = pllNewickParseString(tree_string.c_str());
+	assert(pll_tree != NULL);
+	pllTreeInitTopologyNewick(ptree->pllInst, pll_tree, PLL_FALSE);
+	pllNewickParseDestroy(&pll_tree);
+	_allocateParsimonyDataStructures(ptree->pllInst, ptree->pllPartitions, false);
+	nodeRectifierPars(ptree->pllInst);
+  ptree->pllInst->bestParsimony = UINT_MAX; // Important because of early termination in evaluateSankoffParsimonyIterativeFastSIMD
+	ptree->pllInst->bestParsimony = evaluateParsimony(ptree->pllInst, ptree->pllPartitions, ptree->pllInst->start, PLL_TRUE, false);
+  double epsilon = 1.0 / ptree->getAlnNSite();
+  out << "Tree before 1 SPR looks like: \n";
+  ptree->sortTaxa();
+  ptree->drawTree(out, WT_BR_SCALE, epsilon);
+	out << "Parsimony score: " << ptree->pllInst->bestParsimony << endl;
+  unsigned int curScore = ptree->pllInst->bestParsimony;
+  ptree->pllInst->ntips = ptree->pllInst->mxtips;
+  nodeRectifierPars(ptree->pllInst);
+  ptree->pllInst->removeNode = ptree->pllInst->insertNode = NULL;
+  
+  rearrangeParsimony(ptree->pllInst, ptree->pllPartitions, ptree->pllInst->nodep[7], params.spr_mintrav, params.spr_maxtrav, PLL_FALSE, 0);
+  if (ptree->pllInst->bestParsimony < curScore)
+  {
+    restoreTreeRearrangeParsimony(ptree->pllInst, ptree->pllPartitions, 0);
+  }
+  pllTreeToNewick(ptree->pllInst->tree_string, ptree->pllInst, ptree->pllPartitions, ptree->pllInst->start->back, PLL_TRUE,
+					PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+  string treeString = string(ptree->pllInst->tree_string);
+  ptree->readTreeString(treeString);
+  ptree->initializeAllPartialPars();
+  ptree->clearAllPartialLH();
+  curScore = ptree->computeParsimony();
+  assert(curScore == ptree->pllInst->bestParsimony);
+  out << "Tree after 1 SPR looks like: \n";
+  ptree->sortTaxa();
+  ptree->drawTree(out, WT_BR_SCALE, epsilon);
+	out << "Parsimony score: " << ptree->pllInst->bestParsimony << endl;
+	_pllFreeParsimonyDataStructures(ptree->pllInst, ptree->pllPartitions);
+  cout << "Finished\n";
+	delete ptree;
+}
+
+void testTBROnUserTree(Params &params)
+{
+	Alignment alignment(params.aln_file, params.sequence_type, params.intype);
+
+  IQTree * ptree = new IQTree(&alignment);
+  (ptree->params) = &params;
+  ofstream out("tbr_test.txt");
+
+	cout << "Read user tree... 1st time";
+  ptree->readTree(params.user_file, params.is_rooted);
+
+	ptree->setAlignment(&alignment); // IMPORTANT: Always call setAlignment() after readTree()
+	optimizeAlignment(ptree, params);
+
+	cout << "Read user tree... 2nd time\n";
+  // ptree->readTree(params.user_file, params.is_rooted);
+
+	// ptree->setAlignment(ptree->aln); // IMPORTANT: Always call setAlignment() after readTree()
+  ptree->initializeAllPartialPars();
+  ptree->clearAllPartialLH();
+	ptree->initializePLL(params);
+	string tree_string = ptree->getTreeString();
+	pllNewickTree *pll_tree = pllNewickParseString(tree_string.c_str());
+	assert(pll_tree != NULL);
+	pllTreeInitTopologyNewick(ptree->pllInst, pll_tree, PLL_FALSE);
+	pllNewickParseDestroy(&pll_tree);
+	_allocateParsimonyDataStructures(ptree->pllInst, ptree->pllPartitions, false);
+	nodeRectifierPars(ptree->pllInst);
+  ptree->pllInst->bestParsimony = UINT_MAX; // Important because of early termination in evaluateSankoffParsimonyIterativeFastSIMD
+	ptree->pllInst->bestParsimony = evaluateParsimony(ptree->pllInst, ptree->pllPartitions, ptree->pllInst->start, PLL_TRUE, false);
+  double epsilon = 1.0 / ptree->getAlnNSite();
+  out << "Tree before 1 TBR looks like: \n";
+  ptree->sortTaxa();
+  ptree->drawTree(out, WT_BR_SCALE, epsilon);
+	out << "Parsimony score: " << ptree->pllInst->bestParsimony << endl;
+  unsigned int curScore = ptree->pllInst->bestParsimony;
+  ptree->pllInst->ntips = ptree->pllInst->mxtips;
+  ptree->pllInst->TBR_removeBranch = NULL;
+  ptree->pllInst->TBR_insertBranch1 = NULL;
+  ptree->pllInst->TBR_insertBranch2 = NULL;
+  
+  // TBR
+
+  int ok = pllComputeTBR (ptree->pllInst, ptree->pllPartitions, ptree->pllInst->nodep[23], params.spr_mintrav, params.spr_maxtrav);
+  cout << "OK: " << ok << '\n';
+  cout << ptree->pllInst->bestParsimony << ' ' << curScore << '\n';
+  if (ptree->pllInst->bestParsimony != curScore)
+  {
+    cout << "Found better\n";
+    assert(restoreTreeRearrangeParsimonyTBR(ptree->pllInst, ptree->pllPartitions, 0));
+  }
+  pllTreeToNewick(ptree->pllInst->tree_string, ptree->pllInst, ptree->pllPartitions, ptree->pllInst->start->back, PLL_TRUE,
+					PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+  string treeString = string(ptree->pllInst->tree_string);
+  ptree->readTreeString(treeString);
+  ptree->initializeAllPartialPars();
+  ptree->clearAllPartialLH();
+  curScore = ptree->computeParsimony();
+  // assert(curScore == ptree->pllInst->bestParsimony);
+  out << "Tree after 1 TBR looks like: \n";
+  ptree->sortTaxa();
+  ptree->drawTree(out, WT_BR_SCALE, epsilon);
+	out << "Parsimony score: " << curScore << endl;
+	_pllFreeParsimonyDataStructures(ptree->pllInst, ptree->pllPartitions);
+  cout << "Finished\n";
+	delete ptree;
+}
 /* Diep end */
 
 

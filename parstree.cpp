@@ -400,6 +400,65 @@ void ParsTree::initLeafSiteParsForAmbiguousState(char state, UINT * site_partial
 					return;
 			}
 			break;
+        case 5: // DNA5
+			switch (state) {
+				case 1+4+4:
+					site_partial_pars[aln->convertState('A')] = 0;
+					site_partial_pars[aln->convertState('G')] = 0;
+					return; // A or G, Purine
+				case 2+8+4:
+					site_partial_pars[aln->convertState('C')] = 0;
+					site_partial_pars[aln->convertState('T')] = 0;
+					return; // C or T, Pyrimidine
+				case 1+8+4:
+					site_partial_pars[aln->convertState('A')] = 0;
+					site_partial_pars[aln->convertState('T')] = 0;
+					return; // A or T, Weak
+				case 2+4+4:
+					site_partial_pars[aln->convertState('G')] = 0;
+					site_partial_pars[aln->convertState('C')] = 0;
+					return; // G or C, Strong
+				case 1+2+4:
+					site_partial_pars[aln->convertState('A')] = 0;
+					site_partial_pars[aln->convertState('C')] = 0;
+					return; // A or C, Amino
+				case 4+8+4:
+					site_partial_pars[aln->convertState('G')] = 0;
+					site_partial_pars[aln->convertState('T')] = 0;
+					return; // G or T, Keto
+				case 2+4+8+4:
+					site_partial_pars[aln->convertState('C')] = 0;
+					site_partial_pars[aln->convertState('G')] = 0;
+					site_partial_pars[aln->convertState('T')] = 0;
+					return;// C or G or T
+				case 1+2+8+4:
+					site_partial_pars[aln->convertState('A')] = 0;
+					site_partial_pars[aln->convertState('C')] = 0;
+					site_partial_pars[aln->convertState('T')] = 0;
+					return; // A or C or T
+				case 1+4+8+4:
+					site_partial_pars[aln->convertState('A')] = 0;
+					site_partial_pars[aln->convertState('G')] = 0;
+					site_partial_pars[aln->convertState('T')] = 0;
+					return; // A or G or T
+				case 1+2+4+4:
+					site_partial_pars[aln->convertState('A')] = 0;
+					site_partial_pars[aln->convertState('G')] = 0;
+					site_partial_pars[aln->convertState('C')] = 0;
+					return; // A or G or C
+				case 36:
+					site_partial_pars[aln->convertState('A')] = 0;
+					site_partial_pars[aln->convertState('C')] = 0;
+					site_partial_pars[aln->convertState('G')] = 0;
+					site_partial_pars[aln->convertState('T')] = 0;
+					site_partial_pars[aln->convertState('Z')] = 0;
+					return; // UNKNOWN for DNA
+				default:
+					cout << "nstates = " << nstates << "; state = " << (int) state << endl;
+					outError("Alignment contains invalid state. Please check your data!");
+					return;
+			}
+			break;
         case 20: // Protein
         	if (state == 4+8+19){
         		site_partial_pars[aln->convertState('D')] = 0;

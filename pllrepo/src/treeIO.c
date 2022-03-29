@@ -149,7 +149,7 @@ static char *pllTreeToNewickREC(char *treestr, pllInstance *tr, partitionList *p
       while (*treestr) treestr++;
     }
   else 
-    {                 	 
+    {      
       *treestr++ = '(';
       treestr = pllTreeToNewickREC(treestr, tr, pr, p->next->back, printBranchLengths, printNames, printLikelihood, rellTree,
 			       finalPrint, perGene, branchLabelSupport, printSHSupport);
@@ -224,7 +224,6 @@ char *pllTreeToNewick(char *treestr, pllInstance *tr, partitionList *pr, nodeptr
   if(printSHSupport)
     assert(!branchLabelSupport && !rellTree);
 
- 
   pllTreeToNewickREC(treestr, tr, pr, p, printBranchLengths, printNames, printLikelihood, rellTree,
 		 finalPrint, perGene, branchLabelSupport, printSHSupport);  
     

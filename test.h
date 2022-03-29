@@ -11,7 +11,9 @@
 #include "tools.h"
 
 void test(Params &params);
+void testSPROnUserTree(Params &params);
 void testWeightedParsimony(Params &params);
+void testComputeParsimonyDNA5(Params &params);
 void testTreeConvertTaxaToID(Params &params);
 
 #endif /* SOURCE_DIRECTORY__TEST_H_ */

@@ -243,7 +243,8 @@ extern "C" {
 #define PLL_SECONDARY_DATA_7                    5
 #define PLL_GENERIC_32                          6
 #define PLL_GENERIC_64                          7
-#define PLL_MAX_MODEL                           8
+#define PLL_DNA5_DATA                           8
+#define PLL_MAX_MODEL                           9
 
 #define PLL_SEC_6_A                             0
 #define PLL_SEC_6_B                             1
@@ -1213,6 +1214,12 @@ typedef  struct  {
   double bestOfNode;
   nodeptr removeNode;   /**< the node that has been removed. Together with \a insertNode represents an SPR move */
   nodeptr insertNode;   /**< the node where insertion should take place . Together with \a removeNode represents an SPR move*/
+  
+  // TBR move
+  nodeptr TBR_removeBranch;
+  nodeptr TBR_insertBranch1;  
+  nodeptr TBR_insertBranch2;
+
 
   double zqr[PLL_NUM_BRANCHES];
   double currentZQR[PLL_NUM_BRANCHES];

@@ -437,6 +437,7 @@ void pllInitParsimonyStructures(pllInstance *tr, partitionList *pr, pllBoolean p
 
 static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, pllBoolean perSiteScores)
 {    
+  printf("SEcond\n");
   INT_TYPE
     allOne = SET_ALL_BITS_ONE;
 

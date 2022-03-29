@@ -154,7 +154,7 @@ extern const char binaryStateNames[2];  /**< @brief Alphabet of binary states */
 extern const char dnaStateNames[4];     /**< @brief DNA alphabet  */
 extern const char protStateNames[20];   /**< @brief Amino-acid alphabet */
 extern const unsigned int mask32[32];   /**< @brief Contains the first 32 powers of 2, i.e. 2^0 upto 2^31 */
-
+extern const char dna5StateNames[5];
 static void ascertainmentBiasSequence(unsigned char tip[32], int numStates)
 { 
   assert(numStates <= 32 && numStates > 1);
@@ -3956,6 +3956,9 @@ static char getStateCharacter(int dataType, int state)
     case PLL_AA_DATA:
       result =  protStateNames[state];
       break;    
+    case PLL_DNA5_DATA:
+      result = dna5StateNames[state];
+      break; 
     default:
       assert(0);
     }

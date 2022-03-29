@@ -115,6 +115,26 @@ static const char PLL_MAP_NT[256] =
    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
  };
 
+static const char PLL_MAP_DNA5[256] =
+ {
+   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, -1, -1,
+   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15,
+   -1,  1, 14,  2, 13, -1, -1,  4, 11, -1, -1, 12, -1,  3, 15, 15,
+   -1, -1,  5,  6,  8,  8,  7,  9, 15, 10, 16, -1, -1, -1, -1, -1,
+   -1,  1, 14,  2, 13, -1, -1,  4, 11, -1, -1, 12, -1,  3, 15, 15,
+   -1, -1,  5,  6,  8,  8,  7,  9, 15, 10, -1, -1, -1, -1, -1, -1,
+   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
+ };
+
 static const char PLL_MAP_AA[256] =
  {
    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -2488,6 +2508,7 @@ pllTreeInitTopologyForAlignment (pllInstance * tr, pllAlignmentData * alignmentD
 */
 void pllComputeRandomizedStepwiseAdditionParsimonyTree(pllInstance * tr, partitionList * partitions, int sprDist)
 {
+  printf("ok\n");
   allocateParsimonyDataStructures(tr, partitions);
   pllMakeParsimonyTreeFast(tr, partitions, sprDist);
   pllFreeParsimonyDataStructures(tr, partitions);
@@ -2518,6 +2539,9 @@ void pllBaseSubstitute (pllInstance * tr, partitionList * partitions)
           break;
         case PLL_AA_DATA:
           d = PLL_MAP_AA;
+          break;
+        case PLL_DNA5_DATA:
+          d = PLL_MAP_DNA5;
           break;
         default:
           assert(0);

@@ -16,7 +16,7 @@
  */
 void _pllComputeRandomizedStepwiseAdditionParsimonyTree(pllInstance * tr, partitionList * partitions, int sprDist, IQTree *_iqtree);
 
-void _allocateParsimonyDataStructures(pllInstance *tr, partitionList *pr);
+void _allocateParsimonyDataStructures(pllInstance *tr, partitionList *pr, int perSiteScores);
 void _pllFreeParsimonyDataStructures(pllInstance *tr, partitionList *pr);
 
 /**
@@ -27,6 +27,7 @@ void _pllFreeParsimonyDataStructures(pllInstance *tr, partitionList *pr);
  * @return best parsimony score found
  */
 int pllOptimizeSprParsimony(pllInstance * tr, partitionList * pr, int mintrav, int maxtrav, IQTree *iqtree);
+int pllOptimizeSprParsimony(pllInstance * tr, partitionList * pr, int mintrav, int maxtrav, IQTree *iqtree, bool spr_better);
 
 int pllSaveCurrentTreeSprParsimony(pllInstance * tr, partitionList * pr, int cur_search_pars);
 
@@ -39,14 +40,22 @@ void pllComputeSiteParsimony(pllInstance * tr, partitionList * pr, unsigned shor
 
 int pllCalcMinParsScorePattern(pllInstance *tr, int dataType, int site);
 
+
+/*
+ * TBR operations
+ */
+int pllTbrRemoveBranch (pllInstance * tr, partitionList * pr, nodeptr p);
+static int pllTbrConnectSubtrees(pllInstance * tr, nodeptr p,
+                                 nodeptr q, nodeptr * freeBranch, nodeptr * pb, nodeptr * qb);
 // Diep: for testing site parsimony computed by PLL vs IQTree on the same tree
 // this is called if params.test_site_pars == true
 void testSiteParsimony(Params &params);
+void testSPROnUserTree(Params &params);
+void testTBROnUserTree(Params &params);
 
 void computeUserTreeParsimomy(Params &params);
 void convertNewickToTnt(Params &params);
 void convertNewickToNexus(Params &params);
-
 // util function
 // act as pllAlignmentRemoveDups of PLL but for sorted alignment of IQTREE
 extern void pllSortedAlignmentRemoveDups (pllAlignmentData * alignmentData, partitionList * pl); /* Diep added */

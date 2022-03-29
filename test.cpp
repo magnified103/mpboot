@@ -4,8 +4,8 @@
 #include "parstree.h"
 
 void test(Params &params){
-//	testWeightedParsimony(params);
-	testTreeConvertTaxaToID(params);
+	testComputeParsimonyDNA5(params);
+	// testSPROnUserTree(params);
 }
 
 // -s <alnfile> -test_mode <treefile> -cost <costfile>
@@ -50,6 +50,26 @@ void testWeightedParsimony(Params &params){
 
 //	delete iqtree;
 //	delete iqtree2;
+
+}
+
+// -s <alnfile> -test_mode <treefile> -dna5
+void testComputeParsimonyDNA5(Params &params){
+
+	// read aln
+	cout << "DNA5 test: " << params.dna5 << '\n';
+	Alignment alignment(params.aln_file, params.sequence_type, params.intype, params.dna5);
+	// initialize an ParsTree instance connecting with the alignment
+	IQTree * iqtree = new IQTree(&alignment);
+	(iqtree->params) = &params;
+	// read in a tree from user's file
+	iqtree->readTree(params.user_file, params.is_rooted);
+	iqtree->setAlignment(&alignment); // make BIG difference $$$$$$$$$$$$
+
+	// compute score by Sankoff algorithm
+	cout << "Score = " << iqtree->computeParsimony() << endl;
+	
+	delete iqtree;
 
 }
 

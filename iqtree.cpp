@@ -512,6 +512,8 @@ void IQTree::createPLLPartition(Params &params, ostream &pllPartitionFileHandle)
         	} else {
         		model = "WAG";
         	}
+        } else if (aln->seq_type == SEQ_DNA5) {
+            model = "DNA5";
         } else {
         	model = "WAG";
         	//outError("PLL currently only supports DNA/protein alignments");
@@ -603,11 +605,12 @@ void IQTree::initializePLL(Params &params) {
 
 void IQTree::initializeModel(Params &params) {
 	VerboseMode saved_mode;
+    assert(params.maximum_parsimony != NULL);
 	if(params.maximum_parsimony){
         saved_mode = verbose_mode;
-        verbose_mode = VB_QUIET;
+        assert(verbose_mode != NULL);
+        // verbose_mode = VB_QUIET;
 	}
-
     try {
         if (!getModelFactory()) {
             if (isSuperTree()) {
@@ -900,8 +903,8 @@ double IQTree::computePartialBonus(Node *node, Node* dad) {
         return node_nei->lh_scale_factor;
 
     FOR_NEIGHBOR_IT(node, dad, it){
-    node_nei->lh_scale_factor += computePartialBonus((*it)->node, node);
-}
+        node_nei->lh_scale_factor += computePartialBonus((*it)->node, node);
+    }
     node_nei->partial_lh_computed = 1;
     return node_nei->lh_scale_factor;
 }
@@ -1609,7 +1612,7 @@ double IQTree::doTreeSearch() {
 
 	double cur_correlation = 0.0;
 	int ratchet_iter_count = 0;
-
+    assert(pllInst!=NULL);
 	/*====================================================
 	 * MAIN LOOP OF THE IQ-TREE ALGORITHM
 	 *====================================================*/
@@ -2113,7 +2116,10 @@ string IQTree::doNNISearch(int& nniCount, int& nniSteps) {
 			assert(sprStartTree != NULL);
 			pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
 
-			pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav, max_spr_rad, this);
+            if (params->spr_better == true)
+			    pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav, max_spr_rad, this, true);
+			else
+                pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav, max_spr_rad, this);
 
 			pllNewickParseDestroy(&sprStartTree);
 

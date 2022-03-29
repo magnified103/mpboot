@@ -553,6 +553,10 @@ void get2RandNumb(const int size, int &first, int &second) {
 void parseArg(int argc, char *argv[], Params &params) {
     int cnt;
     verbose_mode = VB_MIN;
+	params.dna5 = false;
+	params.spr_test = false;
+	params.tbr_test = false;
+	params.spr_better = false;
     params.tree_gen = NONE;
     params.user_file = NULL;
     params.out_prefix = NULL;
@@ -839,6 +843,43 @@ void parseArg(int argc, char *argv[], Params &params) {
 
     for (cnt = 1; cnt < argc; cnt++) {
         try {
+			if (strcmp(argv[cnt], "-spr_better") == 0)
+			{
+				params.spr_better = true;
+				continue;
+			}
+			if (strcmp(argv[cnt], "-spr_test") == 0)
+			{
+				cnt++;
+				if (cnt >= argc)
+					throw "Use -spr_test <file.treefile>";
+				params.spr_test = true;
+				params.user_file = argv[cnt];
+				continue;
+			}
+			if (strcmp(argv[cnt], "-tbr_test") == 0)
+			{
+				cnt++;
+				if (cnt >= argc)
+					throw "Use -tbr_test <file.treefile>";
+				params.tbr_test = true;
+				params.user_file = argv[cnt];
+				continue;
+			}
+			if (strcmp(argv[cnt], "-dung") == 0)
+			{
+				cnt++;
+				if (cnt >= argc)
+					throw "Use -dung <file.treefile>";
+				params.compute_parsimony = true;
+				params.user_file = argv[cnt];
+				continue;
+			}
+			if (strcmp(argv[cnt], "-dna5") == 0)
+			{
+				params.dna5 = true;
+				continue;
+			}
 
             if (strcmp(argv[cnt], "-h") == 0 || strcmp(argv[cnt], "--help") == 0) {
 #ifdef IQ_TREE
@@ -2457,8 +2498,8 @@ void parseArg(int argc, char *argv[], Params &params) {
             if(strcmp(argv[cnt], "-test_mode") == 0){
 //            	if(argc != 7)
 //            		throw "These options are to compute weighted parsimony score.\nUse -s [alignment_file] -test_mode [tree_file] -cost fitch/[cost_file]";
-            	if(argc != 5)
-            		throw "These options are to convert newick tree string of taxa to one of id.\nUse -s [alignment_file] -test_mode [tree_file]";
+            	// if(argc != 5)
+            	// 	throw "These options are to convert newick tree string of taxa to one of id.\nUse -s [alignment_file] -test_mode [tree_file]";
 
             	params.test_mode = true;
             	continue;
