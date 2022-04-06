@@ -66,6 +66,7 @@
 //#include <unistd.h>
 #include <stdlib.h>
 #include "sprparsimony.h"
+#include "tbrparsimony.h"
 #include "vectorclass/vectorclass.h"
 
 #ifdef _OPENMP

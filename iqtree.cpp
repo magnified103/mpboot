@@ -28,6 +28,7 @@
 #include "pllrepo/src/pllInternal.h"
 #include "nnisearch.h"
 #include "sprparsimony.h"
+#include "tbrparsimony.h"
 #include "vectorclass/vectorclass.h"
 #include "vectorclass/vectormath_common.h"
 #include "parstree.h"
@@ -2115,8 +2116,11 @@ string IQTree::doNNISearch(int& nniCount, int& nniSteps) {
 			pllNewickTree *sprStartTree = pllNewickParseString(treeString1.c_str());
 			assert(sprStartTree != NULL);
 			pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
-
-            if (params->spr_better == true)
+            if (params->tbr_pars == true)
+            {
+                pllOptimizeTbrParsimony(pllInst, pllPartitions, params->tbr_mintrav, params->tbr_maxtrav, this);
+            }
+            else if (params->spr_better == true)
 			    pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav, max_spr_rad, this, true);
 			else
                 pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav, max_spr_rad, this);

@@ -41,17 +41,10 @@ void pllComputeSiteParsimony(pllInstance * tr, partitionList * pr, unsigned shor
 int pllCalcMinParsScorePattern(pllInstance *tr, int dataType, int site);
 
 
-/*
- * TBR operations
- */
-int pllTbrRemoveBranch (pllInstance * tr, partitionList * pr, nodeptr p);
-static int pllTbrConnectSubtrees(pllInstance * tr, nodeptr p,
-                                 nodeptr q, nodeptr * freeBranch, nodeptr * pb, nodeptr * qb);
 // Diep: for testing site parsimony computed by PLL vs IQTree on the same tree
 // this is called if params.test_site_pars == true
 void testSiteParsimony(Params &params);
 void testSPROnUserTree(Params &params);
-void testTBROnUserTree(Params &params);
 
 void computeUserTreeParsimomy(Params &params);
 void convertNewickToTnt(Params &params);

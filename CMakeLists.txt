@@ -386,6 +386,7 @@ candidateset.cpp
 checkpoint.cpp
 parstree.cpp
 sprparsimony.cpp
+tbrparsimony.cpp
 test.cpp
 )
 

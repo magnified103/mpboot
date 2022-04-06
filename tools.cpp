@@ -556,6 +556,9 @@ void parseArg(int argc, char *argv[], Params &params) {
 	params.dna5 = false;
 	params.spr_test = false;
 	params.tbr_test = false;
+	params.tbr_pars = false;
+	params.tbr_mintrav = 1;
+	params.tbr_maxtrav = 4;
 	params.spr_better = false;
     params.tree_gen = NONE;
     params.user_file = NULL;
@@ -864,6 +867,27 @@ void parseArg(int argc, char *argv[], Params &params) {
 					throw "Use -tbr_test <file.treefile>";
 				params.tbr_test = true;
 				params.user_file = argv[cnt];
+				continue;
+			}
+			if (strcmp(argv[cnt], "-tbr_pars") == 0)
+			{
+				params.tbr_pars = true;
+				continue;
+			}
+			if (strcmp(argv[cnt], "-tbr_mintrav") == 0)
+			{
+				cnt++;
+				if (cnt >= argc)
+					throw "Use -tbr_mintrav <mintrav>";
+				params.tbr_mintrav = convert_int(argv[cnt]);
+				continue;
+			}
+			if (strcmp(argv[cnt], "-tbr_maxtrav") == 0)
+			{
+				cnt++;
+				if (cnt >= argc)
+					throw "Use -tbr_maxtrav <maxtrav>";
+				params.tbr_maxtrav = convert_int(argv[cnt]);
 				continue;
 			}
 			if (strcmp(argv[cnt], "-dung") == 0)

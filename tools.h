@@ -426,6 +426,17 @@ struct Params {
          *  Test TBR once on a user tree 
          */
         bool tbr_test;
+
+        /**
+         *  Optimize the parsimony tree using TBR implemented in PLL
+         */
+        bool tbr_pars;
+
+        /**
+         *  TBR's radius as required by PLL
+         */
+        int tbr_mintrav;
+        int tbr_maxtrav;
         
 
         /**
