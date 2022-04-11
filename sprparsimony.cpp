@@ -3167,15 +3167,18 @@ void _allocateParsimonyDataStructures(pllInstance *tr, partitionList *pr, int pe
 	  }
 
 	  compressDNA(tr, pr, informative, perSiteScores);
-
-	  for(i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 1; i++)
+    // cout << "Allocate parismony data structures\n";
+	  for(i = 1; i <= tr->mxtips + tr->mxtips - 1; i++)
 	    {
 	      nodeptr
 	        p = tr->nodep[i];
-
-	      p->xPars = 1;
-	      p->next->xPars = 0;
-	      p->next->next->xPars = 0;
+          p->recalculate = 0;
+          p->xPars = 1;
+          if (i > tr->mxtips)
+          {
+            p->next->xPars = 0;
+            p->next->next->xPars = 0;
+          }
 	    }
 
 	  tr->ti = (int*)rax_malloc(sizeof(int) * 4 * (size_t)tr->mxtips);
@@ -3511,7 +3514,7 @@ int pllOptimizeSprParsimony(pllInstance * tr, partitionList * pr, int mintrav, i
 	nodeRectifierPars(tr);
 	tr->bestParsimony = UINT_MAX;
 	tr->bestParsimony = evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
-
+  // cout << "STARTING SCORE: " << tr->bestParsimony << '\n';
 	assert(-iqtree->curScore == tr->bestParsimony);
 
 //	cout << "\ttr->bestParsimony (initial tree) = " << tr->bestParsimony << endl;

@@ -14,8 +14,6 @@
  * because the original one seems to have the wrong deallocation function
  */
 
-void _allocateParsimonyDataStructures(pllInstance *tr, partitionList *pr, int perSiteScores);
-void _pllFreeParsimonyDataStructures(pllInstance *tr, partitionList *pr);
 
 /**
  * TBR operations

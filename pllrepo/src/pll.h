@@ -692,9 +692,11 @@ typedef  struct noderec
   double           z[PLL_NUM_BRANCHES];
   struct noderec  *next;        
   struct noderec  *back;       
+  struct noderec  *par;       
   hashNumberType   hash;
   int              support;
-  int              number;    
+  int              number;   
+  pllBoolean       recalculate; 
   char             x;
   char             xPars;
   char             xBips;
@@ -1186,6 +1188,8 @@ typedef  struct  {
   node           **nodep;                /**< pointer to the list of nodes, which describe the current topology */
   nodeptr          nodeBaseAddress;
   node            *start;                /**< starting node by default for full traversals (must be a tip contained in the tree we are operating on) */
+  node            *curRoot;              /** For TBR recompute parsimony */
+  node            *curRootBack;              /** For TBR recompute parsimony */
   int              mxtips;  /**< Number of tips in the topology */
 
   int              *constraintVector;   /**< @todo What is this? */
