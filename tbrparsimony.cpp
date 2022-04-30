@@ -1838,7 +1838,6 @@ static void getRecalculateNodeTBR(nodeptr root, nodeptr root1, nodeptr u, nodept
 
 static unsigned int evaluateParsimonyTBR(pllInstance *tr, partitionList *pr, nodeptr u, nodeptr v, nodeptr w, int perSiteScores)
 {
-  // cout << "evaluateParsimonyTBR\n";
 	volatile unsigned int result;
 	nodeptr p = tr->curRoot;
 	nodeptr q = tr->curRootBack;
@@ -2641,7 +2640,6 @@ pllTestTBRMove (pllInstance * tr, partitionList * pr, nodeptr branch1,
     }
 
   //pllEvaluateLikelihood (tr, pr, tr->start, PLL_TRUE, PLL_FALSE);
-
   nodeptr TBR_removeBranch = NULL;
   // if (mp != tr->bestParsimony)
   // {
@@ -2658,7 +2656,6 @@ pllTestTBRMove (pllInstance * tr, partitionList * pr, nodeptr branch1,
   // unsigned int mp = evaluateParsimony(tr, pr, tr->start, PLL_TRUE, PLL_FALSE);
   // cout << "Here\n";
   unsigned int mp = evaluateParsimonyTBR(tr, pr, branch1, branch2, TBR_removeBranch, PLL_FALSE);
-  // cout << "Root : " << tr->curRoot << '\n';
   tr->curRoot = TBR_removeBranch;
   tr->curRootBack = TBR_removeBranch->back;
   // cout << "SCORE: " << tr->bestParsimony << '\n';
@@ -2685,7 +2682,6 @@ pllTestTBRMove (pllInstance * tr, partitionList * pr, nodeptr branch1,
 
   /* restore */
   int restoreTopologyOK = pllTbrRemoveBranch (tr, pr, TBR_removeBranch);
-  // cout << "Here\n";
 
   assert(restoreTopologyOK);
 
@@ -2718,9 +2714,7 @@ pllTraverseUpdateTBR (pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q, 
   
   if (mintravP <= 1 && mintravQ <= 1)
     {
-      cout << "Test1 now " << '\n';
       assert((pllTestTBRMove (tr, pr, p, q, r)));
-      // cout << "Test now\n";
     }
 
   /* traverse q subtree */
@@ -2857,12 +2851,12 @@ pllComputeTBR (pllInstance * tr, partitionList * pr, nodeptr p, int mintrav,
       nodeptr pb, qb, freeBranch;
       /* restore the topology as it was before the split */
       freeBranch = (p->xPars ? p : q);
-      p1 = (p1->xPars ? p1 : p2);
-      q1 = (q1->xPars ? q1 : q2);
+      p1 = (p1->xPars ? p1 : p1->back);
+      q1 = (q1->xPars ? q1 : q1->back);
       int restoreTopoOK = pllTbrConnectSubtrees (tr, p1, q1, &freeBranch, &pb, &qb);
       evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, PLL_FALSE);
-      // tr->curRoot = freeBranch;
-      // tr->curRootBack = freeBranch->back;
+      tr->curRoot = freeBranch;
+      tr->curRootBack = freeBranch->back;
       assert(restoreTopoOK);
       // newviewParsimony(tr, pr, p, 0);
     }
@@ -2991,8 +2985,8 @@ int pllOptimizeTbrParsimony(pllInstance * tr, partitionList * pr, int mintrav, i
 	randomMP = tr->bestParsimony;
 	tr->ntips = tr->mxtips;
 	
-  nodeRectifierPars(tr);
-  evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
+  // nodeRectifierPars(tr);
+  // evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
   do{
 		startMP = randomMP;
 		for(i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; i++){
