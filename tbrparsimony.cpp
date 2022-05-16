@@ -2718,24 +2718,64 @@ pllTraverseUpdateTBR (pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q, 
     }
 
   /* traverse q subtree */
-  if ((!isTip (q->number, tr->mxtips)) && (--maxtravQ > 0))
+  if ((!isTip (q->number, tr->mxtips)) && (maxtravQ - 1 > 0))
     {
       pllTraverseUpdateTBR (tr, pr, p, q->next->back, r, mintravP, maxtravP, mintravQ - 1,
-                            maxtravQ);
+                            maxtravQ - 1);
       pllTraverseUpdateTBR (tr, pr, p, q->next->next->back, r, mintravP, maxtravP,
-                            mintravQ - 1, maxtravQ);
+                            mintravQ - 1, maxtravQ - 1);
     }
 
   /* last, we traverse the p subtree */
-  if ((!isTip (p->number, tr->mxtips)) && (--maxtravP > 0))
+  if ((!isTip (p->number, tr->mxtips)) && (maxtravP - 1 > 0))
     {
-      pllTraverseUpdateTBR (tr, pr, p->next->back, q, r, mintravP - 1, maxtravP,
+      pllTraverseUpdateTBR (tr, pr, p->next->back, q, r, mintravP - 1, maxtravP - 1,
                             mintravQ, maxtravQ);
       pllTraverseUpdateTBR (tr, pr, p->next->next->back, q, r, mintravP - 1,
-                            maxtravP, mintravQ, maxtravQ);
+                            maxtravP - 1, mintravQ, maxtravQ);
     }
 }
 
+/** @ingroup rearrangementGroup
+ @brief Internal function for recursively traversing a tree and testing a possible subtree insertion
+
+ Recursively traverses the tree rooted at \a q in the direction of \a q->next->back and \a q->next->next->back
+ and at each node tests the placement of the pruned subtree rooted at \a p by calling the function
+ \a pllTestInsertBIG, which in turn saves the computed SPR in \a bestList if a) there is still space in
+ the \a bestList or b) if the likelihood of the SPR is better than any of the ones in \a bestList.
+
+ Tests a TBR move between branches 'p' and 'q'.
+
+ @note This function is not part of the API and should not be called by the user.
+ */
+static void
+pllTraverseUpdateTBRVer2 (pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q, nodeptr * r,
+                      int mintrav, int maxtrav)
+{
+  
+  if (mintrav <= 1)
+    {
+      assert((pllTestTBRMove (tr, pr, p, q, r)));
+    }
+
+  /* traverse q subtree */
+  if ((!isTip (q->number, tr->mxtips)) && (maxtrav - 1 > 0))
+    {
+      pllTraverseUpdateTBRVer2 (tr, pr, p, q->next->back, r, mintrav - 1,
+                            maxtrav - 1);
+      pllTraverseUpdateTBRVer2 (tr, pr, p, q->next->next->back, r, mintrav - 1,
+                            maxtrav - 1);
+    }
+
+  /* last, we traverse the p subtree */
+  if ((!isTip (p->number, tr->mxtips)) && (maxtrav - 1 > 0))
+    {
+      pllTraverseUpdateTBRVer2 (tr, pr, p->next->back, q, r, mintrav - 1,
+                            maxtrav - 1);
+      pllTraverseUpdateTBRVer2 (tr, pr, p->next->next->back, q, r, mintrav - 1,
+                            maxtrav - 1);
+    }
+}
 
 /** @ingroup rearrangementGroup
  @brief Compute a list of possible TBR moves
@@ -2848,6 +2888,130 @@ pllComputeTBR (pllInstance * tr, partitionList * pr, nodeptr p, int mintrav,
                                     maxtrav - 1, mintrav - 1, maxtrav - 1);
             }
         }
+      nodeptr pb, qb, freeBranch;
+      /* restore the topology as it was before the split */
+      freeBranch = (p->xPars ? p : q);
+      p1 = (p1->xPars ? p1 : p1->back);
+      q1 = (q1->xPars ? q1 : q1->back);
+      int restoreTopoOK = pllTbrConnectSubtrees (tr, p1, q1, &freeBranch, &pb, &qb);
+      evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, PLL_FALSE);
+      tr->curRoot = freeBranch;
+      tr->curRootBack = freeBranch->back;
+      assert(restoreTopoOK);
+      // newviewParsimony(tr, pr, p, 0);
+    }
+
+  return PLL_TRUE;
+}
+
+
+/** @ingroup rearrangementGroup
+ @brief Compute a list of possible TBR moves
+
+ Iteratively tries all possible TBR moves that can be performed by
+ pruning the branch at \a p and testing all possible placements
+ in a radius of at least \a mintrav nodes and at most \a maxtrav nodes from
+ \a p. Note that \a tr->thoroughInsertion affects the behaviour of the function (see note).
+
+ @param tr
+ PLL instance
+
+ @param pr
+ List of partitions
+
+ @param p
+ Node specifying the pruned branch.
+
+ @param mintrav
+ Minimum distance from \a p where to try inserting the pruned branch
+
+ @param maxtrav
+ Maximum distance from \a p where to try inserting the pruned branch
+
+//  @param[out] bestList
+//  Sorted list of the best rearrangements
+ */
+static int
+pllComputeTBRVer2 (pllInstance * tr, partitionList * pr, nodeptr p, int mintrav,
+               int maxtrav)
+{
+  // tr->startLH = tr->endLH = tr->likelihood;
+
+  // /* TODO: Add cutoff code */
+
+  // tr->bestOfNode = PLL_UNLIKELY;
+
+  nodeptr p1, p2, q, q1, q2;
+  // double p1z[PLL_NUM_BRANCHES], p2z[PLL_NUM_BRANCHES], q1z[PLL_NUM_BRANCHES],
+  //     q2z[PLL_NUM_BRANCHES], rz[PLL_NUM_BRANCHES];
+  int i, numPartitions;
+
+  q = p->back;
+
+  if (isTip (p->number, tr->mxtips) || isTip (q->number, tr->mxtips))
+    {
+      // errno = PLL_TBR_NOT_INNER_BRANCH;
+      return PLL_FALSE;
+    }
+
+  // numPartitions = pr->perGeneBranchLengths ? pr->numberOfPartitions : 1;
+
+  p1 = p->next->back;
+  p2 = p->next->next->back;
+  q1 = q->next->back;
+  q2 = q->next->next->back;
+
+  // /* save branch lengths before splitting the tree in two components */
+  // for (i = 0; i < numPartitions; ++i)
+  //   {
+  //     p1z[i] = p1->z[i];
+  //     p2z[i] = p2->z[i];
+  //     q1z[i] = q1->z[i];
+  //     q2z[i] = q2->z[i];
+  //     rz[i] = p->z[i];
+  //   }
+
+  if (maxtrav < 1 || mintrav > maxtrav)
+    return PLL_BADREAR;
+  q = p->back;
+
+  if (!isTip (p1->number, tr->mxtips) || !isTip (p2->number, tr->mxtips))
+    {
+
+      /* split the tree in two components */
+      if (!pllTbrRemoveBranch (tr, pr, p))
+        return PLL_BADREAR;
+      /* p1 and p2 are now connected */
+      assert(p1->back == p2 && p2->back == p1);
+
+      /* recursively traverse and perform TBR */
+      pllTraverseUpdateTBRVer2 (tr, pr, p1, q1, &p, mintrav, maxtrav);
+      if (!isTip (q2->number, tr->mxtips))
+      {
+        pllTraverseUpdateTBRVer2 (tr, pr, q2->next->back, p1, &p, mintrav - 1,
+                              maxtrav - 1);
+        pllTraverseUpdateTBRVer2 (tr, pr, q2->next->next->back, p1, &p, mintrav - 1,
+                              maxtrav - 1);
+      }
+
+      if (!isTip (p2->number, tr->mxtips))
+      {
+          pllTraverseUpdateTBRVer2 (tr, pr, p2->next->back, q1, &p, mintrav - 1,
+                                maxtrav - 1);
+          pllTraverseUpdateTBRVer2 (tr, pr, p2->next->next->back, q1, &p, mintrav - 1,
+                                maxtrav - 1);
+          if (!isTip (q2->number, tr->mxtips))
+          {
+            pllTraverseUpdateTBRVer2 (tr, pr, p2->next->back, q2->next->back, &p,
+                                  mintrav - 2, maxtrav - 2);
+            pllTraverseUpdateTBRVer2 (tr, pr, p2->next->back,
+                                  q2->next->next->back, &p, mintrav - 2, maxtrav - 2);
+            pllTraverseUpdateTBRVer2 (tr, pr, p2->next->next->back,
+                                  q2->next->back, &p, mintrav - 2, maxtrav - 2);
+            pllTraverseUpdateTBRVer2 (tr, pr, p2->next->next->back,
+                                  q2->next->next->back, &p, mintrav - 2, maxtrav - 2);
+          }
+      }
       nodeptr pb, qb, freeBranch;
       /* restore the topology as it was before the split */
       freeBranch = (p->xPars ? p : q);
@@ -2996,7 +3160,7 @@ int pllOptimizeTbrParsimony(pllInstance * tr, partitionList * pr, int mintrav, i
 			tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
 			bestTreeScoreHits = 1;
       //assert(tr->nodep[i]->xPars);
-      pllComputeTBR(tr, pr, tr->nodep[i], mintrav, maxtrav);
+      pllComputeTBRVer2(tr, pr, tr->nodep[i], mintrav, maxtrav);
 			if(tr->bestParsimony == randomMP) bestIterationScoreHits++;
 			if(tr->bestParsimony < randomMP) bestIterationScoreHits = 1;
 			if(((tr->bestParsimony < randomMP) ||

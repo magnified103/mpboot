@@ -558,7 +558,7 @@ void parseArg(int argc, char *argv[], Params &params) {
 	params.tbr_test = false;
 	params.tbr_pars = false;
 	params.tbr_mintrav = 1;
-	params.tbr_maxtrav = 4;
+	params.tbr_maxtrav = 6;
 	params.spr_better = false;
     params.tree_gen = NONE;
     params.user_file = NULL;
