@@ -3,6 +3,7 @@
  * NOTE: Use functions the same as in sprparsimony.cpp, so I have to declare it static 
  *       (globally can't have functions or variables with the same name)
  */
+#include <algorithm>
 #include <tbrparsimony.h>
 #include <sprparsimony.h>
 
@@ -366,14 +367,14 @@ static void computeTraversalInfoParsimonyTBR(nodeptr p, int *ti, int *counter, i
 	}
 #endif
   p->recalculate = false;
-	if (!p->xPars)
-		getxnodeLocal(p);
   if (p->number <= maxTips)
     return;
+  if (!p->xPars)
+    getxnodeLocal(p);
   p->next->recalculate = p->next->next->recalculate = false;
-	nodeptr
-		q = p->next->back,
-		r = p->next->next->back;
+  nodeptr
+    q = p->next->back,
+    r = p->next->next->back;
   // cout << "computeTraversal\n";
   q->par = r->par = p;
   if (needRecalculate(q, maxTips))
@@ -2335,62 +2336,47 @@ static void compressDNA(pllInstance *tr, partitionList *pr, int *informative, in
     tr->parsimonyScore[i] = 0;
 }
 
-static void reorderNodes(pllInstance *tr, nodeptr *np, nodeptr p, int *count)
+static void reorderNodes(pllInstance *tr, nodeptr *np, nodeptr p, int *count, bool resetParent = false)
 {
-  int i, found = 0;
-
   if((p->number <= tr->mxtips))
     return;
   else
     {
-      for(i = tr->mxtips + 1; (i <= (tr->mxtips + tr->mxtips - 1)) && (found == 0); i++)
-        {
-          if (p == np[i] || p == np[i]->next || p == np[i]->next->next)
-            {
-              if(p == np[i])
-                tr->nodep[*count + tr->mxtips + 1] = np[i];
-              else
-                {
-                  if(p == np[i]->next)
-                    tr->nodep[*count + tr->mxtips + 1] = np[i]->next;
-                  else
-                    tr->nodep[*count + tr->mxtips + 1] = np[i]->next->next;
-                }
+      tr->nodep[*count + tr->mxtips + 1] = p;
+      *count = *count + 1;
+      
+      if (resetParent)
+        p->next->back->par = p->next->next->back->par = p;
 
-              found = 1;
-              *count = *count + 1;
-            }
-        }
-
-      assert(found != 0);
-      p->next->back->par = p->next->next->back->par = p;
-
-      reorderNodes(tr, np, p->next->back, count);
-      reorderNodes(tr, np, p->next->next->back, count);
+      reorderNodes(tr, np, p->next->back, count, resetParent);
+      reorderNodes(tr, np, p->next->next->back, count, resetParent);
     }
 }
-static void nodeRectifierPars(pllInstance *tr)
+static void nodeRectifierPars(pllInstance *tr, bool reset = false)
 {
   nodeptr *np = (nodeptr *)rax_malloc(2 * tr->mxtips * sizeof(nodeptr));
   int i;
   int count = 0;
   tr->start       = tr->nodep[1];
-  tr->curRoot     = tr->nodep[1];
-  tr->curRootBack = tr->nodep[1]->back;
   tr->rooted      = PLL_FALSE;
-  tr->curRoot->par = NULL;
-  tr->start->back->par = tr->start;
   /* TODO why is tr->rooted set to PLL_FALSE here ?*/
+  if (reset)
+  {
+    tr->curRoot     = tr->nodep[1];
+    tr->curRootBack = tr->nodep[1]->back;
+    tr->curRoot->par = NULL;
+    tr->start->back->par = tr->start;
+  }
 
   for(i = tr->mxtips + 1; i <= (tr->mxtips + tr->mxtips - 1); i++)
     np[i] = tr->nodep[i];
 
-  reorderNodes(tr, np, tr->start->back, &count);
-
+  reorderNodes(tr, np, tr->curRoot, &count, reset);
+  reorderNodes(tr, np, tr->curRoot->back, &count, reset);
 
   rax_free(np);
 }
-
+ 
 static bool restoreTreeRearrangeParsimonyTBR(pllInstance *tr, partitionList *pr, int perSiteScores)
 {
   nodeptr q, r, rb, qb;
@@ -2659,13 +2645,10 @@ pllTestTBRMove (pllInstance * tr, partitionList * pr, nodeptr branch1,
   tr->curRoot = TBR_removeBranch;
   tr->curRootBack = TBR_removeBranch->back;
   // cout << "SCORE: " << tr->bestParsimony << '\n';
-  if ((mp < tr->bestParsimony) || 
-			((mp == tr->bestParsimony) && (random_double() <= 1.0 / bestTreeScoreHits)))
+  if (mp < tr->bestParsimony) bestTreeScoreHits = 1;
+  else if (mp == tr->bestParsimony) bestTreeScoreHits++;
+  if ((mp < tr->bestParsimony) || ((mp == tr->bestParsimony) && (random_double() <= 1.0 / bestTreeScoreHits)))
   {
-    if (mp < 6662)
-    {
-      cout << "Score : " << mp << '\n'; 
-    }
     tr->bestParsimony = mp;
     tr->TBR_insertBranch1 = branch1;
     tr->TBR_insertBranch2 = branch2;
@@ -3028,7 +3011,123 @@ pllComputeTBRVer2 (pllInstance * tr, partitionList * pr, nodeptr p, int mintrav,
   return PLL_TRUE;
 }
 
+static int 
+pllTestTBRMoveLeaf(pllInstance * tr, partitionList * pr, nodeptr insertBranch, nodeptr removeBranch)
+{
+  insertBranch = (insertBranch->xPars ? insertBranch : insertBranch->back);
+  removeBranch = (removeBranch->xPars ? removeBranch : removeBranch->back);
+  nodeptr p = (isTip(removeBranch->number, tr->mxtips) ? removeBranch->back : removeBranch);
+  // Connect 
+  nodeptr i1 = insertBranch;
+  nodeptr i2 = i1->back;
+  hookupDefault(i1, p->next);
+  hookupDefault(i2, p->next->next);
+
+  unsigned int mp = evaluateParsimonyTBR(tr, pr, p->back, insertBranch, p, PLL_FALSE);
+  tr->curRoot = removeBranch;
+  tr->curRootBack = removeBranch->back;
+
+  if (mp < tr->bestParsimony) bestTreeScoreHits = 1;
+  else if (mp == tr->bestParsimony) bestTreeScoreHits++;
+
+  if ((mp < tr->bestParsimony) || ((mp == tr->bestParsimony) && (random_double() <= 1.0 / bestTreeScoreHits)))
+  {
+    tr->bestParsimony = mp;
+    tr->TBR_insertBranch1 = insertBranch;
+    tr->TBR_removeBranch = p;
+  }
+  
+  // Remove
+  hookupDefault(p->next->back, p->next->next->back);
+  p->next->back = p->next->next->back = NULL;
+
+  return PLL_TRUE;
+}
+
+static void
+pllTraverseUpdateTBRLeaf(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr removeBranch, int mintrav, int maxtrav)
+{
+  if (mintrav <= 1)
+  {
+    assert(pllTestTBRMoveLeaf(tr, pr, p, removeBranch));
+  }
+  if (!isTip(p->number, tr->mxtips) && maxtrav - 1 > 0)
+  {
+    pllTraverseUpdateTBRLeaf(tr, pr, p->next->back, removeBranch, mintrav - 1, maxtrav - 1);
+    pllTraverseUpdateTBRLeaf(tr, pr, p->next->next->back, removeBranch, mintrav - 1, maxtrav - 1);
+  }
+}
+
+static int 
+pllComputeTBRLeaf (pllInstance * tr, partitionList * pr, nodeptr p, int mintrav, int maxtrav)
+{
+  nodeptr q = p->back;
+  if (!isTip(q->number, tr->mxtips))
+  {
+    swap(p, q);
+    // q must be leaf
+  }
+
+  if (!isTip(q->number, tr->mxtips))
+  {
+    // Both p and q are not leaves.
+    return PLL_FALSE;
+  }
+  nodeptr p1, p2;
+  p1 = p->next->back;
+  p2 = p->next->next->back;
+
+  // Disconnect edge (p, p1) and (p, p2)
+  // Connect (p1, p2)
+  hookupDefault(p1, p2);
+  p->next->back = p->next->next->back = NULL;
+
+  if (!isTip(p1->number, tr->mxtips))
+  {
+    pllTraverseUpdateTBRLeaf(tr, pr, p1->next->back, p, mintrav - 1, maxtrav - 1);
+    pllTraverseUpdateTBRLeaf(tr, pr, p1->next->next->back, p, mintrav - 1, maxtrav - 1);
+  }
+
+  if (!isTip(p2->number, tr->mxtips))
+  {
+    pllTraverseUpdateTBRLeaf(tr, pr, p2->next->back, p, mintrav - 1, maxtrav - 1);
+    pllTraverseUpdateTBRLeaf(tr, pr, p2->next->next->back, p, mintrav - 1, maxtrav - 1);
+  }
+
+  // Connect p to p1 and p2 again
+  hookupDefault(p->next, p1);
+  hookupDefault(p->next->next, p2);
+  p1 = (p1->xPars ? p1 : p2);
+  evaluateParsimonyTBR(tr, pr, q, p1, q, PLL_FALSE);
+  tr->curRoot = q;
+  tr->curRootBack = q->back;
+
+  return PLL_TRUE;
+}
+
+static bool restoreTreeRearrangeParsimonyTBRLeaf(pllInstance *tr, partitionList *pr, int perSiteScores)
+{
+  
+  hookupDefault(tr->TBR_removeBranch->next->back, tr->TBR_removeBranch->next->next->back);
+  
+  nodeptr r = tr->TBR_insertBranch1;
+  nodeptr rb = r->back;
+
+  hookupDefault(r, tr->TBR_removeBranch->next);
+  hookupDefault(rb, tr->TBR_removeBranch->next->next);
+  evaluateParsimonyTBR(tr, pr, tr->TBR_removeBranch->back, r, tr->TBR_removeBranch, PLL_FALSE);
+
+  return PLL_TRUE;
+}
+
+
+
+
 void testTBROnUserTree(Params &params)
+{
+  
+}
+/*
 {
 	Alignment alignment(params.aln_file, params.sequence_type, params.intype);
 
@@ -3095,7 +3194,7 @@ void testTBROnUserTree(Params &params)
   cout << "Finished\n";
   delete ptree;
 }
-
+*/
 
 int pllOptimizeTbrParsimony(pllInstance * tr, partitionList * pr, int mintrav, int maxtrav, IQTree *_iqtree){
   int perSiteScores = globalParam->gbo_replicates > 0;
@@ -3128,7 +3227,7 @@ int pllOptimizeTbrParsimony(pllInstance * tr, partitionList * pr, int mintrav, i
 
 	assert(!tr->constrained);
 
-	nodeRectifierPars(tr);
+	nodeRectifierPars(tr, true);
 	tr->bestParsimony = UINT_MAX;
 	tr->bestParsimony = evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
 
@@ -3151,27 +3250,44 @@ int pllOptimizeTbrParsimony(pllInstance * tr, partitionList * pr, int mintrav, i
 	
   // nodeRectifierPars(tr);
   // evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
-  do{
-		startMP = randomMP;
-		for(i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; i++){
+  do
+  {
+    nodeRectifierPars(tr, false);	
+    startMP = randomMP;
+    for (i = 1; i <= tr->mxtips; i++)
+    {
+      tr->TBR_removeBranch = tr->TBR_insertBranch1 = NULL;
+      bestTreeScoreHits = 1;
+      pllComputeTBRLeaf(tr, pr, tr->nodep[i]->back, mintrav, maxtrav);
+      if (tr->bestParsimony == randomMP) bestIterationScoreHits++;
+      if (tr->bestParsimony < randomMP) bestIterationScoreHits = 1;
+      if (((tr->bestParsimony < randomMP) || ((tr->bestParsimony == randomMP) &&	(random_double() <= 1.0 / bestIterationScoreHits))) && tr->TBR_removeBranch && tr->TBR_insertBranch1) 
+      {
+        restoreTreeRearrangeParsimonyTBRLeaf(tr, pr, perSiteScores);
+        randomMP = tr->bestParsimony;
+      }
+    }
+
+    for (i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; i++)
+    {
 //		for(j = 1; j <= tr->mxtips + tr->mxtips - 2; j++){
 //			i = perm[j];
-			tr->TBR_removeBranch = NULL;
-			tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
-			bestTreeScoreHits = 1;
+      tr->TBR_removeBranch = NULL;
+      tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
+      bestTreeScoreHits = 1;
       //assert(tr->nodep[i]->xPars);
       pllComputeTBRVer2(tr, pr, tr->nodep[i], mintrav, maxtrav);
-			if(tr->bestParsimony == randomMP) bestIterationScoreHits++;
-			if(tr->bestParsimony < randomMP) bestIterationScoreHits = 1;
-			if(((tr->bestParsimony < randomMP) ||
-					((tr->bestParsimony == randomMP) &&
+      if(tr->bestParsimony == randomMP) bestIterationScoreHits++;
+      if(tr->bestParsimony < randomMP) bestIterationScoreHits = 1;
+      if(((tr->bestParsimony < randomMP) || ((tr->bestParsimony == randomMP) &&
 						(random_double() <= 1.0 / bestIterationScoreHits))) &&
-					tr->TBR_removeBranch && tr->TBR_insertBranch1 && tr->TBR_insertBranch2){
+					tr->TBR_removeBranch && tr->TBR_insertBranch1 && tr->TBR_insertBranch2)
+      {
 				restoreTreeRearrangeParsimonyTBR(tr, pr, perSiteScores);
 				randomMP = tr->bestParsimony;
-			}
-		}
-	}while(randomMP < startMP);
+      }
+    }
+  } while (randomMP < startMP);
 
-	return startMP;
+  return startMP;
 }

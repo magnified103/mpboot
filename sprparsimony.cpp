@@ -2290,6 +2290,7 @@ static int rearrangeParsimony(pllInstance *tr, partitionList *pr, nodeptr p, int
 
   if(tr->constrained)
     {
+      cout << "Constrained\n";
       if(! tipHomogeneityCheckerPars(tr, p->back, 0))
         doP = PLL_FALSE;
 
