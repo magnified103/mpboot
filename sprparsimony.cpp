@@ -295,7 +295,7 @@ void addPerSiteSubtreeScores(partitionList *pr, int pNumber, int qNumber,
   //		rBuf =
   //&(pr->partitionData[i]->perSitePartialPars[partialParsLength
   //* rNumber]); 		for(int k = 0; k < partialParsLength; k++)
-  //pBuf[k] += qBuf[k] + rBuf[k];
+  // pBuf[k] += qBuf[k] + rBuf[k];
   //	}
 
 #ifdef __AVX
@@ -2961,7 +2961,7 @@ void _allocateParsimonyDataStructures(pllInstance *tr, partitionList *pr,
 
   compressDNA(tr, pr, informative, perSiteScores);
   // cout << "Allocate parismony data structures\n";
-  for (i = 1; i <= tr->mxtips + tr->mxtips - 1; i++) {
+  for (i = 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
     nodeptr p = tr->nodep[i];
     p->recalculate = 0;
     p->xPars = 1;
@@ -3275,11 +3275,11 @@ int pllOptimizeSprParsimony(pllInstance *tr, partitionList *pr, int mintrav,
   //&& (!globalParam->hclimb1_nni)) || (!iqtree)){ 		iqtree =
   //_iqtree;
   //		// consider updating tr->yVector, then tr->aliaswgt (similar as
-  //in pllLoadAlignment) 		if((globalParam->ratchet_iter >= 0  ||
+  // in pllLoadAlignment) 		if((globalParam->ratchet_iter >= 0  ||
   // globalParam->optimize_boot_trees) && (!globalParam->hclimb1_nni))
   //			_updateInternalPllOnRatchet(tr, pr);
   //		_allocateParsimonyDataStructures(tr, pr, perSiteScores); //
-  //called once if not running ratchet
+  // called once if not running ratchet
   //	}
 
   int i;
@@ -3373,11 +3373,11 @@ int pllOptimizeSprParsimony(pllInstance *tr, partitionList *pr, int mintrav,
   //&& (!globalParam->hclimb1_nni)) || (!iqtree)){ 		iqtree =
   //_iqtree;
   //		// consider updating tr->yVector, then tr->aliaswgt (similar as
-  //in pllLoadAlignment) 		if((globalParam->ratchet_iter >= 0  ||
+  // in pllLoadAlignment) 		if((globalParam->ratchet_iter >= 0  ||
   // globalParam->optimize_boot_trees) && (!globalParam->hclimb1_nni))
   //			_updateInternalPllOnRatchet(tr, pr);
   //		_allocateParsimonyDataStructures(tr, pr, perSiteScores); //
-  //called once if not running ratchet
+  // called once if not running ratchet
   //	}
 
   int i;
@@ -3638,8 +3638,9 @@ void testSiteParsimony(Params &params) {
   //	} else if (alignment.seq_type == SEQ_PROTEIN) {
   //		if (params.model_name != "" && params.model_name.substr(0, 4) !=
   //"TEST") 			model = params.model_name.substr(0,
-  // params.model_name.find_first_of("+{")); 		else 			model = "WAG";
-  // } else { 		outError("PLL only works with DNA/protein alignments");
+  // params.model_name.find_first_of("+{")); 		else 			model =
+  // "WAG"; } else { 		outError("PLL only works with DNA/protein
+  // alignments");
   //	}
   //	pllPartitionFileHandle << model << ", p1 = " << "1-" <<
   // iqtree->getAlnNSite() << endl;
@@ -3701,17 +3702,17 @@ void testSiteParsimony(Params &params) {
   //	cout << "************** PARSIMONY SCORES BY PLL
   //**************************" << endl; 	printf ("Tree score: %d\n",
   // pllEvaluateParsimony(iqtree->pllInst, iqtree->pllPartitions,
-  // iqtree->pllInst->start->back, PLL_TRUE, PLL_TRUE)); 	int sum_test = 0;
-  // int zero_count = 0; 	for (i = 0; i <
+  // iqtree->pllInst->start->back, PLL_TRUE, PLL_TRUE)); 	int sum_test =
+  // 0; int zero_count = 0; 	for (i = 0; i <
   // iqtree->pllPartitions->numberOfPartitions;
   //++i)
   //	{
   //		cout << "parsimonyLength of partition " << i << " is " <<
-  // iqtree->pllPartitions->partitionData[i]->parsimonyLength << endl; 		for
-  // (j = 0; j < iqtree->pllPartitions->partitionData[i]->parsimonyLength *
+  // iqtree->pllPartitions->partitionData[i]->parsimonyLength << endl;
+  // for (j = 0; j < iqtree->pllPartitions->partitionData[i]->parsimonyLength *
   // PLL_PCF;
   //++j){ 			cout <<
-  //iqtree->pllPartitions->partitionData[i]->perSiteParsScores[j]
+  // iqtree->pllPartitions->partitionData[i]->perSiteParsScores[j]
   //<< " "; 			sum_test +=
   // iqtree->pllPartitions->partitionData[i]->perSiteParsScores[j];
   //			if(iqtree->pllPartitions->partitionData[i]->perSiteParsScores[j]
