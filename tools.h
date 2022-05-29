@@ -431,6 +431,11 @@ struct Params {
   bool spr_test;
 
   /**
+   * Init candidate trees with TBR instead of SPR
+   */
+  bool tbr_init;
+
+  /**
    * Draw tree max 10 times, before and after a TBR Move
    */
   bool tbr_test_draw;

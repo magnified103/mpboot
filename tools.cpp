@@ -570,11 +570,12 @@ void parseArg(int argc, char *argv[], Params &params) {
   verbose_mode = VB_MIN;
   params.dna5 = false;
   params.spr_test = false;
+  params.tbr_init = false;
   params.tbr_test_draw = false;
   params.tbr_test = false;
   params.tbr_pars = false;
   params.tbr_mintrav = 1;
-  params.tbr_maxtrav = 6;
+  params.tbr_maxtrav = 5;
   params.spr_better = false;
   params.tree_gen = NONE;
   params.user_file = NULL;
@@ -874,6 +875,10 @@ void parseArg(int argc, char *argv[], Params &params) {
           throw "Use -spr_test <file.treefile>";
         params.spr_test = true;
         params.user_file = argv[cnt];
+        continue;
+      }
+      if (strcmp(argv[cnt], "-tbr_init") == 0) {
+        params.tbr_init = true;
         continue;
       }
       if (strcmp(argv[cnt], "-tbr_test_draw") == 0) {

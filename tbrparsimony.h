@@ -32,6 +32,11 @@ static int pllTbrConnectSubtrees(pllInstance * tr, nodeptr p,
  */
 int pllOptimizeTbrParsimony(pllInstance * tr, partitionList * pr, int mintrav, int maxtrav, IQTree *iqtree);
 
+
+void pllComputeRandomizedStepwiseAdditionParsimonyTreeTBR(
+    pllInstance *tr, partitionList *partitions, int tbr_mintrav,
+    int tbr_maxtrav, IQTree *_iqtree);
+
 void testTBROnUserTree(Params &params);
 
 #endif /* TBRPARSIMONY_H_ */

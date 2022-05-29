@@ -3016,7 +3016,6 @@ void _pllFreeParsimonyDataStructures(pllInstance *tr, partitionList *pr) {
     }
   }
 }
-
 static void _pllMakeParsimonyTreeFast(pllInstance *tr, partitionList *pr,
                                       int sprDist) {
   nodeptr p, f;
@@ -3243,7 +3242,6 @@ void _pllComputeRandomizedStepwiseAdditionParsimonyTree(
   doing_stepwise_addition = false;
   //	cout << "Done free..." << endl;
 }
-
 /**
  * DTH: optimize whatever tree is stored in tr by parsimony SPR
  * @param tr: the tree instance :)
@@ -3638,9 +3636,9 @@ void testSiteParsimony(Params &params) {
   //	} else if (alignment.seq_type == SEQ_PROTEIN) {
   //		if (params.model_name != "" && params.model_name.substr(0, 4) !=
   //"TEST") 			model = params.model_name.substr(0,
-  // params.model_name.find_first_of("+{")); 		else 			model =
-  // "WAG"; } else { 		outError("PLL only works with DNA/protein
-  // alignments");
+  // params.model_name.find_first_of("+{")); 		else
+  // model = "WAG"; } else { 		outError("PLL only works with
+  // DNA/protein alignments");
   //	}
   //	pllPartitionFileHandle << model << ", p1 = " << "1-" <<
   // iqtree->getAlnNSite() << endl;
