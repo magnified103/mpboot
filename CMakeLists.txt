@@ -52,6 +52,22 @@ endif()
 
 include_directories("${PROJECT_SOURCE_DIR}")
 
+# Check if __ARM_NEON is defined
+set (__ARM_NEON "FALSE")
+set (NEON 0)
+if (APPLE)
+	execute_process(
+      COMMAND uname -m
+      RESULT_VARIABLE result
+      OUTPUT_VARIABLE OSX_NATIVE_ARCHITECTURE
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+	)
+	if(OSX_NATIVE_ARCHITECTURE STREQUAL "arm64")
+		message("APPLE SILICON (M1) DETECTED!")
+		set (__ARM_NEON "TRUE")
+		set (NEON 1)
+	endif()
+endif()
 
 ##################################################################
 # Detect target platforms
@@ -64,9 +80,22 @@ if (WIN32)
     add_definitions(-DWIN32)
 elseif (APPLE) 
 	message("Target OS     : Mac OS X")
-	# to be compatible back to Mac OS X 10.6
-	add_definitions("-mmacosx-version-min=10.6") 
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -mmacosx-version-min=10.6")
+	execute_process(
+      COMMAND uname -m
+      RESULT_VARIABLE result
+      OUTPUT_VARIABLE OSX_NATIVE_ARCHITECTURE
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+	)
+	if(OSX_NATIVE_ARCHITECTURE STREQUAL "arm64")
+		message("Target arch   : arm64")
+		add_definitions("--target=arm64-apple-macos")		# MacOS version?
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --target=arm64-apple-macos")
+	else()
+		message("Target arch   : x86_64")
+		# to be compatible back to Mac OS X 10.6
+		add_definitions("-mmacosx-version-min=10.6") 
+		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -mmacosx-version-min=10.6")
+	endif()
     SET(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
 elseif (UNIX) 
 	message("Target OS     : Unix")
@@ -83,13 +112,9 @@ endif()
 # Setup compiler, currently supported GCC, CLANG, MSVC, and ICC
 ##################################################################
 
-if (MSVC) 
-	# MS Visual Studio environment
-	message("Exporting MS Visual Studio projects...")
-	add_definitions(/MP) # enable multi-processor compilation
-	if (CMAKE_BUILD_TYPE STREQUAL "Release")
-		add_definitions(/O2 /Ot /Oi)
-	endif()
+# disable AVX for NEON
+if (__ARM_NEON)
+    set(IQTREE_FLAGS "${IQTREE_FLAGS} novx")
 endif()
 
 set(GCC "FALSE")   #  GNU compiler
@@ -97,29 +122,74 @@ set(CLANG "FALSE") # Clang compiler
 set(ICC "FALSE")   # Intel compiler
 set(VCC "FALSE")   # MS Visual C Compiler, note that it is different from MSVC variable
 
-if (CMAKE_COMPILER_IS_GNUCXX) 	
-	message("Compiler      : GNU Compiler (gcc)")
-	set(GCC "TRUE")
-#	set(COMBINED_FLAGS "-Wall -Wno-unused-function -Wno-sign-compare -pedantic -D_GNU_SOURCE -fms-extensions -Wno-deprecated")
-#	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++98")
-	set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g0")
-	set(CMAKE_C_FLAGS_RELEASE "-O3 -g0")
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-	message("Compiler      : Clang")
-	set(CLANG "TRUE")
-#	set(COMBINED_FLAGS "-Wall -Wno-unused-function -Wno-sign-compare -pedantic -D_GNU_SOURCE -Wno-nested-anon-types")
-	set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-	set(CMAKE_C_FLAGS_RELEASE "-O3")	
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-	set(VCC "TRUE")
-	message("Compiler      : MS Visual C++ Compiler")
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-	message("Compiler      : Intel C++ Compiler (icc)")
-	set(ICC "TRUE")
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /Qstd=c99")
+if (CMAKE_CXX_COMPILER MATCHES "VISUAL STUDIO")
+    set(CLANG_UNDER_VS "TRUE")
+    #it won't recognize the -std=c++11 parameter.
+    #Todo: don't hard-code this; figure out some way it can be passed in (though ideally, not the whole shebang).
+    include_directories("C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Tools\\Llvm\\lib\\clang\\10.0.0\\include")
+elseif(CMAKE_CXX_COMPILER MATCHES "MS Visual")
+    #Don't set -std=c++11'
+    set(VCC "TRUE")
+elseif(CMAKE_CXX_COMPILER MATCHES "Microsoft Visual")
+    set(VCC "TRUE")
 else()
-	message("Compiler      : Unknown and untested yet")
+    message("Compiler Literal: ${CMAKE_CXX_COMPILER} ")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
+
+if (CMAKE_COMPILER_IS_GNUCXX)
+    message("Compiler      : GNU Compiler (gcc)")
+    set(GCC "TRUE")
+#    set(COMBINED_FLAGS "-Wall -Wno-unused-function -Wno-sign-compare -pedantic -D_GNU_SOURCE -fms-extensions -Wno-deprecated")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O2 -g -ffunction-sections -fdata-sections")
+    set(CMAKE_C_FLAGS_RELEASE "-O2 -g -ffunction-sections -fdata-sections")
+    if (APPLE)
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,-dead_strip")
+    else()
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,--gc-sections")
+    endif()
+    # require at least gcc ${GCC_MIN_VERSION}
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS GCC_MIN_VERSION)
+        message(FATAL_ERROR "GCC version must be at least ${GCC_MIN_VERSION}!")
+    endif()
+    if (WIN32)
+        # disable AVX on Windows due to memory alignment
+        set(IQTREE_FLAGS "${IQTREE_FLAGS} novx")
+        message("WARNING: AVX is disabled on Windows as GCC does not properly suport memory alignment")
+    endif()
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message("Compiler      : Clang")
+    set(CLANG "TRUE")
+#    set(COMBINED_FLAGS "-Wall -Wno-unused-function -Wno-sign-compare -pedantic -D_GNU_SOURCE -Wno-nested-anon-types")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffunction-sections -fdata-sections")
+    set(CMAKE_C_FLAGS_RELEASE "-O3 -ffunction-sections -fdata-sections")
+    if (APPLE)
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,-dead_strip")
+    else()
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,--gc-sections")
+    endif()
+
+    # use libc++ per default in MacOS
+    if (APPLE)
+        SET(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+    endif()
+
+    #remove -rdynamic for Clang under Linux
+    if (UNIX AND IQTREE_FLAGS MATCHES "static")
+        SET(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS)
+    endif()
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    set(VCC "TRUE")
+    message("Compiler      : MS Visual C++ Compiler")
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+    message("Compiler      : Intel C++ Compiler (icc)")
+    set(ICC "TRUE")
+    #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /Qstd=c99")
+else()
+    message("Compiler      : Unknown and untested yet")
+endif()
+message("Compiler version: ${CMAKE_CXX_COMPILER_VERSION}")
 
 set(EXE_SUFFIX "")
 
@@ -129,6 +199,10 @@ set(EXE_SUFFIX "")
 if (IQTREE_FLAGS MATCHES "pll")
 	add_definitions(-DUSING_PLL)
 	set(EXE_SUFFIX "${EXE_SUFFIX}-pll")
+endif()
+
+if(IQTREE_FLAGS MATCHES "novx")
+    add_definitions(-D__NOAVX__)
 endif()
 
 ##################################################################
@@ -182,89 +256,120 @@ endif()
 ##################################################################
 # configure SSE/AVX/FMA instructions
 ##################################################################
-if (IQTREE_FLAGS MATCHES "fma") # AVX+FMA instruction set
- 	message("Vectorization : AVX+FMA")
-	add_definitions(-D__SSE3 -D__AVX) # define both SSE3 and AVX directive
-	if (VCC)
-		# Visual C++ has no /mfma flag!, FMA is only included in AVX2 
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} /arch:AVX2")
-	elseif (CLANG)
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} -mavx -mfma")
-	elseif (GCC)
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} -mavx -fabi-version=0 -mfma")
-	elseif (ICC) 
-		if (WIN32)
-			 set(COMBINED_FLAGS "${COMBINED_FLAGS} /arch:AVX /Qfma")
-		else()
-			 set(COMBINED_FLAGS "${COMBINED_FLAGS} -mavx -mfma")
-		endif()
-	endif()
-	SET(EXE_SUFFIX "${EXE_SUFFIX}-fma")
 
-elseif (IQTREE_FLAGS MATCHES "avx2") # AVX instruction set
- 	message("Vectorization : AVX2")
-	add_definitions(-D__SSE3 -D__AVX) # define both SSE3 and AVX directive
-	if (VCC) 
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} /arch:AVX2")
-	elseif (CLANG)
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} -mavx2 -mfma")
-	elseif (GCC)
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} -mavx2 -fabi-version=0 -mfma")
-	elseif (ICC) 
-		if (WIN32)
-			 set(COMBINED_FLAGS "${COMBINED_FLAGS} /arch:AVX2 /Qfma")
-		else()
-			 set(COMBINED_FLAGS "${COMBINED_FLAGS} -mavx2 -mfma")
-		endif()
-	endif()
-	SET(EXE_SUFFIX "${EXE_SUFFIX}-avx2")
+SET(AVX_FLAGS "-D__SSE3 -D__AVX")
+if (VCC)
+    set(AVX_FLAGS "${AVX_FLAGS} /arch:AVX")
+elseif (CLANG)
+    if (__ARM_NEON)
+        set(AVX_FLAGS "${AVX_FLAGS} -march=armv8-a+fp+simd+crypto+crc")
+    else()
+        set(AVX_FLAGS "${AVX_FLAGS} -mavx")
+    endif()
+elseif (GCC)
+    if (__ARM_NEON)
+        set(AVX_FLAGS "${AVX_FLAGS} -march=armv8-a+fp+simd+crypto+crc") #-mavx -fabi-version=0")
+    else()
+        set(AVX_FLAGS "${AVX_FLAGS} -mavx -fabi-version=0")
+    endif()
+elseif (ICC)
+    if (WIN32)
+         set(AVX_FLAGS "${AVX_FLAGS} /arch:avx")
+    else()
+         set(AVX_FLAGS "${AVX_FLAGS} -mavx")
+    endif()
+endif()
+
+SET(SSE_FLAGS "-D__SSE3")
+if (VCC)
+    if (BINARY32)
+        set(SSE_FLAGS "${SSE_FLAGS} /arch:SSE2 -D__SSE3__")
+    else()
+        #For 64-bit compiler, passing /arch:SSE2 just results in warning
+        #messages.  It doesn't have any other effect.
+        set(SSE_FLAGS "${SSE_FLAGS} -D__SSE3__")
+    endif()
+elseif (GCC OR CLANG)
+    if (__ARM_NEON)
+        set(SSE_FLAGS "-march=armv8-a+fp+simd+crypto+crc")  # changed from -msse3
+    else()
+        set(SSE_FLAGS "${SSE_FLAGS} -msse3")
+    endif()
+elseif (ICC)
+    if (WIN32)
+        set(SSE_FLAGS "${SSE_FLAGS} /arch:sse3")
+    else()
+        set(SSE_FLAGS "${SSE_FLAGS} -msse3")
+    endif()
+endif()
+
+SET(FMA_FLAGS "-D__SSE3 -D__AVX")
+if (VCC)
+    set(FMA_FLAGS "${FMA_FLAGS} /arch:AVX2")
+elseif (CLANG)
+    if (__ARM_NEON)
+        set(FMA_FLAGS "${FMA_FLAGS} -march=armv8-a+fp+simd+crypto+crc") #-mavx -mfma")
+    else()
+        set(FMA_FLAGS "${FMA_FLAGS} -mavx -mfma")
+    endif()
+elseif (GCC)
+    if (__ARM_NEON)
+        set(FMA_FLAGS "-march=armv8-a+fp+simd+crypto+crc") #-mavx -fabi-version=0 -mfma")
+    else()
+        set(FMA_FLAGS "${FMA_FLAGS} -mavx -fabi-version=0 -mfma")
+    endif()
+elseif (ICC)
+    if (WIN32)
+         set(FMA_FLAGS "${FMA_FLAGS} /arch:core-avx2")
+    else()
+         set(FMA_FLAGS "${FMA_FLAGS} -march=core-avx2")
+    endif()
+endif()
+
+SET(AVX512_FLAGS "-D__SSE3 -D__AVX")
+if (VCC)
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 16.3)
+        message("AVX512 not available in Visual C++ in versions earlier than 16.3")
+    else()    
+        set(AVX512_FLAGS "${AVX512_FLAGS} /arch:AVX512")
+    endif()
+elseif (CLANG)
+    set(AVX512_FLAGS "${AVX512_FLAGS} -mavx512f -mfma")
+elseif (GCC)
+    set(AVX512_FLAGS "${AVX512_FLAGS} -mavx512f -mfma")
+elseif (ICC)
+    if (WIN32)
+         set(AVX512_FLAGS "${AVX512_FLAGS} /QxMIC-AVX512")
+    else()
+         set(AVX512_FLAGS "${AVX512_FLAGS} -xMIC-AVX512")
+    endif()
+endif()
+
+# further flag to improve performance
+
+if (IQTREE_FLAGS MATCHES "fma") # AVX+FMA instruction set
+    message("Vectorization : AVX+FMA")
+    add_definitions(-D__SSE3 -D__AVX) # define both SSE3 and AVX directive
+    set(COMBINED_FLAGS "${COMBINED_FLAGS} ${FMA_FLAGS}")
+    #SET(EXE_SUFFIX "${EXE_SUFFIX}-fma")
 elseif (IQTREE_FLAGS MATCHES "avx") # AVX instruction set
- 	message("Vectorization : AVX")
-	add_definitions(-D__SSE3 -D__AVX) # define both SSE3 and AVX directive
-	if (VCC) 
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} /arch:AVX")
-	elseif (CLANG)
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} -mavx")
-	elseif (GCC)
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} -mavx -fabi-version=0")
-	elseif (ICC) 
-		if (WIN32)
-			 set(COMBINED_FLAGS "${COMBINED_FLAGS} /arch:AVX")
-		else()
-			 set(COMBINED_FLAGS "${COMBINED_FLAGS} -mavx")
-		endif()
-	endif()
-	SET(EXE_SUFFIX "${EXE_SUFFIX}-avx")
-elseif (IQTREE_FLAGS MATCHES "sse4") #SSE intruction set
-	message("Vectorization : SSE4.1")
-	add_definitions(-D__SSE3)
-	
-	if (VCC)
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} /arch:SSE4.1 -D__SSE4.1__")
-	elseif (GCC OR CLANG)
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} -msse4.1")
-	elseif (ICC)
-		if (WIN32)
-			set(COMBINED_FLAGS "${COMBINED_FLAGS} /arch:SSE4.1")
-		else()
-			set(COMBINED_FLAGS "${COMBINED_FLAGS} -msse4.1")
-		endif()
-	endif()
-elseif (IQTREE_FLAGS MATCHES "sse") #SSE intruction set
-	message("Vectorization : SSE3")
-	add_definitions(-D__SSE3)
-	
-	if (VCC)
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} /arch:SSE2 -D__SSE3__")
-	elseif (GCC OR CLANG)
-		set(COMBINED_FLAGS "${COMBINED_FLAGS} -msse3")
-	elseif (ICC)
-		if (WIN32)
-			set(COMBINED_FLAGS "${COMBINED_FLAGS} /arch:SSE3")
-		else()
-			set(COMBINED_FLAGS "${COMBINED_FLAGS} -msse3")
-		endif()
-	endif()
+    message("Vectorization : AVX")
+    add_definitions(-D__SSE3 -D__AVX) # define both SSE3 and AVX directive
+    set(COMBINED_FLAGS "${COMBINED_FLAGS} ${AVX_FLAGS}")
+    #SET(EXE_SUFFIX "${EXE_SUFFIX}-avx")
+elseif (IQTREE_FLAGS MATCHES "neon") # ARM NEON
+	message("Vectorization : NEON")
+	add_definitions(-D__ARM_NEON)
+	set(COMBINED_FLAGS "${COMBINED_FLAGS} ${SSE_FLAGS}")
+elseif (NOT IQTREE_FLAGS MATCHES "nosse") #SSE intruction set
+    if (IQTREE_FLAGS MATCHES "KNL")
+        message("Vectorization : SSE3/AVX/AVX2/AVX-512")
+        add_definitions(-D__AVX512KNL)
+    else()
+        message("Vectorization : SSE3/AVX/AVX2")
+    endif()
+    #add_definitions(-D__SSE3)
+    #set(COMBINED_FLAGS "${COMBINED_FLAGS} ${SSE_FLAGS}")
 endif()
 
 ##################################################################

@@ -83,11 +83,15 @@
 #define VECTOR_STORE  _mm256_store_pd
 #define VECTOR_AND_NOT _mm256_andnot_pd
 
-#elif (defined(__SSE3))
+#elif (defined(__SSE3) || defined(__ARM_NEON))
 
+#ifdef __SSE3
 #include <xmmintrin.h>
 #include <pmmintrin.h>
-  
+#elif defined(__ARM_NEON)
+#include "sse2neon.h"       // Advanced SIMD (NEON) support for ARM
+#endif
+
 #define INTS_PER_VECTOR 4
 #ifdef __i386__
 //#define LONG_INTS_PER_VECTOR 4

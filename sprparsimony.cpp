@@ -78,10 +78,14 @@
 #define VECTOR_STORE  _mm256_store_pd
 #define VECTOR_AND_NOT _mm256_andnot_pd
 
-#elif (defined(__SSE3))
+#elif (defined(__SSE3) || defined(__ARM_NEON))
 
+#ifdef __SSE3
 #include <xmmintrin.h>
 #include <pmmintrin.h>
+#else
+#include "sse2neon.h"
+#endif
 #include "vectorclass/vectorclass.h"
 
 #define VECTOR_SIZE 4

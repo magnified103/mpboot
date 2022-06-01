@@ -47,6 +47,8 @@
 #include <xmmintrin.h>
 #include <pmmintrin.h>
 /*#include <tmmintrin.h>*/
+#elif defined(__ARM_NEON)
+#include "sse2neon.h"       // Advanced SIMD (NEON) support for ARM
 #endif
 
 #ifdef __MIC_NATIVE

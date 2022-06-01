@@ -34,7 +34,7 @@
 #define INSTRSET 8
 #elif defined ( __AVX__ )
 #define INSTRSET 7
-#elif defined ( __SSE4_2__ )
+#elif defined ( __SSE4_2__ ) || defined ( __ARM_NEON )  // set INSTRSET value to 6 if ARM_NEON, to include intrinsics from SSE4.2 and below
 #define INSTRSET 6
 #elif defined ( __SSE4_1__ )
 #define INSTRSET 5
@@ -65,7 +65,11 @@
 #elif INSTRSET == 7
 #include <immintrin.h>                 // AVX
 #elif INSTRSET == 6
+#ifdef __ARM_NEON
+#include "sse2neon.h"                  // Advanced SIMD (NEON) support for ARM
+#else
 #include <nmmintrin.h>                 // SSE4.2
+#endif
 #elif INSTRSET == 5
 #include <smmintrin.h>                 // SSE4.1
 #elif INSTRSET == 4

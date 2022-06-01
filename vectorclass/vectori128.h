@@ -5255,7 +5255,7 @@ static inline Vec4ui compress_saturated (Vec2uq const & low, Vec2uq const & high
 #if INSTRSET >= 6   // SSE4.2
     // popcnt instruction is not officially part of the SSE4.2 instruction set,
     // but available in all known processors with SSE4.2
-#if defined (__GNUC__) || defined(__clang__)
+#if (defined (__GNUC__) || defined(__clang__)) && !defined(__ARM_NEON) // use intrinsic in sse2neon.h
 static inline uint32_t vml_popcnt (uint32_t a) __attribute__ ((pure));
 static inline uint32_t vml_popcnt (uint32_t a) {	
     uint32_t r;
@@ -5283,9 +5283,13 @@ static inline uint32_t vml_popcnt (uint32_t a) {
 #if defined (__GNUC__) || defined(__clang__)
 static inline uint32_t bit_scan_forward (uint32_t a) __attribute__ ((pure));
 static inline uint32_t bit_scan_forward (uint32_t a) {	
+#ifdef __ARM_NEON
+    return __builtin_ctz(a);        // bsf = index of the least significant bit = number of trailing zeroes
+#else
     uint32_t r;
     __asm("bsfl %1, %0" : "=r"(r) : "r"(a) : );
     return r;
+#endif
 }
 #else
 static inline uint32_t bit_scan_forward (uint32_t a) {	
@@ -5299,9 +5303,13 @@ static inline uint32_t bit_scan_forward (uint32_t a) {
 #if defined (__GNUC__) || defined(__clang__)
 static inline uint32_t bit_scan_reverse (uint32_t a) __attribute__ ((pure));
 static inline uint32_t bit_scan_reverse (uint32_t a) {	
+#ifdef __ARM_NEON
+    return __builtin_clz(a) ^ 31;       // bsr = index of the most significant bit = 31 - number of leading zeroes
+#else
     uint32_t r;
     __asm("bsrl %1, %0" : "=r"(r) : "r"(a) : );
     return r;
+#endif
 }
 #else
 static inline uint32_t bit_scan_reverse (uint32_t a) {	

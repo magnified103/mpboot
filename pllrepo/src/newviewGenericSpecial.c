@@ -53,10 +53,14 @@
 #endif
 
 
-#ifdef __SSE3
+#if (defined(__SSE3) || defined(__ARM_NEON))
 #include <stdint.h>
+#if defined(_SSE3)
 #include <xmmintrin.h>
 #include <pmmintrin.h>
+#elif defined(__ARM_NEON)
+#include "sse2neon.h"       // Advanced SIMD (NEON) support for ARM
+#endif
 #include "cycle.h"
 
 static void computeTraversalInfo(nodeptr, traversalInfo *, int *, int, int, pllBoolean, recompVectors *, pllBoolean);

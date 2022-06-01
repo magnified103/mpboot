@@ -55,6 +55,8 @@
 #if ! (defined(__ppc) || defined(__powerpc__) || defined(PPC))
 #if (defined(__AVX) || defined(__SSE3))
 #include <xmmintrin.h>
+#elif defined(__ARM_NEON)
+#include "sse2neon.h"       // Advanced SIMD (NEON) support for ARM
 #endif
 /*
    special bug fix, enforces denormalized numbers to be flushed to zero,

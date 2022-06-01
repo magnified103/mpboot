@@ -26,7 +26,7 @@ static __inline void cpuid(unsigned int op, int count,
 	*ebx = regs[1];
 	*ecx = regs[2];
 	*edx = regs[3];
-#else
+#elif (defined(__i386__) || defined(__x86_64__))
 	*eax = op;
   *ecx = count;
   asm volatile("cpuid"
@@ -37,6 +37,8 @@ static __inline void cpuid(unsigned int op, int count,
 
         : "0" (*eax), "2" (*ecx)
         : "memory");
+#elif defined(__ARM_NEON)
+// unimplemented
 #endif
 }
 

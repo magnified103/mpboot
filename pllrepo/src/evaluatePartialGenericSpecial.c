@@ -47,6 +47,8 @@
 #ifdef __SSE3
 #include <xmmintrin.h>
 #include <pmmintrin.h>
+#elif defined(__ARM_NEON)
+#include "sse2neon.h"       // Advanced SIMD (NEON) support for ARM
 #endif
 
 

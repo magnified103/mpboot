@@ -73,10 +73,14 @@ extern "C" {
 #define PLL_BYTE_ALIGNMENT 32
 #define PLL_VECTOR_WIDTH 4
 
-#elif defined (__SSE3)
+#elif (defined (__SSE3) || defined(__ARM_NEON))
 
+#ifdef __SSE3
 #include <xmmintrin.h>
 #include <pmmintrin.h>
+#elif defined(__ARM_NEON)
+#include "sse2neon.h"       // Advanced SIMD (NEON) support for ARM
+#endif
 
 #define PLL_BYTE_ALIGNMENT 16
 #define PLL_VECTOR_WIDTH 2
