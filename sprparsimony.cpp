@@ -488,10 +488,10 @@ void newviewSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
   }
 }
 
-static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
-                                          int perSiteScores) {
+void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
+                                    int perSiteScores) {
   if (pllCostMatrix) {
-//        newviewSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
+//        _newviewSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
 //        return;
 #ifdef __AVX
     if (globalParam->sankoff_short_int) {
@@ -793,7 +793,7 @@ parsimonyNumber evaluateSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
   uint32_t total_sum = 0;
 
   if (tr->ti[0] > 4)
-    newviewParsimonyIterativeFast(tr, pr, perSiteScores);
+    _newviewParsimonyIterativeFast(tr, pr, perSiteScores);
 
   for (model = 0; model < pr->numberOfPartitions; model++) {
     size_t patterns = pr->partitionData[model]->parsimonyLength;
@@ -869,11 +869,10 @@ parsimonyNumber evaluateSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
   return total_sum;
 }
 
-static unsigned int evaluateParsimonyIterativeFast(pllInstance *tr,
-                                                   partitionList *pr,
-                                                   int perSiteScores) {
+unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
+                                             int perSiteScores) {
   if (pllCostMatrix) {
-//        return evaluateSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
+//        return _evaluateSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
 #ifdef __AVX
     if (globalParam->sankoff_short_int) {
       switch (pr->partitionData[0]->states) {
@@ -945,7 +944,7 @@ static unsigned int evaluateParsimonyIterativeFast(pllInstance *tr,
   unsigned int bestScore = tr->bestParsimony, sum;
 
   if (tr->ti[0] > 4)
-    newviewParsimonyIterativeFast(tr, pr, perSiteScores);
+    _newviewParsimonyIterativeFast(tr, pr, perSiteScores);
 
   sum = tr->parsimonyScore[pNumber] + tr->parsimonyScore[qNumber];
 
@@ -1093,9 +1092,8 @@ static unsigned int evaluateParsimonyIterativeFast(pllInstance *tr,
  * Diep: Sankoff weighted parsimony
  * The unvectorized version
  */
-static void newviewSankoffParsimonyIterativeFast(pllInstance *tr,
-                                                 partitionList *pr,
-                                                 int perSiteScores) {
+void _newviewSankoffParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
+                                           int perSiteScores) {
   cout << "newviewSankoffParsimonyIterativeFast...";
   int model, *ti = tr->ti, count = ti[0], index;
 
@@ -1249,10 +1247,10 @@ static void newviewSankoffParsimonyIterativeFast(pllInstance *tr,
   //	cout << "... DONE" << endl;
 }
 
-static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
-                                          int perSiteScores) {
+void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
+                                    int perSiteScores) {
   if (pllCostMatrix)
-    return newviewSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
+    return _newviewSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
   int model, *ti = tr->ti, count = ti[0], index;
   cout << "newhere\n";
   for (index = 4; index < count; index += 4) {
@@ -1416,9 +1414,9 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
   cout << "newhere1\n";
 }
 
-static unsigned int evaluateSankoffParsimonyIterativeFast(pllInstance *tr,
-                                                          partitionList *pr,
-                                                          int perSiteScores) {
+unsigned int _evaluateSankoffParsimonyIterativeFast(pllInstance *tr,
+                                                    partitionList *pr,
+                                                    int perSiteScores) {
   cout << "evaluateSankoffParsimonyIterativeFast ...";
   size_t pNumber = (size_t)tr->ti[1], qNumber = (size_t)tr->ti[2];
 
@@ -1427,7 +1425,7 @@ static unsigned int evaluateSankoffParsimonyIterativeFast(pllInstance *tr,
   unsigned int bestScore = tr->bestParsimony, sum;
 
   if (tr->ti[0] > 4)
-    newviewParsimonyIterativeFast(tr, pr, perSiteScores);
+    _newviewParsimonyIterativeFast(tr, pr, perSiteScores);
 
   //  sum = tr->parsimonyScore[pNumber] + tr->parsimonyScore[qNumber];
   sum = 0;
@@ -1543,12 +1541,11 @@ static unsigned int evaluateSankoffParsimonyIterativeFast(pllInstance *tr,
   return sum;
 }
 
-static unsigned int evaluateParsimonyIterativeFast(pllInstance *tr,
-                                                   partitionList *pr,
-                                                   int perSiteScores) {
+unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
+                                             int perSiteScores) {
   // cout << "evaluateParsimonyIterativeFast\n";
   if (pllCostMatrix)
-    return evaluateSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
+    return _evaluateSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
   // cout << "Don't go to CostMatrix\n";
   size_t pNumber = (size_t)tr->ti[1], qNumber = (size_t)tr->ti[2];
 
@@ -1557,7 +1554,7 @@ static unsigned int evaluateParsimonyIterativeFast(pllInstance *tr,
   unsigned int bestScore = tr->bestParsimony, sum;
 
   if (tr->ti[0] > 4)
-    newviewParsimonyIterativeFast(tr, pr, perSiteScores);
+    _newviewParsimonyIterativeFast(tr, pr, perSiteScores);
 
   sum = tr->parsimonyScore[pNumber] + tr->parsimonyScore[qNumber];
 
@@ -1674,9 +1671,8 @@ static unsigned int evaluateParsimonyIterativeFast(pllInstance *tr,
 
 #endif
 
-static unsigned int evaluateParsimony(pllInstance *tr, partitionList *pr,
-                                      nodeptr p, pllBoolean full,
-                                      int perSiteScores) {
+unsigned int _evaluateParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
+                                pllBoolean full, int perSiteScores) {
   volatile unsigned int result;
   nodeptr q = p->back;
   int *ti = tr->ti, counter = 4;
@@ -1701,12 +1697,12 @@ static unsigned int evaluateParsimony(pllInstance *tr, partitionList *pr,
   }
 
   ti[0] = counter;
-  result = evaluateParsimonyIterativeFast(tr, pr, perSiteScores);
+  result = _evaluateParsimonyIterativeFast(tr, pr, perSiteScores);
   return result;
 }
 
-static void newviewParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
-                             int perSiteScores) {
+void _newviewParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
+                       int perSiteScores) {
   if (p->number <= tr->mxtips)
     return;
 
@@ -1716,7 +1712,7 @@ static void newviewParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
                                   perSiteScores);
     tr->ti[0] = counter;
 
-    newviewParsimonyIterativeFast(tr, pr, perSiteScores);
+    _newviewParsimonyIterativeFast(tr, pr, perSiteScores);
   }
 }
 
@@ -1730,7 +1726,7 @@ static void insertParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
 
   hookupDefault(p->next, q);
   hookupDefault(p->next->next, r);
-  newviewParsimony(tr, pr, p, perSiteScores);
+  _newviewParsimony(tr, pr, p, perSiteScores);
 }
 
 static nodeptr buildNewTip(pllInstance *tr, nodeptr p) {
@@ -1898,7 +1894,7 @@ static void testInsertParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
 
     insertParsimony(tr, pr, p, q, perSiteScores);
 
-    mp = evaluateParsimony(tr, pr, p->next->next, PLL_FALSE, perSiteScores);
+    mp = _evaluateParsimony(tr, pr, p->next->next, PLL_FALSE, perSiteScores);
 
     //		if(globalParam->gbo_replicates > 0 && perSiteScores){
     if (perSiteScores) {
@@ -1982,7 +1978,7 @@ static void testInsertParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
 
     insertParsimony(tr, pr, p, q, perSiteScores);
 
-    mp = evaluateParsimony(tr, pr, p->next->next, PLL_FALSE, perSiteScores);
+    mp = _evaluateParsimony(tr, pr, p->next->next, PLL_FALSE, perSiteScores);
 
     //		if(globalParam->gbo_replicates > 0 && perSiteScores){
     if (perSiteScores) {
@@ -2029,7 +2025,7 @@ static void restoreTreeParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
                                 perSiteScores);
   tr->ti[0] = counter;
 
-  newviewParsimonyIterativeFast(tr, pr, perSiteScores);
+  _newviewParsimonyIterativeFast(tr, pr, perSiteScores);
 }
 
 static void addTraverseParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
@@ -2117,7 +2113,7 @@ static int rearrangeParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
 
   q = p->back;
 
-  unsigned int mp = evaluateParsimony(
+  unsigned int mp = _evaluateParsimony(
       tr, pr, p, PLL_FALSE, perSiteScores); // Diep: This is VERY important to
                                             // make sure SPR is accurate*****
   if (perSiteScores) {
@@ -2162,7 +2158,7 @@ static int rearrangeParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
       hookupDefault(p->next, p1);
       hookupDefault(p->next->next, p2);
 
-      newviewParsimony(tr, pr, p, perSiteScores);
+      _newviewParsimony(tr, pr, p, perSiteScores);
     }
   }
 
@@ -2199,7 +2195,7 @@ static int rearrangeParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
       hookupDefault(q->next, q1);
       hookupDefault(q->next->next, q2);
 
-      newviewParsimony(tr, pr, q, perSiteScores);
+      _newviewParsimony(tr, pr, q, perSiteScores);
     }
   }
 
@@ -2228,7 +2224,7 @@ static int rearrangeParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
 
   q = p->back;
 
-  unsigned int mp = evaluateParsimony(
+  unsigned int mp = _evaluateParsimony(
       tr, pr, p, PLL_FALSE, perSiteScores); // Diep: This is VERY important to
                                             // make sure SPR is accurate*****
   if (perSiteScores) {
@@ -2276,7 +2272,7 @@ static int rearrangeParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
       hookupDefault(p->next, p1);
       hookupDefault(p->next->next, p2);
 
-      newviewParsimony(tr, pr, p, perSiteScores);
+      _newviewParsimony(tr, pr, p, perSiteScores);
     }
   }
   if (found_better == true)
@@ -2318,7 +2314,7 @@ static int rearrangeParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
       hookupDefault(q->next, q1);
       hookupDefault(q->next->next, q2);
 
-      newviewParsimony(tr, pr, q, perSiteScores);
+      _newviewParsimony(tr, pr, q, perSiteScores);
     }
   }
 
@@ -2909,7 +2905,7 @@ static void stepwiseAddition(pllInstance *tr, partitionList *pr, nodeptr p,
   tr->ti[1] = p->number;
   tr->ti[2] = p->back->number;
 
-  mp = evaluateParsimonyIterativeFast(tr, pr, PLL_FALSE);
+  mp = _evaluateParsimonyIterativeFast(tr, pr, PLL_FALSE);
 
   if (mp < tr->bestParsimony)
     bestTreeScoreHits = 1;
@@ -2960,15 +2956,13 @@ void _allocateParsimonyDataStructures(pllInstance *tr, partitionList *pr,
   }
 
   compressDNA(tr, pr, informative, perSiteScores);
-  // cout << "Allocate parismony data structures\n";
-  for (i = 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
+
+  for (i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 1; i++) {
     nodeptr p = tr->nodep[i];
-    p->recalculate = 0;
+
     p->xPars = 1;
-    if (i > tr->mxtips) {
-      p->next->xPars = 0;
-      p->next->next->xPars = 0;
-    }
+    p->next->xPars = 0;
+    p->next->next->xPars = 0;
   }
 
   tr->ti = (int *)rax_malloc(sizeof(int) * 4 * (size_t)tr->mxtips);
@@ -3069,7 +3063,7 @@ static void _pllMakeParsimonyTreeFast(pllInstance *tr, partitionList *pr,
                                     0);
       tr->ti[0] = counter;
 
-      newviewParsimonyIterativeFast(tr, pr, 0);
+      _newviewParsimonyIterativeFast(tr, pr, 0);
     }
   }
 
@@ -3170,7 +3164,7 @@ static void _pllMakeParsimonyTreeFast(pllInstance *tr, partitionList *pr,
                                     0);
       tr->ti[0] = counter;
 
-      newviewParsimonyIterativeFast(tr, pr, 0);
+      _newviewParsimonyIterativeFast(tr, pr, 0);
     }
   }
 
@@ -3288,7 +3282,7 @@ int pllOptimizeSprParsimony(pllInstance *tr, partitionList *pr, int mintrav,
   nodeRectifierPars(tr);
   tr->bestParsimony = UINT_MAX;
   tr->bestParsimony =
-      evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
+      _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
   // cout << "STARTING SCORE: " << tr->bestParsimony << '\n';
   assert(-iqtree->curScore == tr->bestParsimony);
 
@@ -3297,7 +3291,7 @@ int pllOptimizeSprParsimony(pllInstance *tr, partitionList *pr, int mintrav,
   /*
   // Diep: to be investigated
   tr->bestParsimony = -iqtree->logl_cutoff;
-  evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
+  _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
   */
 
   int j;
@@ -3386,7 +3380,7 @@ int pllOptimizeSprParsimony(pllInstance *tr, partitionList *pr, int mintrav,
   nodeRectifierPars(tr);
   tr->bestParsimony = UINT_MAX;
   tr->bestParsimony =
-      evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
+      _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
 
   assert(-iqtree->curScore == tr->bestParsimony);
 
@@ -3395,7 +3389,7 @@ int pllOptimizeSprParsimony(pllInstance *tr, partitionList *pr, int mintrav,
   /*
   // Diep: to be investigated
   tr->bestParsimony = -iqtree->logl_cutoff;
-  evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
+  _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
   */
 
   int j;
@@ -3792,8 +3786,8 @@ void computeUserTreeParsimomy(Params &params) {
         UINT_MAX; // Important because of early termination in
                   // evaluateSankoffParsimonyIterativeFastSIMD
     unsigned int pll_score =
-        evaluateParsimony(ptree->pllInst, ptree->pllPartitions,
-                          ptree->pllInst->start, PLL_TRUE, false);
+        _evaluateParsimony(ptree->pllInst, ptree->pllPartitions,
+                           ptree->pllInst->start, PLL_TRUE, false);
     cout << "Parsimony score (by PLL kernel) is: " << pll_score << endl;
 
     if (ptree->pllPartitions->partitionData[0]->informativePtnWgt) {
@@ -3823,8 +3817,8 @@ void computeUserTreeParsimomy(Params &params) {
         UINT_MAX; // Important because of early termination in
                   // evaluateSankoffParsimonyIterativeFastSIMD
     unsigned int pll_score =
-        evaluateParsimony(ptree->pllInst, ptree->pllPartitions,
-                          ptree->pllInst->start, PLL_TRUE, false);
+        _evaluateParsimony(ptree->pllInst, ptree->pllPartitions,
+                           ptree->pllInst->start, PLL_TRUE, false);
     cout << "Parsimony score (by PLL kernel) is: " << pll_score << endl;
 
     _pllFreeParsimonyDataStructures(ptree->pllInst, ptree->pllPartitions);
@@ -4085,8 +4079,8 @@ void testSPROnUserTree(Params &params) {
       UINT_MAX; // Important because of early termination in
                 // evaluateSankoffParsimonyIterativeFastSIMD
   ptree->pllInst->bestParsimony =
-      evaluateParsimony(ptree->pllInst, ptree->pllPartitions,
-                        ptree->pllInst->start, PLL_TRUE, false);
+      _evaluateParsimony(ptree->pllInst, ptree->pllPartitions,
+                         ptree->pllInst->start, PLL_TRUE, false);
   double epsilon = 1.0 / ptree->getAlnNSite();
   out << "Tree before 1 SPR looks like: \n";
   ptree->sortTaxa();
