@@ -2663,7 +2663,6 @@ void IQTree::optimizeBootTrees() {
 
   string btree_file = params->out_prefix;
   btree_file += ".sampletree";
-
   int nmultifurcate = 0;
   for (int sample = 0; sample < num_boot_rep; sample++) {
     if ((sample + 1) % 100 == 0)
@@ -2675,7 +2674,6 @@ void IQTree::optimizeBootTrees() {
                                      boot_samples_pars[sample], nptn);
 
     setAlignment(bootstrap_aln);
-
     if (params->multiple_hits) { // process a few trees in
                                  // boot_trees_parsimony[sample]
       IntegerSet result;
@@ -2749,7 +2747,6 @@ void IQTree::optimizeBootTrees() {
       //			out << boot_trees_parsimony[sample].size() << "
       //;" << endl;
     }
-
     if (params->distinct_iter_top_boot >= 1 && (!params->multiple_hits)) {
       // process a few trees in boot_trees_parsimony_top[sample]
       string all_btree_str;
@@ -2961,7 +2958,6 @@ void IQTree::optimizeBootTrees() {
       //    		}
       //    		out << endl;
     }
-
     if ((!params->multiple_hits) &&
         (params->distinct_iter_top_boot <
          1)) { // process one tree in boot_trees[sample]
@@ -3050,12 +3046,13 @@ void IQTree::optimizeBootTrees() {
   initializeAllPartialLh();
   clearAllPartialLH();
   curScore = optimizeAllBranches();
-
   //	cout << "*** RESULT:" << endl;
   //	for(int sample = 0; sample < num_boot_rep; sample++){
   //		for(IntegerSet::iterator it =
   // boot_trees_parsimony[sample].begin(); 				it !=
-  // boot_trees_parsimony[sample].end(); ++it){ 			cout << "id =
+  // boot_trees_parsimony[sample].end(); ++it){ 			cout <<
+  // "id
+  // =
   // "
   // << *it
   // << ", score = " << treels_logl[*it] << "; ";
@@ -3164,7 +3161,9 @@ void IQTree::optimizeBootTreesPure() {
   //	for(int sample = 0; sample < num_boot_rep; sample++){
   //		for(IntegerSet::iterator it =
   // boot_trees_parsimony[sample].begin(); 				it !=
-  // boot_trees_parsimony[sample].end(); ++it){ 			cout << "id =
+  // boot_trees_parsimony[sample].end(); ++it){ 			cout <<
+  // "id
+  // =
   // "
   // << *it
   // << ", score = " << treels_logl[*it] << "; ";

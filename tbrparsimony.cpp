@@ -916,6 +916,12 @@ void _allocateParsimonyDataStructuresTBR(pllInstance *tr, partitionList *pr,
   rax_free(informative);
 }
 
+int pllSaveCurrentTreeTBRParsimony(pllInstance *tr, partitionList *pr,
+                                   int cur_search_pars) {
+  iqtree->saveCurrentTree(-cur_search_pars);
+  return (int)(cur_search_pars);
+}
+
 static void reorderNodes(pllInstance *tr, nodeptr *np, nodeptr p, int *count,
                          bool resetParent = false) {
   if ((p->number <= tr->mxtips))
@@ -1257,6 +1263,11 @@ static int pllTestTBRMove(pllInstance *tr, partitionList *pr, nodeptr branch1,
                                          TBR_removeBranch, perSiteScores);
   tr->curRoot = TBR_removeBranch;
   tr->curRootBack = TBR_removeBranch->back;
+  if (perSiteScores) {
+    // If UFBoot is enabled ...
+    pllSaveCurrentTreeTBRParsimony(tr, pr, mp); // run UFBoot
+  }
+
   // cout << "SCORE: " << tr->bestParsimony << '\n';
   if (globalParam->tbr_test_draw == true) {
     drawTreeTBR(tr, pr);
