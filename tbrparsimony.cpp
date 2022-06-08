@@ -970,7 +970,7 @@ static bool restoreTreeRearrangeParsimonyTBR(pllInstance *tr, partitionList *pr,
     // assert(pllTbrConnectSubtreesML (tr, pr, q, r));
     return PLL_FALSE;
   }
-  evaluateParsimonyTBR(tr, pr, q, r, tr->TBR_removeBranch, PLL_FALSE);
+  evaluateParsimonyTBR(tr, pr, q, r, tr->TBR_removeBranch, perSiteScores);
   tr->curRoot = tr->TBR_removeBranch;
   tr->curRootBack = tr->TBR_removeBranch->back;
 
@@ -1215,7 +1215,8 @@ static void drawTreeTBR(pllInstance *tr, partitionList *pr) {
  @return
  */
 static int pllTestTBRMove(pllInstance *tr, partitionList *pr, nodeptr branch1,
-                          nodeptr branch2, nodeptr *freeBranch) {
+                          nodeptr branch2, nodeptr *freeBranch,
+                          int perSiteScores) {
   int i;
   // double b1z[PLL_NUM_BRANCHES], b2z[PLL_NUM_BRANCHES];
   // int numPartitions = pr->perGeneBranchLengths ? pr->numberOfPartitions : 1;
@@ -1253,7 +1254,7 @@ static int pllTestTBRMove(pllInstance *tr, partitionList *pr, nodeptr branch1,
   // PLL_FALSE); unsigned int mp = _evaluateParsimony(tr, pr, tr->start,
   // PLL_TRUE, PLL_FALSE); cout << "Here\n";
   unsigned int mp = evaluateParsimonyTBR(tr, pr, branch1, branch2,
-                                         TBR_removeBranch, PLL_FALSE);
+                                         TBR_removeBranch, perSiteScores);
   tr->curRoot = TBR_removeBranch;
   tr->curRootBack = TBR_removeBranch->back;
   // cout << "SCORE: " << tr->bestParsimony << '\n';
@@ -1314,26 +1315,27 @@ static int pllTestTBRMove(pllInstance *tr, partitionList *pr, nodeptr branch1,
  */
 static void pllTraverseUpdateTBR(pllInstance *tr, partitionList *pr, nodeptr p,
                                  nodeptr q, nodeptr *r, int mintravP,
-                                 int maxtravP, int mintravQ, int maxtravQ) {
+                                 int maxtravP, int mintravQ, int maxtravQ,
+                                 int perSiteScores) {
 
   if (mintravP <= 1 && mintravQ <= 1) {
-    assert((pllTestTBRMove(tr, pr, p, q, r)));
+    assert((pllTestTBRMove(tr, pr, p, q, r, perSiteScores)));
   }
 
   /* traverse q subtree */
   if ((!isTip(q->number, tr->mxtips)) && (maxtravQ - 1 > 0)) {
     pllTraverseUpdateTBR(tr, pr, p, q->next->back, r, mintravP, maxtravP,
-                         mintravQ - 1, maxtravQ - 1);
+                         mintravQ - 1, maxtravQ - 1, perSiteScores);
     pllTraverseUpdateTBR(tr, pr, p, q->next->next->back, r, mintravP, maxtravP,
-                         mintravQ - 1, maxtravQ - 1);
+                         mintravQ - 1, maxtravQ - 1, perSiteScores);
   }
 
   /* last, we traverse the p subtree */
   if ((!isTip(p->number, tr->mxtips)) && (maxtravP - 1 > 0)) {
     pllTraverseUpdateTBR(tr, pr, p->next->back, q, r, mintravP - 1,
-                         maxtravP - 1, mintravQ, maxtravQ);
+                         maxtravP - 1, mintravQ, maxtravQ, perSiteScores);
     pllTraverseUpdateTBR(tr, pr, p->next->next->back, q, r, mintravP - 1,
-                         maxtravP - 1, mintravQ, maxtravQ);
+                         maxtravP - 1, mintravQ, maxtravQ, perSiteScores);
   }
 }
 
@@ -1356,10 +1358,10 @@ static void pllTraverseUpdateTBR(pllInstance *tr, partitionList *pr, nodeptr p,
 static void pllTraverseUpdateTBRVer2(pllInstance *tr, partitionList *pr,
                                      nodeptr p, nodeptr q, nodeptr *r,
                                      int mintrav, int maxtrav, int distP,
-                                     int distQ) {
+                                     int distQ, int perSiteScores) {
 
   if (mintrav <= 0) {
-    assert((pllTestTBRMove(tr, pr, p, q, r)));
+    assert((pllTestTBRMove(tr, pr, p, q, r, perSiteScores)));
     if (globalParam->tbr_test_draw == true) {
       printTravInfo(distP, distQ);
     }
@@ -1368,17 +1370,17 @@ static void pllTraverseUpdateTBRVer2(pllInstance *tr, partitionList *pr,
   /* traverse q subtree */
   if ((!isTip(q->number, tr->mxtips)) && (maxtrav - 1 >= 0)) {
     pllTraverseUpdateTBRVer2(tr, pr, p, q->next->back, r, mintrav - 1,
-                             maxtrav - 1, distP, distQ + 1);
+                             maxtrav - 1, distP, distQ + 1, perSiteScores);
     pllTraverseUpdateTBRVer2(tr, pr, p, q->next->next->back, r, mintrav - 1,
-                             maxtrav - 1, distP, distQ + 1);
+                             maxtrav - 1, distP, distQ + 1, perSiteScores);
   }
 
   /* last, we traverse the p subtree */
   if ((!isTip(p->number, tr->mxtips)) && (maxtrav - 1 >= 0)) {
     pllTraverseUpdateTBRVer2(tr, pr, p->next->back, q, r, mintrav - 1,
-                             maxtrav - 1, distP + 1, distQ);
+                             maxtrav - 1, distP + 1, distQ, perSiteScores);
     pllTraverseUpdateTBRVer2(tr, pr, p->next->next->back, q, r, mintrav - 1,
-                             maxtrav - 1, distP + 1, distQ);
+                             maxtrav - 1, distP + 1, distQ, perSiteScores);
   }
 }
 
@@ -1410,7 +1412,7 @@ static void pllTraverseUpdateTBRVer2(pllInstance *tr, partitionList *pr,
 //  Sorted list of the best rearrangements
  */
 static int pllComputeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
-                         int mintrav, int maxtrav) {
+                         int mintrav, int maxtrav, int perSiteScores) {
   // tr->startLH = tr->endLH = tr->likelihood;
 
   // /* TODO: Add cutoff code */
@@ -1458,33 +1460,33 @@ static int pllComputeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
     assert(p1->back == p2 && p2->back == p1);
 
     /* recursively traverse and perform TBR */
-    pllTraverseUpdateTBR(tr, pr, p1, q1, &p, mintrav, maxtrav, mintrav,
-                         maxtrav);
+    pllTraverseUpdateTBR(tr, pr, p1, q1, &p, mintrav, maxtrav, mintrav, maxtrav,
+                         perSiteScores);
     if (!isTip(q2->number, tr->mxtips)) {
       pllTraverseUpdateTBR(tr, pr, q2->next->back, p1, &p, mintrav - 1,
-                           maxtrav - 1, mintrav, maxtrav);
+                           maxtrav - 1, mintrav, maxtrav, perSiteScores);
       pllTraverseUpdateTBR(tr, pr, q2->next->next->back, p1, &p, mintrav - 1,
-                           maxtrav - 1, mintrav, maxtrav);
+                           maxtrav - 1, mintrav, maxtrav, perSiteScores);
     }
 
     if (!isTip(p2->number, tr->mxtips)) {
       pllTraverseUpdateTBR(tr, pr, p2->next->back, q1, &p, mintrav - 1,
-                           maxtrav - 1, mintrav, maxtrav);
+                           maxtrav - 1, mintrav, maxtrav, perSiteScores);
       pllTraverseUpdateTBR(tr, pr, p2->next->next->back, q1, &p, mintrav - 1,
-                           maxtrav - 1, mintrav, maxtrav);
+                           maxtrav - 1, mintrav, maxtrav, perSiteScores);
       if (!isTip(q2->number, tr->mxtips)) {
         pllTraverseUpdateTBR(tr, pr, p2->next->back, q2->next->back, &p,
-                             mintrav - 1, maxtrav - 1, mintrav - 1,
-                             maxtrav - 1);
+                             mintrav - 1, maxtrav - 1, mintrav - 1, maxtrav - 1,
+                             perSiteScores);
         pllTraverseUpdateTBR(tr, pr, p2->next->back, q2->next->next->back, &p,
-                             mintrav - 1, maxtrav - 1, mintrav - 1,
-                             maxtrav - 1);
+                             mintrav - 1, maxtrav - 1, mintrav - 1, maxtrav - 1,
+                             perSiteScores);
         pllTraverseUpdateTBR(tr, pr, p2->next->next->back, q2->next->back, &p,
-                             mintrav - 1, maxtrav - 1, mintrav - 1,
-                             maxtrav - 1);
+                             mintrav - 1, maxtrav - 1, mintrav - 1, maxtrav - 1,
+                             perSiteScores);
         pllTraverseUpdateTBR(tr, pr, p2->next->next->back, q2->next->next->back,
                              &p, mintrav - 1, maxtrav - 1, mintrav - 1,
-                             maxtrav - 1);
+                             maxtrav - 1, perSiteScores);
       }
     }
     nodeptr pb, qb, freeBranch;
@@ -1494,7 +1496,7 @@ static int pllComputeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
     q1 = (q1->xPars ? q1 : q1->back);
     int restoreTopoOK =
         pllTbrConnectSubtrees(tr, p1, q1, &freeBranch, &pb, &qb);
-    evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, PLL_FALSE);
+    evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, perSiteScores);
     tr->curRoot = freeBranch;
     tr->curRootBack = freeBranch->back;
     assert(restoreTopoOK);
@@ -1532,7 +1534,7 @@ static int pllComputeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
 //  Sorted list of the best rearrangements
  */
 static int pllComputeTBRVer2(pllInstance *tr, partitionList *pr, nodeptr p,
-                             int mintrav, int maxtrav) {
+                             int mintrav, int maxtrav, int perSiteScores) {
   // tr->startLH = tr->endLH = tr->likelihood;
 
   // /* TODO: Add cutoff code */
@@ -1583,29 +1585,32 @@ static int pllComputeTBRVer2(pllInstance *tr, partitionList *pr, nodeptr p,
     assert(p1->back == p2 && p2->back == p1);
 
     /* recursively traverse and perform TBR */
-    pllTraverseUpdateTBRVer2(tr, pr, p1, q1, &p, mintrav, maxtrav, 0, 0);
+    pllTraverseUpdateTBRVer2(tr, pr, p1, q1, &p, mintrav, maxtrav, 0, 0,
+                             perSiteScores);
     if (!isTip(q2->number, tr->mxtips)) {
       pllTraverseUpdateTBRVer2(tr, pr, q2->next->back, p1, &p, mintrav - 1,
-                               maxtrav - 1, 1, 0);
+                               maxtrav - 1, 1, 0, perSiteScores);
       pllTraverseUpdateTBRVer2(tr, pr, q2->next->next->back, p1, &p,
-                               mintrav - 1, maxtrav - 1, 1, 0);
+                               mintrav - 1, maxtrav - 1, 1, 0, perSiteScores);
     }
 
     if (!isTip(p2->number, tr->mxtips)) {
       pllTraverseUpdateTBRVer2(tr, pr, p2->next->back, q1, &p, mintrav - 1,
-                               maxtrav - 1, 1, 0);
+                               maxtrav - 1, 1, 0, perSiteScores);
       pllTraverseUpdateTBRVer2(tr, pr, p2->next->next->back, q1, &p,
-                               mintrav - 1, maxtrav - 1, 1, 0);
+                               mintrav - 1, maxtrav - 1, 1, 0, perSiteScores);
       if (!isTip(q2->number, tr->mxtips)) {
         pllTraverseUpdateTBRVer2(tr, pr, p2->next->back, q2->next->back, &p,
-                                 mintrav - 2, maxtrav - 2, 1, 1);
+                                 mintrav - 2, maxtrav - 2, 1, 1, perSiteScores);
         pllTraverseUpdateTBRVer2(tr, pr, p2->next->back, q2->next->next->back,
-                                 &p, mintrav - 2, maxtrav - 2, 1, 1);
+                                 &p, mintrav - 2, maxtrav - 2, 1, 1,
+                                 perSiteScores);
         pllTraverseUpdateTBRVer2(tr, pr, p2->next->next->back, q2->next->back,
-                                 &p, mintrav - 2, maxtrav - 2, 1, 1);
+                                 &p, mintrav - 2, maxtrav - 2, 1, 1,
+                                 perSiteScores);
         pllTraverseUpdateTBRVer2(tr, pr, p2->next->next->back,
                                  q2->next->next->back, &p, mintrav - 2,
-                                 maxtrav - 2, 1, 1);
+                                 maxtrav - 2, 1, 1, perSiteScores);
       }
     }
     nodeptr pb, qb, freeBranch;
@@ -1615,7 +1620,7 @@ static int pllComputeTBRVer2(pllInstance *tr, partitionList *pr, nodeptr p,
     q1 = (q1->xPars ? q1 : q1->back);
     int restoreTopoOK =
         pllTbrConnectSubtrees(tr, p1, q1, &freeBranch, &pb, &qb);
-    evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, PLL_FALSE);
+    evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, perSiteScores);
     tr->curRoot = freeBranch;
     tr->curRootBack = freeBranch->back;
     assert(restoreTopoOK);
@@ -1626,7 +1631,8 @@ static int pllComputeTBRVer2(pllInstance *tr, partitionList *pr, nodeptr p,
 }
 
 static int pllTestTBRMoveLeaf(pllInstance *tr, partitionList *pr,
-                              nodeptr insertBranch, nodeptr removeBranch) {
+                              nodeptr insertBranch, nodeptr removeBranch,
+                              int perSiteScores) {
   insertBranch = (insertBranch->xPars ? insertBranch : insertBranch->back);
   removeBranch = (removeBranch->xPars ? removeBranch : removeBranch->back);
   nodeptr p = (isTip(removeBranch->number, tr->mxtips) ? removeBranch->back
@@ -1639,7 +1645,7 @@ static int pllTestTBRMoveLeaf(pllInstance *tr, partitionList *pr,
   assert(i1->xPars);
   assert(removeBranch->xPars);
   unsigned int mp =
-      evaluateParsimonyTBR(tr, pr, p->back, insertBranch, p, PLL_FALSE);
+      evaluateParsimonyTBR(tr, pr, p->back, insertBranch, p, perSiteScores);
   tr->curRoot = removeBranch;
   tr->curRootBack = removeBranch->back;
   if (globalParam->tbr_test_draw == true) {
@@ -1668,23 +1674,25 @@ static int pllTestTBRMoveLeaf(pllInstance *tr, partitionList *pr,
 
 static void pllTraverseUpdateTBRLeaf(pllInstance *tr, partitionList *pr,
                                      nodeptr p, nodeptr removeBranch,
-                                     int mintrav, int maxtrav, int distP) {
+                                     int mintrav, int maxtrav, int distP,
+                                     int perSiteScores) {
   if (mintrav <= 0) {
-    assert(pllTestTBRMoveLeaf(tr, pr, p, removeBranch));
+    assert(pllTestTBRMoveLeaf(tr, pr, p, removeBranch, perSiteScores));
     if (globalParam->tbr_test_draw == true) {
       printTravInfo(-1, distP);
     }
   }
   if (!isTip(p->number, tr->mxtips) && maxtrav - 1 >= 0) {
     pllTraverseUpdateTBRLeaf(tr, pr, p->next->back, removeBranch, mintrav - 1,
-                             maxtrav - 1, distP + 1);
+                             maxtrav - 1, distP + 1, perSiteScores);
     pllTraverseUpdateTBRLeaf(tr, pr, p->next->next->back, removeBranch,
-                             mintrav - 1, maxtrav - 1, distP + 1);
+                             mintrav - 1, maxtrav - 1, distP + 1,
+                             perSiteScores);
   }
 }
 
 static int pllComputeTBRLeaf(pllInstance *tr, partitionList *pr, nodeptr p,
-                             int mintrav, int maxtrav) {
+                             int mintrav, int maxtrav, int perSiteScores) {
   nodeptr q = p->back;
   if (!isTip(q->number, tr->mxtips)) {
     swap(p, q);
@@ -1709,16 +1717,16 @@ static int pllComputeTBRLeaf(pllInstance *tr, partitionList *pr, nodeptr p,
 
   if (!isTip(p1->number, tr->mxtips)) {
     pllTraverseUpdateTBRLeaf(tr, pr, p1->next->back, p, mintrav - 1,
-                             maxtrav - 1, 1);
+                             maxtrav - 1, 1, perSiteScores);
     pllTraverseUpdateTBRLeaf(tr, pr, p1->next->next->back, p, mintrav - 1,
-                             maxtrav - 1, 1);
+                             maxtrav - 1, 1, perSiteScores);
   }
 
   if (!isTip(p2->number, tr->mxtips)) {
     pllTraverseUpdateTBRLeaf(tr, pr, p2->next->back, p, mintrav - 1,
-                             maxtrav - 1, 1);
+                             maxtrav - 1, 1, perSiteScores);
     pllTraverseUpdateTBRLeaf(tr, pr, p2->next->next->back, p, mintrav - 1,
-                             maxtrav - 1, 1);
+                             maxtrav - 1, 1, perSiteScores);
   }
 
   // Connect p to p1 and p2 again
@@ -1726,7 +1734,7 @@ static int pllComputeTBRLeaf(pllInstance *tr, partitionList *pr, nodeptr p,
   hookupDefault(p->next->next, p2);
   p1 = (p1->xPars ? p1 : p2);
   assert(p1->xPars);
-  evaluateParsimonyTBR(tr, pr, q, p1, q, PLL_FALSE);
+  evaluateParsimonyTBR(tr, pr, q, p1, q, perSiteScores);
   tr->curRoot = q;
   tr->curRootBack = q->back;
   return PLL_TRUE;
@@ -1749,7 +1757,7 @@ static bool restoreTreeRearrangeParsimonyTBRLeaf(pllInstance *tr,
   hookupDefault(r, tr->TBR_removeBranch->next);
   hookupDefault(rb, tr->TBR_removeBranch->next->next);
   evaluateParsimonyTBR(tr, pr, tr->TBR_removeBranch->back, r,
-                       tr->TBR_removeBranch, PLL_FALSE);
+                       tr->TBR_removeBranch, perSiteScores);
   tr->curRoot = tr->TBR_removeBranch;
   tr->curRootBack = tr->TBR_removeBranch->back;
 
@@ -1894,7 +1902,8 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
     for (i = 1; i <= tr->mxtips; i++) {
       tr->TBR_removeBranch = tr->TBR_insertBranch1 = NULL;
       bestTreeScoreHits = 1;
-      pllComputeTBRLeaf(tr, pr, tr->nodep[i]->back, mintrav, maxtrav);
+      pllComputeTBRLeaf(tr, pr, tr->nodep[i]->back, mintrav, maxtrav,
+                        perSiteScores);
       if (tr->bestParsimony == randomMP)
         bestIterationScoreHits++;
       if (tr->bestParsimony < randomMP)
@@ -1915,7 +1924,7 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
       tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
       bestTreeScoreHits = 1;
       // assert(tr->nodep[i]->xPars);
-      pllComputeTBRVer2(tr, pr, tr->nodep[i], mintrav, maxtrav);
+      pllComputeTBRVer2(tr, pr, tr->nodep[i], mintrav, maxtrav, perSiteScores);
       if (tr->bestParsimony == randomMP)
         bestIterationScoreHits++;
       if (tr->bestParsimony < randomMP)
@@ -2109,7 +2118,8 @@ static void pllMakeParsimonyTreeFastTBR(pllInstance *tr, partitionList *pr,
     for (i = 1; i <= tr->mxtips; i++) {
       tr->TBR_removeBranch = tr->TBR_insertBranch1 = NULL;
       bestTreeScoreHits = 1;
-      pllComputeTBRLeaf(tr, pr, tr->nodep[i]->back, tbr_mintrav, tbr_maxtrav);
+      pllComputeTBRLeaf(tr, pr, tr->nodep[i]->back, tbr_mintrav, tbr_maxtrav,
+                        PLL_FALSE);
       if (tr->bestParsimony == randomMP)
         bestIterationScoreHits++;
       if (tr->bestParsimony < randomMP)
@@ -2130,7 +2140,8 @@ static void pllMakeParsimonyTreeFastTBR(pllInstance *tr, partitionList *pr,
       tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
       bestTreeScoreHits = 1;
       // assert(tr->nodep[i]->xPars);
-      pllComputeTBRVer2(tr, pr, tr->nodep[i], tbr_mintrav, tbr_maxtrav);
+      pllComputeTBRVer2(tr, pr, tr->nodep[i], tbr_mintrav, tbr_maxtrav,
+                        PLL_FALSE);
       if (tr->bestParsimony == randomMP)
         bestIterationScoreHits++;
       if (tr->bestParsimony < randomMP)
