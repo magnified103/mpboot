@@ -74,11 +74,11 @@
 #define INT_TYPE __m256d
 #define CAST double *
 #define SET_ALL_BITS_ONE                                                       \
-  (__m256d) _mm256_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,   \
-                             0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)
+    (__m256d) _mm256_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, \
+                               0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)
 #define SET_ALL_BITS_ZERO                                                      \
-  (__m256d) _mm256_set_epi32(0x00000000, 0x00000000, 0x00000000, 0x00000000,   \
-                             0x00000000, 0x00000000, 0x00000000, 0x00000000)
+    (__m256d) _mm256_set_epi32(0x00000000, 0x00000000, 0x00000000, 0x00000000, \
+                               0x00000000, 0x00000000, 0x00000000, 0x00000000)
 #define VECTOR_LOAD _mm256_load_pd
 #define VECTOR_BIT_AND _mm256_and_pd
 #define VECTOR_BIT_OR _mm256_or_pd
@@ -106,9 +106,9 @@
 #define INT_TYPE __m128i
 #define CAST __m128i *
 #define SET_ALL_BITS_ONE                                                       \
-  _mm_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)
+    _mm_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)
 #define SET_ALL_BITS_ZERO                                                      \
-  _mm_set_epi32(0x00000000, 0x00000000, 0x00000000, 0x00000000)
+    _mm_set_epi32(0x00000000, 0x00000000, 0x00000000, 0x00000000)
 #define VECTOR_LOAD _mm_load_si128
 #define VECTOR_BIT_AND _mm_and_si128
 #define VECTOR_BIT_OR _mm_or_si128
@@ -151,40 +151,41 @@ static bool first_call = true;
 static int numDrawTrees = 0;
 static string lastTreeString = "";
 static void initializeCostMatrix() {
-  highest_cost = *max_element(pllCostMatrix,
-                              pllCostMatrix + pllCostNstates * pllCostNstates) +
-                 1;
+    highest_cost =
+        *max_element(pllCostMatrix,
+                     pllCostMatrix + pllCostNstates * pllCostNstates) +
+        1;
 
-  //    cout << "Segments: ";
-  //    for (int i = 0; i < pllRepsSegments; i++)
-  //        cout <<  " " << pllSegmentUpper[i];
-  //    cout << endl;
+    //    cout << "Segments: ";
+    //    for (int i = 0; i < pllRepsSegments; i++)
+    //        cout <<  " " << pllSegmentUpper[i];
+    //    cout << endl;
 
 #if (defined(__SSE3) || defined(__AVX))
-  assert(pllCostMatrix);
-  if (!vectorCostMatrix) {
-    rax_posix_memalign((void **)&(vectorCostMatrix), PLL_BYTE_ALIGNMENT,
-                       sizeof(parsimonyNumber) * pllCostNstates *
-                           pllCostNstates);
+    assert(pllCostMatrix);
+    if (!vectorCostMatrix) {
+        rax_posix_memalign((void **)&(vectorCostMatrix), PLL_BYTE_ALIGNMENT,
+                           sizeof(parsimonyNumber) * pllCostNstates *
+                               pllCostNstates);
 
-    if (globalParam->sankoff_short_int) {
-      parsimonyNumberShort *shortMatrix =
-          (parsimonyNumberShort *)vectorCostMatrix;
-      // duplicate the cost entries for vector operations
-      for (int i = 0; i < pllCostNstates; i++)
-        for (int j = 0; j < pllCostNstates; j++)
-          shortMatrix[(i * pllCostNstates + j)] =
-              pllCostMatrix[i * pllCostNstates + j];
-    } else {
-      // duplicate the cost entries for vector operations
-      for (int i = 0; i < pllCostNstates; i++)
-        for (int j = 0; j < pllCostNstates; j++)
-          vectorCostMatrix[(i * pllCostNstates + j)] =
-              pllCostMatrix[i * pllCostNstates + j];
+        if (globalParam->sankoff_short_int) {
+            parsimonyNumberShort *shortMatrix =
+                (parsimonyNumberShort *)vectorCostMatrix;
+            // duplicate the cost entries for vector operations
+            for (int i = 0; i < pllCostNstates; i++)
+                for (int j = 0; j < pllCostNstates; j++)
+                    shortMatrix[(i * pllCostNstates + j)] =
+                        pllCostMatrix[i * pllCostNstates + j];
+        } else {
+            // duplicate the cost entries for vector operations
+            for (int i = 0; i < pllCostNstates; i++)
+                for (int j = 0; j < pllCostNstates; j++)
+                    vectorCostMatrix[(i * pllCostNstates + j)] =
+                        pllCostMatrix[i * pllCostNstates + j];
+        }
     }
-  }
 #else
-  vectorCostMatrix = NULL;
+    vectorCostMatrix = NULL;
 #endif
 }
 
@@ -209,17 +210,17 @@ static void initializeCostMatrix() {
 
 #if (defined(__SSE3) || defined(__AVX))
 static inline unsigned int vectorPopcount(INT_TYPE v) {
-  unsigned long counts[LONG_INTS_PER_VECTOR]
-      __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+    unsigned long counts[LONG_INTS_PER_VECTOR]
+        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
 
-  int i, sum = 0;
+    int i, sum = 0;
 
-  VECTOR_STORE((CAST)counts, v);
+    VECTOR_STORE((CAST)counts, v);
 
-  for (i = 0; i < LONG_INTS_PER_VECTOR; i++)
-    sum += __builtin_popcountl(counts[i]);
+    for (i = 0; i < LONG_INTS_PER_VECTOR; i++)
+        sum += __builtin_popcountl(counts[i]);
 
-  return ((unsigned int)sum);
+    return ((unsigned int)sum);
 }
 #endif
 
@@ -233,27 +234,29 @@ static inline void storePerSiteNodeScores(partitionList *pr, int model,
                                           INT_TYPE v, unsigned int offset,
                                           int nodeNumber) {
 
-  unsigned long counts[LONG_INTS_PER_VECTOR]
-      __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-  parsimonyNumber *buf;
+    unsigned long counts[LONG_INTS_PER_VECTOR]
+        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+    parsimonyNumber *buf;
 
-  int i, j;
+    int i, j;
 
-  VECTOR_STORE((CAST)counts, v);
+    VECTOR_STORE((CAST)counts, v);
 
-  int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
-  int nodeStart = partialParsLength * nodeNumber;
-  int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
-  for (i = 0; i < LONG_INTS_PER_VECTOR; ++i) {
-    buf = &(pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
-    nodeStartPlusOffset += ULINT_SIZE;
-    //		buf = &(pr->partitionData[model]->perSitePartialPars[nodeStart +
-    // offset * PLL_PCF + i * ULINT_SIZE]); // Diep's 		buf =
-    //&(pr->partitionData[model]->perSitePartialPars[nodeStart + offset *
-    // PLL_PCF + i]); // Tomas's code
-    for (j = 0; j < ULINT_SIZE; ++j)
-      buf[j] += ((counts[i] >> j) & 1);
-  }
+    int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
+    int nodeStart = partialParsLength * nodeNumber;
+    int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
+    for (i = 0; i < LONG_INTS_PER_VECTOR; ++i) {
+        buf = &(
+            pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
+        nodeStartPlusOffset += ULINT_SIZE;
+        //		buf =
+        //&(pr->partitionData[model]->perSitePartialPars[nodeStart +
+        // offset * PLL_PCF + i * ULINT_SIZE]); // Diep's 		buf =
+        //&(pr->partitionData[model]->perSitePartialPars[nodeStart + offset *
+        // PLL_PCF + i]); // Tomas's code
+        for (j = 0; j < ULINT_SIZE; ++j)
+            buf[j] += ((counts[i] >> j) & 1);
+    }
 }
 
 // Diep:
@@ -262,23 +265,23 @@ static inline void storePerSiteNodeScores(partitionList *pr, int model,
 template <class VectorClass>
 void addPerSiteSubtreeScoresSIMD(partitionList *pr, int pNumber, int qNumber,
                                  int rNumber) {
-  assert(VectorClass::size() == INTS_PER_VECTOR);
-  parsimonyNumber *pBuf, *qBuf, *rBuf;
-  for (int i = 0; i < pr->numberOfPartitions; i++) {
-    int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
-    pBuf = &(
-        pr->partitionData[i]->perSitePartialPars[partialParsLength * pNumber]);
-    qBuf = &(
-        pr->partitionData[i]->perSitePartialPars[partialParsLength * qNumber]);
-    rBuf = &(
-        pr->partitionData[i]->perSitePartialPars[partialParsLength * rNumber]);
-    for (int k = 0; k < partialParsLength; k += VectorClass::size()) {
-      VectorClass *pBufVC = (VectorClass *)&pBuf[k];
-      VectorClass *qBufVC = (VectorClass *)&qBuf[k];
-      VectorClass *rBufVC = (VectorClass *)&rBuf[k];
-      *pBufVC += *qBufVC + *rBufVC;
+    assert(VectorClass::size() == INTS_PER_VECTOR);
+    parsimonyNumber *pBuf, *qBuf, *rBuf;
+    for (int i = 0; i < pr->numberOfPartitions; i++) {
+        int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
+        pBuf = &(pr->partitionData[i]
+                     ->perSitePartialPars[partialParsLength * pNumber]);
+        qBuf = &(pr->partitionData[i]
+                     ->perSitePartialPars[partialParsLength * qNumber]);
+        rBuf = &(pr->partitionData[i]
+                     ->perSitePartialPars[partialParsLength * rNumber]);
+        for (int k = 0; k < partialParsLength; k += VectorClass::size()) {
+            VectorClass *pBufVC = (VectorClass *)&pBuf[k];
+            VectorClass *qBufVC = (VectorClass *)&qBuf[k];
+            VectorClass *rBufVC = (VectorClass *)&rBuf[k];
+            *pBufVC += *qBufVC + *rBufVC;
+        }
     }
-  }
 }
 
 // Diep:
@@ -286,190 +289,190 @@ void addPerSiteSubtreeScoresSIMD(partitionList *pr, int pNumber, int qNumber,
 // q and r are children of p
 static void addPerSiteSubtreeScores(partitionList *pr, int pNumber, int qNumber,
                                     int rNumber) {
-  //	parsimonyNumber * pBuf, * qBuf, *rBuf;
-  //	for(int i = 0; i < pr->numberOfPartitions; i++){
-  //		int partialParsLength = pr->partitionData[i]->parsimonyLength *
-  // PLL_PCF; 		pBuf =
-  // &(pr->partitionData[i]->perSitePartialPars[partialParsLength
-  //* pNumber]); 		qBuf =
-  //&(pr->partitionData[i]->perSitePartialPars[partialParsLength * qNumber]);
-  //		rBuf =
-  //&(pr->partitionData[i]->perSitePartialPars[partialParsLength
-  //* rNumber]); 		for(int k = 0; k < partialParsLength; k++)
-  // pBuf[k] += qBuf[k] + rBuf[k];
-  //	}
+    //	parsimonyNumber * pBuf, * qBuf, *rBuf;
+    //	for(int i = 0; i < pr->numberOfPartitions; i++){
+    //		int partialParsLength = pr->partitionData[i]->parsimonyLength *
+    // PLL_PCF; 		pBuf =
+    // &(pr->partitionData[i]->perSitePartialPars[partialParsLength
+    //* pNumber]); 		qBuf =
+    //&(pr->partitionData[i]->perSitePartialPars[partialParsLength * qNumber]);
+    //		rBuf =
+    //&(pr->partitionData[i]->perSitePartialPars[partialParsLength
+    //* rNumber]); 		for(int k = 0; k < partialParsLength; k++)
+    // pBuf[k] += qBuf[k] + rBuf[k];
+    //	}
 
 #ifdef __AVX
-  addPerSiteSubtreeScoresSIMD<Vec8ui>(pr, pNumber, qNumber, rNumber);
+    addPerSiteSubtreeScoresSIMD<Vec8ui>(pr, pNumber, qNumber, rNumber);
 #else
-  addPerSiteSubtreeScoresSIMD<Vec4ui>(pr, pNumber, qNumber, rNumber);
+    addPerSiteSubtreeScoresSIMD<Vec4ui>(pr, pNumber, qNumber, rNumber);
 #endif
 }
 
 // Diep:
 // Reset site scores of p
 static void resetPerSiteNodeScores(partitionList *pr, int pNumber) {
-  parsimonyNumber *pBuf;
-  for (int i = 0; i < pr->numberOfPartitions; i++) {
-    int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
-    pBuf = &(
-        pr->partitionData[i]->perSitePartialPars[partialParsLength * pNumber]);
-    memset(pBuf, 0, partialParsLength * sizeof(parsimonyNumber));
-  }
+    parsimonyNumber *pBuf;
+    for (int i = 0; i < pr->numberOfPartitions; i++) {
+        int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
+        pBuf = &(pr->partitionData[i]
+                     ->perSitePartialPars[partialParsLength * pNumber]);
+        memset(pBuf, 0, partialParsLength * sizeof(parsimonyNumber));
+    }
 }
 #endif
 
 static int checkerPars(pllInstance *tr, nodeptr p) {
-  int group = tr->constraintVector[p->number];
+    int group = tr->constraintVector[p->number];
 
-  if (isTip(p->number, tr->mxtips)) {
-    group = tr->constraintVector[p->number];
-    return group;
-  } else {
-    if (group != -9)
-      return group;
+    if (isTip(p->number, tr->mxtips)) {
+        group = tr->constraintVector[p->number];
+        return group;
+    } else {
+        if (group != -9)
+            return group;
 
-    group = checkerPars(tr, p->next->back);
-    if (group != -9)
-      return group;
+        group = checkerPars(tr, p->next->back);
+        if (group != -9)
+            return group;
 
-    group = checkerPars(tr, p->next->next->back);
-    if (group != -9)
-      return group;
+        group = checkerPars(tr, p->next->next->back);
+        if (group != -9)
+            return group;
 
-    return -9;
-  }
+        return -9;
+    }
 }
 
 static pllBoolean tipHomogeneityCheckerPars(pllInstance *tr, nodeptr p,
                                             int grouping) {
-  if (isTip(p->number, tr->mxtips)) {
-    if (tr->constraintVector[p->number] != grouping)
-      return PLL_FALSE;
-    else
-      return PLL_TRUE;
-  } else {
-    return (tipHomogeneityCheckerPars(tr, p->next->back, grouping) &&
-            tipHomogeneityCheckerPars(tr, p->next->next->back, grouping));
-  }
+    if (isTip(p->number, tr->mxtips)) {
+        if (tr->constraintVector[p->number] != grouping)
+            return PLL_FALSE;
+        else
+            return PLL_TRUE;
+    } else {
+        return (tipHomogeneityCheckerPars(tr, p->next->back, grouping) &&
+                tipHomogeneityCheckerPars(tr, p->next->next->back, grouping));
+    }
 }
 
 static void getxnodeLocal(nodeptr p) {
-  // cout << "Reset\n";
-  nodeptr s;
+    nodeptr s;
 
-  if ((s = p->next)->xPars || (s = s->next)->xPars) {
-    p->xPars = s->xPars;
-    s->xPars = 0;
-  }
+    if ((s = p->next)->xPars || (s = s->next)->xPars) {
+        p->xPars = s->xPars;
+        s->xPars = 0;
+    }
 
-  assert(p->next->xPars || p->next->next->xPars || p->xPars);
+    assert(p->next->xPars || p->next->next->xPars || p->xPars);
 }
 static bool needRecalculate(nodeptr p, int maxTips) {
-  if (p->number <= maxTips)
-    return p->recalculate;
-  return p->recalculate || p->next->recalculate || p->next->next->recalculate;
+    if (p->number <= maxTips)
+        return p->recalculate;
+    return p->recalculate || p->next->recalculate || p->next->next->recalculate;
 }
 static void computeTraversalInfoParsimonyTBR(nodeptr p, int *ti, int *counter,
                                              int maxTips, int perSiteScores) {
 #if (defined(__SSE3) || defined(__AVX))
-  if (perSiteScores && pllCostMatrix == NULL) {
-    resetPerSiteNodeScores(iqtree->pllPartitions, p->number);
-  }
+    if (perSiteScores && pllCostMatrix == NULL) {
+        resetPerSiteNodeScores(iqtree->pllPartitions, p->number);
+    }
 #endif
-  p->recalculate = false;
-  if (p->number <= maxTips)
-    return;
-  if (!p->xPars)
-    getxnodeLocal(p);
-  p->next->recalculate = p->next->next->recalculate = false;
-  nodeptr q = p->next->back, r = p->next->next->back;
-  // cout << "computeTraversal\n";
-  q->par = r->par = p;
-  if (needRecalculate(q, maxTips))
-    computeTraversalInfoParsimonyTBR(q, ti, counter, maxTips, perSiteScores);
+    p->recalculate = false;
+    if (p->number <= maxTips)
+        return;
+    if (!p->xPars)
+        getxnodeLocal(p);
+    p->next->recalculate = p->next->next->recalculate = false;
+    nodeptr q = p->next->back, r = p->next->next->back;
+    // cout << "computeTraversal\n";
+    q->par = r->par = p;
+    if (needRecalculate(q, maxTips))
+        computeTraversalInfoParsimonyTBR(q, ti, counter, maxTips,
+                                         perSiteScores);
 
-  if (needRecalculate(r, maxTips))
-    computeTraversalInfoParsimonyTBR(r, ti, counter, maxTips, perSiteScores);
+    if (needRecalculate(r, maxTips))
+        computeTraversalInfoParsimonyTBR(r, ti, counter, maxTips,
+                                         perSiteScores);
 
-  ti[*counter] = p->number;
-  ti[*counter + 1] = q->number;
-  ti[*counter + 2] = r->number;
-  *counter = *counter + 4;
+    ti[*counter] = p->number;
+    ti[*counter + 1] = q->number;
+    ti[*counter + 2] = r->number;
+    *counter = *counter + 4;
 }
 
 static void computeTraversalInfoParsimony(nodeptr p, int *ti, int *counter,
                                           int maxTips, pllBoolean full,
                                           int perSiteScores) {
 #if (defined(__SSE3) || defined(__AVX))
-  if (perSiteScores && pllCostMatrix == NULL) {
-    resetPerSiteNodeScores(iqtree->pllPartitions, p->number);
-  }
+    if (perSiteScores && pllCostMatrix == NULL) {
+        resetPerSiteNodeScores(iqtree->pllPartitions, p->number);
+    }
 #endif
 
-  nodeptr q = p->next->back, r = p->next->next->back;
+    nodeptr q = p->next->back, r = p->next->next->back;
 
-  if (!p->xPars)
-    getxnodeLocal(p);
+    if (!p->xPars)
+        getxnodeLocal(p);
 
-  if (full) {
-    if (q->number > maxTips)
-      computeTraversalInfoParsimony(q, ti, counter, maxTips, full,
-                                    perSiteScores);
+    if (full) {
+        if (q->number > maxTips)
+            computeTraversalInfoParsimony(q, ti, counter, maxTips, full,
+                                          perSiteScores);
 
-    if (r->number > maxTips)
-      computeTraversalInfoParsimony(r, ti, counter, maxTips, full,
-                                    perSiteScores);
-  } else {
-    if (q->number > maxTips && !q->xPars)
-      computeTraversalInfoParsimony(q, ti, counter, maxTips, full,
-                                    perSiteScores);
+        if (r->number > maxTips)
+            computeTraversalInfoParsimony(r, ti, counter, maxTips, full,
+                                          perSiteScores);
+    } else {
+        if (q->number > maxTips && !q->xPars)
+            computeTraversalInfoParsimony(q, ti, counter, maxTips, full,
+                                          perSiteScores);
 
-    if (r->number > maxTips && !r->xPars)
-      computeTraversalInfoParsimony(r, ti, counter, maxTips, full,
-                                    perSiteScores);
-  }
+        if (r->number > maxTips && !r->xPars)
+            computeTraversalInfoParsimony(r, ti, counter, maxTips, full,
+                                          perSiteScores);
+    }
 
-  ti[*counter] = p->number;
-  ti[*counter + 1] = q->number;
-  ti[*counter + 2] = r->number;
-  *counter = *counter + 4;
+    ti[*counter] = p->number;
+    ti[*counter + 1] = q->number;
+    ti[*counter + 2] = r->number;
+    *counter = *counter + 4;
 }
 
 static void getRecalculateNodeTBR(nodeptr root, nodeptr root1, nodeptr u,
                                   nodeptr v) {
-  root->recalculate = root1->recalculate = true;
-  while (u != root && u != root1) {
-    assert(u != NULL);
-    u->recalculate = true;
-    u = u->par;
-  }
-  while (v != root && v != root1) {
-    assert(v != NULL);
-    v->recalculate = true;
-    v = v->par;
-  }
+    root->recalculate = root1->recalculate = true;
+    while (u != root && u != root1) {
+        // assert(u != NULL);
+        u->recalculate = true;
+        u = u->par;
+    }
+    while (v != root && v != root1) {
+        // assert(v != NULL);
+        v->recalculate = true;
+        v = v->par;
+    }
 }
 
 static unsigned int evaluateParsimonyTBR(pllInstance *tr, partitionList *pr,
                                          nodeptr u, nodeptr v, nodeptr w,
                                          int perSiteScores) {
-  volatile unsigned int result;
-  nodeptr p = tr->curRoot;
-  nodeptr q = tr->curRootBack;
-  int *ti = tr->ti, counter = 4;
+    volatile unsigned int result;
+    nodeptr p = tr->curRoot;
+    nodeptr q = tr->curRootBack;
+    int *ti = tr->ti, counter = 4;
 
-  ti[1] = w->number;
-  ti[2] = w->back->number;
-  // cout << "ABC\n";
-  getRecalculateNodeTBR(p, q, u, v);
-  computeTraversalInfoParsimonyTBR(w, ti, &counter, tr->mxtips, perSiteScores);
-  computeTraversalInfoParsimonyTBR(w->back, ti, &counter, tr->mxtips,
-                                   perSiteScores);
-  ti[0] = counter;
-  result = _evaluateParsimonyIterativeFast(tr, pr, perSiteScores);
-  // cout << "OK\n";
-  return result;
+    ti[1] = w->number;
+    ti[2] = w->back->number;
+    getRecalculateNodeTBR(p, q, u, v);
+    computeTraversalInfoParsimonyTBR(w, ti, &counter, tr->mxtips,
+                                     perSiteScores);
+    computeTraversalInfoParsimonyTBR(w->back, ti, &counter, tr->mxtips,
+                                     perSiteScores);
+    ti[0] = counter;
+    result = _evaluateParsimonyIterativeFast(tr, pr, perSiteScores);
+    return result;
 }
 
 /****************************************************************************************************************************************/
@@ -482,505 +485,518 @@ static unsigned int evaluateParsimonyTBR(pllInstance *tr, partitionList *pr,
 /* check whether site contains at least 2 different letters, i.e.
    whether it will generate a score */
 static pllBoolean isInformative(pllInstance *tr, int dataType, int site) {
-  if (globalParam && !globalParam->sort_alignment)
-    return PLL_TRUE; // because of the sync between IQTree and PLL alignment (to
-                     // get correct freq of pattern)
+    if (globalParam && !globalParam->sort_alignment)
+        return PLL_TRUE; // because of the sync between IQTree and PLL alignment
+                         // (to get correct freq of pattern)
 
-  int informativeCounter = 0, check[256], j,
-      undetermined = getUndetermined(dataType);
+    int informativeCounter = 0, check[256], j,
+        undetermined = getUndetermined(dataType);
 
-  const unsigned int *bitVector = getBitVector(dataType);
+    const unsigned int *bitVector = getBitVector(dataType);
 
-  unsigned char nucleotide;
+    unsigned char nucleotide;
 
-  for (j = 0; j < 256; j++)
-    check[j] = 0;
+    for (j = 0; j < 256; j++)
+        check[j] = 0;
 
-  for (j = 1; j <= tr->mxtips; j++) {
-    nucleotide = tr->yVector[j][site];
-    check[nucleotide] = 1;
-    assert(bitVector[nucleotide] > 0);
-  }
+    for (j = 1; j <= tr->mxtips; j++) {
+        nucleotide = tr->yVector[j][site];
+        check[nucleotide] = 1;
+        assert(bitVector[nucleotide] > 0);
+    }
 
-  for (j = 0; j < undetermined; j++) {
-    if (check[j] > 0)
-      informativeCounter++;
-  }
+    for (j = 0; j < undetermined; j++) {
+        if (check[j] > 0)
+            informativeCounter++;
+    }
 
-  if (informativeCounter > 1)
-    return PLL_TRUE;
+    if (informativeCounter > 1)
+        return PLL_TRUE;
 
-  return PLL_FALSE;
+    return PLL_FALSE;
 }
 static void determineUninformativeSites(pllInstance *tr, partitionList *pr,
                                         int *informative) {
-  int model, number = 0, i;
+    int model, number = 0, i;
 
-  /*
-     Not all characters are useful in constructing a parsimony tree.
-     Invariant characters, those that have the same state in all taxa,
-     are obviously useless and are ignored by the method. Characters in
-     which a state occurs in only one taxon are also ignored.
-     All these characters are called parsimony uninformative.
+    /*
+       Not all characters are useful in constructing a parsimony tree.
+       Invariant characters, those that have the same state in all taxa,
+       are obviously useless and are ignored by the method. Characters in
+       which a state occurs in only one taxon are also ignored.
+       All these characters are called parsimony uninformative.
 
-     Alternative definition: informative columns contain at least two types
-     of nucleotides, and each nucleotide must appear at least twice in each
-     column. Kind of a pain if we intend to check for this when using, e.g.,
-     amibiguous DNA encoding.
-  */
+       Alternative definition: informative columns contain at least two types
+       of nucleotides, and each nucleotide must appear at least twice in each
+       column. Kind of a pain if we intend to check for this when using, e.g.,
+       amibiguous DNA encoding.
+    */
 
-  for (model = 0; model < pr->numberOfPartitions; model++) {
+    for (model = 0; model < pr->numberOfPartitions; model++) {
 
-    for (i = pr->partitionData[model]->lower;
-         i < pr->partitionData[model]->upper; i++) {
-      if (isInformative(tr, pr->partitionData[model]->dataType, i)) {
-        informative[i] = 1;
-      } else {
-        informative[i] = 0;
-      }
+        for (i = pr->partitionData[model]->lower;
+             i < pr->partitionData[model]->upper; i++) {
+            if (isInformative(tr, pr->partitionData[model]->dataType, i)) {
+                informative[i] = 1;
+            } else {
+                informative[i] = 0;
+            }
+        }
     }
-  }
 
-  /* printf("Uninformative Patterns: %d\n", number); */
+    /* printf("Uninformative Patterns: %d\n", number); */
 }
 template <class Numeric, const int VECSIZE>
 static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
                                int *informative, int perSiteScores) {
-  //	cout << "Begin compressSankoffDNA()" << endl;
-  size_t totalNodes, i, model;
+    //	cout << "Begin compressSankoffDNA()" << endl;
+    size_t totalNodes, i, model;
 
-  totalNodes = 2 * (size_t)tr->mxtips;
+    totalNodes = 2 * (size_t)tr->mxtips;
 
-  for (model = 0; model < (size_t)pr->numberOfPartitions; model++) {
-    size_t k, states = (size_t)pr->partitionData[model]->states,
-              compressedEntries, compressedEntriesPadded, entries = 0,
-              lower = pr->partitionData[model]->lower,
-              upper = pr->partitionData[model]->upper;
+    for (model = 0; model < (size_t)pr->numberOfPartitions; model++) {
+        size_t k, states = (size_t)pr->partitionData[model]->states,
+                  compressedEntries, compressedEntriesPadded, entries = 0,
+                  lower = pr->partitionData[model]->lower,
+                  upper = pr->partitionData[model]->upper;
 
-    //      parsimonyNumber
-    //        **compressedTips = (parsimonyNumber **)rax_malloc(states *
-    //        sizeof(parsimonyNumber*)), *compressedValues = (parsimonyNumber
-    //        *)rax_malloc(states * sizeof(parsimonyNumber));
+        //      parsimonyNumber
+        //        **compressedTips = (parsimonyNumber **)rax_malloc(states *
+        //        sizeof(parsimonyNumber*)), *compressedValues =
+        //        (parsimonyNumber
+        //        *)rax_malloc(states * sizeof(parsimonyNumber));
 
-    for (i = lower; i < upper; i++)
-      if (informative[i])
-        entries++; // Diep: here,entries counts # informative pattern
+        for (i = lower; i < upper; i++)
+            if (informative[i])
+                entries++; // Diep: here,entries counts # informative pattern
 
-    // number of informative site patterns
-    compressedEntries = entries;
-
-#if (defined(__SSE3) || defined(__AVX))
-    if (compressedEntries % VECSIZE != 0)
-      compressedEntriesPadded =
-          compressedEntries + (VECSIZE - (compressedEntries % VECSIZE));
-    else
-      compressedEntriesPadded = compressedEntries;
-#else
-    compressedEntriesPadded = compressedEntries;
-#endif
-
-    // parsVect stores cost for each node by state at each pattern
-    // for a certain node of DNA: ptn1_A, ptn2_A, ptn3_A,..., ptn1_C, ptn2_C,
-    // ptn3_C,...,ptn1_G, ptn2_G, ptn3_G,...,ptn1_T, ptn2_T, ptn3_T,..., (not
-    // 100% sure) this is also the perSitePartialPars
-
-    rax_posix_memalign((void **)&(pr->partitionData[model]->parsVect),
-                       PLL_BYTE_ALIGNMENT,
-                       (size_t)compressedEntriesPadded * states * totalNodes *
-                           sizeof(parsimonyNumber));
-    memset(pr->partitionData[model]->parsVect, 0,
-           compressedEntriesPadded * states * totalNodes *
-               sizeof(parsimonyNumber));
-
-    rax_posix_memalign((void **)&(pr->partitionData[model]->informativePtnWgt),
-                       PLL_BYTE_ALIGNMENT,
-                       (size_t)compressedEntriesPadded * sizeof(Numeric));
-
-    memset(pr->partitionData[model]->informativePtnWgt, 0,
-           (size_t)compressedEntriesPadded * sizeof(Numeric));
-
-    if (perSiteScores) {
-      rax_posix_memalign(
-          (void **)&(pr->partitionData[model]->informativePtnScore),
-          PLL_BYTE_ALIGNMENT,
-          (size_t)compressedEntriesPadded * sizeof(Numeric));
-      memset(pr->partitionData[model]->informativePtnScore, 0,
-             (size_t)compressedEntriesPadded * sizeof(Numeric));
-    }
-
-    //      if (perSiteScores)
-    //       {
-    //         /* for per site parsimony score at each node */
-    //         rax_posix_memalign ((void **)
-    //         &(pr->partitionData[model]->perSitePartialPars),
-    //         PLL_BYTE_ALIGNMENT, totalNodes * (size_t)compressedEntriesPadded
-    //         * PLL_PCF * sizeof (parsimonyNumber)); for (i = 0; i < totalNodes
-    //         * (size_t)compressedEntriesPadded * PLL_PCF; ++i)
-    //        	 pr->partitionData[model]->perSitePartialPars[i] = 0;
-    //       }
-
-    // Diep: For each leaf
-    for (i = 0; i < (size_t)tr->mxtips; i++) {
-      size_t w = 0, compressedIndex = 0, compressedCounter = 0, index = 0,
-             informativeIndex = 0;
-
-      //          for(k = 0; k < states; k++)
-      //            {
-      //              compressedTips[k] =
-      //              &(pr->partitionData[model]->parsVect[(compressedEntriesPadded
-      //              * states * (i + 1)) + (compressedEntriesPadded * k)]);
-      //              compressedValues[k] = INT_MAX; // Diep
-      //            }
-
-      Numeric *tipVect =
-          (Numeric *)&pr->partitionData[model]
-              ->parsVect[(compressedEntriesPadded * states * (i + 1))];
-
-      Numeric *ptnWgt = (Numeric *)pr->partitionData[model]->informativePtnWgt;
-      // for each informative pattern
-      for (index = lower; index < (size_t)upper; index++) {
-
-        if (informative[index]) {
-          //                	cout << "index = " << index << endl;
-          const unsigned int *bitValue =
-              getBitVector(pr->partitionData[model]
-                               ->dataType); // Diep: bitValue is for dataType
-
-          parsimonyNumber value = bitValue[tr->yVector[i + 1][index]];
-
-          /*
-                  memory for score per node, assuming VectorClass::size()=2, and
-             states=4 (A,C,G,T) in block of size VectorClass::size()*states
-
-                  Index  0  1  2  3  4  5  6  7  8  9  10 ...
-                  Site   0  1  0  1  0  1  0  1  2  3   2 ...
-                  State  A  A  C  C  G  G  T  T  A  A   C ...
-
-          */
-
-          for (k = 0; k < states; k++) {
-            if (value & mask32[k])
-              tipVect[k * VECSIZE] = 0; // Diep: if the state is present,
-                                        // corresponding value is set to zero
-            else
-              tipVect[k * VECSIZE] = highest_cost;
-            //					  compressedTips[k][informativeIndex]
-            //= compressedValues[k]; // Diep
-            // cout << "compressedValues[k]: " << compressedValues[k] << endl;
-          }
-          ptnWgt[informativeIndex] = tr->aliaswgt[index];
-          informativeIndex++;
-
-          tipVect += 1; // process to the next site
-
-          // jump to the next block
-          if (informativeIndex % VECSIZE == 0)
-            tipVect += VECSIZE * (states - 1);
-        }
-      }
-
-      // dummy values for the last padded entries
-      for (index = informativeIndex; index < compressedEntriesPadded; index++) {
-
-        for (k = 0; k < states; k++) {
-          tipVect[k * VECSIZE] = 0;
-        }
-        tipVect += 1;
-      }
-    }
+        // number of informative site patterns
+        compressedEntries = entries;
 
 #if (defined(__SSE3) || defined(__AVX))
-    pr->partitionData[model]->parsimonyLength = compressedEntriesPadded;
+        if (compressedEntries % VECSIZE != 0)
+            compressedEntriesPadded =
+                compressedEntries + (VECSIZE - (compressedEntries % VECSIZE));
+        else
+            compressedEntriesPadded = compressedEntries;
 #else
-    pr->partitionData[model]->parsimonyLength =
-        compressedEntries; // for unvectorized version
+        compressedEntriesPadded = compressedEntries;
 #endif
-    //	cout << "compressedEntries = " << compressedEntries << endl;
-    //      rax_free(compressedTips);
-    //      rax_free(compressedValues);
-  }
 
-  // TODO: remove this for Sankoff?
+        // parsVect stores cost for each node by state at each pattern
+        // for a certain node of DNA: ptn1_A, ptn2_A, ptn3_A,..., ptn1_C,
+        // ptn2_C, ptn3_C,...,ptn1_G, ptn2_G, ptn3_G,...,ptn1_T, ptn2_T,
+        // ptn3_T,..., (not 100% sure) this is also the perSitePartialPars
 
-  rax_posix_memalign((void **)&(tr->parsimonyScore), PLL_BYTE_ALIGNMENT,
-                     sizeof(unsigned int) * totalNodes);
+        rax_posix_memalign((void **)&(pr->partitionData[model]->parsVect),
+                           PLL_BYTE_ALIGNMENT,
+                           (size_t)compressedEntriesPadded * states *
+                               totalNodes * sizeof(parsimonyNumber));
+        memset(pr->partitionData[model]->parsVect, 0,
+               compressedEntriesPadded * states * totalNodes *
+                   sizeof(parsimonyNumber));
 
-  for (i = 0; i < totalNodes; i++)
-    tr->parsimonyScore[i] = 0;
+        rax_posix_memalign(
+            (void **)&(pr->partitionData[model]->informativePtnWgt),
+            PLL_BYTE_ALIGNMENT,
+            (size_t)compressedEntriesPadded * sizeof(Numeric));
 
-  if ((!perSiteScores) && pllRepsSegments > 1) {
-    // compute lower-bound if not currently extracting per site score AND having
-    // > 1 segments
-    pllRemainderLowerBounds =
-        new parsimonyNumber[pllRepsSegments -
-                            1]; // last segment does not need lower bound
-    assert(iqtree != NULL);
-    int partitionId = 0;
-    int ptn;
-    int nptn = iqtree->aln->n_informative_patterns;
-    int *min_ptn_pars = new int[nptn];
+        memset(pr->partitionData[model]->informativePtnWgt, 0,
+               (size_t)compressedEntriesPadded * sizeof(Numeric));
 
-    for (ptn = 0; ptn < nptn; ptn++)
-      min_ptn_pars[ptn] = dynamic_cast<ParsTree *>(iqtree)->findMstScore(ptn);
+        if (perSiteScores) {
+            rax_posix_memalign(
+                (void **)&(pr->partitionData[model]->informativePtnScore),
+                PLL_BYTE_ALIGNMENT,
+                (size_t)compressedEntriesPadded * sizeof(Numeric));
+            memset(pr->partitionData[model]->informativePtnScore, 0,
+                   (size_t)compressedEntriesPadded * sizeof(Numeric));
+        }
 
-    for (int seg = 0; seg < pllRepsSegments - 1; seg++) {
-      pllRemainderLowerBounds[seg] = 0;
-      for (ptn = pllSegmentUpper[seg]; ptn < nptn; ptn++) {
-        pllRemainderLowerBounds[seg] +=
-            min_ptn_pars[ptn] *
-            pr->partitionData[partitionId]->informativePtnWgt[ptn];
-      }
+        //      if (perSiteScores)
+        //       {
+        //         /* for per site parsimony score at each node */
+        //         rax_posix_memalign ((void **)
+        //         &(pr->partitionData[model]->perSitePartialPars),
+        //         PLL_BYTE_ALIGNMENT, totalNodes *
+        //         (size_t)compressedEntriesPadded
+        //         * PLL_PCF * sizeof (parsimonyNumber)); for (i = 0; i <
+        //         totalNodes
+        //         * (size_t)compressedEntriesPadded * PLL_PCF; ++i)
+        //        	 pr->partitionData[model]->perSitePartialPars[i] = 0;
+        //       }
+
+        // Diep: For each leaf
+        for (i = 0; i < (size_t)tr->mxtips; i++) {
+            size_t w = 0, compressedIndex = 0, compressedCounter = 0, index = 0,
+                   informativeIndex = 0;
+
+            //          for(k = 0; k < states; k++)
+            //            {
+            //              compressedTips[k] =
+            //              &(pr->partitionData[model]->parsVect[(compressedEntriesPadded
+            //              * states * (i + 1)) + (compressedEntriesPadded *
+            //              k)]); compressedValues[k] = INT_MAX; // Diep
+            //            }
+
+            Numeric *tipVect =
+                (Numeric *)&pr->partitionData[model]
+                    ->parsVect[(compressedEntriesPadded * states * (i + 1))];
+
+            Numeric *ptnWgt =
+                (Numeric *)pr->partitionData[model]->informativePtnWgt;
+            // for each informative pattern
+            for (index = lower; index < (size_t)upper; index++) {
+
+                if (informative[index]) {
+                    //                	cout << "index = " << index << endl;
+                    const unsigned int *bitValue = getBitVector(
+                        pr->partitionData[model]
+                            ->dataType); // Diep: bitValue is for dataType
+
+                    parsimonyNumber value = bitValue[tr->yVector[i + 1][index]];
+
+                    /*
+                            memory for score per node, assuming
+                       VectorClass::size()=2, and states=4 (A,C,G,T) in block of
+                       size VectorClass::size()*states
+
+                            Index  0  1  2  3  4  5  6  7  8  9  10 ...
+                            Site   0  1  0  1  0  1  0  1  2  3   2 ...
+                            State  A  A  C  C  G  G  T  T  A  A   C ...
+
+                    */
+
+                    for (k = 0; k < states; k++) {
+                        if (value & mask32[k])
+                            tipVect[k * VECSIZE] =
+                                0; // Diep: if the state is present,
+                                   // corresponding value is set to zero
+                        else
+                            tipVect[k * VECSIZE] = highest_cost;
+                        //					  compressedTips[k][informativeIndex]
+                        //= compressedValues[k]; // Diep
+                        // cout << "compressedValues[k]: " <<
+                        // compressedValues[k] << endl;
+                    }
+                    ptnWgt[informativeIndex] = tr->aliaswgt[index];
+                    informativeIndex++;
+
+                    tipVect += 1; // process to the next site
+
+                    // jump to the next block
+                    if (informativeIndex % VECSIZE == 0)
+                        tipVect += VECSIZE * (states - 1);
+                }
+            }
+
+            // dummy values for the last padded entries
+            for (index = informativeIndex; index < compressedEntriesPadded;
+                 index++) {
+
+                for (k = 0; k < states; k++) {
+                    tipVect[k * VECSIZE] = 0;
+                }
+                tipVect += 1;
+            }
+        }
+
+#if (defined(__SSE3) || defined(__AVX))
+        pr->partitionData[model]->parsimonyLength = compressedEntriesPadded;
+#else
+        pr->partitionData[model]->parsimonyLength =
+            compressedEntries; // for unvectorized version
+#endif
+        //	cout << "compressedEntries = " << compressedEntries << endl;
+        //      rax_free(compressedTips);
+        //      rax_free(compressedValues);
     }
 
-    delete[] min_ptn_pars;
-  } else
-    pllRemainderLowerBounds = NULL;
+    // TODO: remove this for Sankoff?
+
+    rax_posix_memalign((void **)&(tr->parsimonyScore), PLL_BYTE_ALIGNMENT,
+                       sizeof(unsigned int) * totalNodes);
+
+    for (i = 0; i < totalNodes; i++)
+        tr->parsimonyScore[i] = 0;
+
+    if ((!perSiteScores) && pllRepsSegments > 1) {
+        // compute lower-bound if not currently extracting per site score AND
+        // having > 1 segments
+        pllRemainderLowerBounds =
+            new parsimonyNumber[pllRepsSegments -
+                                1]; // last segment does not need lower bound
+        assert(iqtree != NULL);
+        int partitionId = 0;
+        int ptn;
+        int nptn = iqtree->aln->n_informative_patterns;
+        int *min_ptn_pars = new int[nptn];
+
+        for (ptn = 0; ptn < nptn; ptn++)
+            min_ptn_pars[ptn] =
+                dynamic_cast<ParsTree *>(iqtree)->findMstScore(ptn);
+
+        for (int seg = 0; seg < pllRepsSegments - 1; seg++) {
+            pllRemainderLowerBounds[seg] = 0;
+            for (ptn = pllSegmentUpper[seg]; ptn < nptn; ptn++) {
+                pllRemainderLowerBounds[seg] +=
+                    min_ptn_pars[ptn] *
+                    pr->partitionData[partitionId]->informativePtnWgt[ptn];
+            }
+        }
+
+        delete[] min_ptn_pars;
+    } else
+        pllRemainderLowerBounds = NULL;
 }
 static void _updateInternalPllOnRatchet(pllInstance *tr, partitionList *pr) {
-  //	cout << "lower = " << pr->partitionData[0]->lower << ", upper = " <<
-  // pr->partitionData[0]->upper << ", aln->size() = " << iqtree->aln->size() <<
-  // endl;
-  for (int i = 0; i < pr->numberOfPartitions; i++) {
-    for (int ptn = pr->partitionData[i]->lower;
-         ptn < pr->partitionData[i]->upper; ptn++) {
-      tr->aliaswgt[ptn] = iqtree->aln->at(ptn).frequency;
+    //	cout << "lower = " << pr->partitionData[0]->lower << ", upper = " <<
+    // pr->partitionData[0]->upper << ", aln->size() = " << iqtree->aln->size()
+    // << endl;
+    for (int i = 0; i < pr->numberOfPartitions; i++) {
+        for (int ptn = pr->partitionData[i]->lower;
+             ptn < pr->partitionData[i]->upper; ptn++) {
+            tr->aliaswgt[ptn] = iqtree->aln->at(ptn).frequency;
+        }
     }
-  }
 }
 static void compressDNA(pllInstance *tr, partitionList *pr, int *informative,
                         int perSiteScores) {
-  if (pllCostMatrix != NULL) {
-    if (globalParam->sankoff_short_int)
-      return compressSankoffDNA<parsimonyNumberShort, USHORT_PER_VECTOR>(
-          tr, pr, informative, perSiteScores);
-    else
-      return compressSankoffDNA<parsimonyNumber, INTS_PER_VECTOR>(
-          tr, pr, informative, perSiteScores);
-  }
+    if (pllCostMatrix != NULL) {
+        if (globalParam->sankoff_short_int)
+            return compressSankoffDNA<parsimonyNumberShort, USHORT_PER_VECTOR>(
+                tr, pr, informative, perSiteScores);
+        else
+            return compressSankoffDNA<parsimonyNumber, INTS_PER_VECTOR>(
+                tr, pr, informative, perSiteScores);
+    }
 
-  size_t totalNodes, i, model;
+    size_t totalNodes, i, model;
 
-  totalNodes = 2 * (size_t)tr->mxtips;
+    totalNodes = 2 * (size_t)tr->mxtips;
 
-  for (model = 0; model < (size_t)pr->numberOfPartitions; model++) {
-    size_t k, states = (size_t)pr->partitionData[model]->states,
-              compressedEntries, compressedEntriesPadded, entries = 0,
-              lower = pr->partitionData[model]->lower,
-              upper = pr->partitionData[model]->upper;
+    for (model = 0; model < (size_t)pr->numberOfPartitions; model++) {
+        size_t k, states = (size_t)pr->partitionData[model]->states,
+                  compressedEntries, compressedEntriesPadded, entries = 0,
+                  lower = pr->partitionData[model]->lower,
+                  upper = pr->partitionData[model]->upper;
 
-    parsimonyNumber **compressedTips = (parsimonyNumber **)rax_malloc(
-                        states * sizeof(parsimonyNumber *)),
-                    *compressedValues = (parsimonyNumber *)rax_malloc(
-                        states * sizeof(parsimonyNumber));
+        parsimonyNumber **compressedTips = (parsimonyNumber **)rax_malloc(
+                            states * sizeof(parsimonyNumber *)),
+                        *compressedValues = (parsimonyNumber *)rax_malloc(
+                            states * sizeof(parsimonyNumber));
 
-    pr->partitionData[model]->numInformativePatterns =
-        0; // to fix score bug THAT too many uninformative sites cause
-           // out-of-bound array access
+        pr->partitionData[model]->numInformativePatterns =
+            0; // to fix score bug THAT too many uninformative sites cause
+               // out-of-bound array access
 
-    for (i = lower; i < upper; i++)
-      if (informative[i]) {
-        entries += (size_t)tr->aliaswgt[i];
-        pr->partitionData[model]->numInformativePatterns++;
-      }
+        for (i = lower; i < upper; i++)
+            if (informative[i]) {
+                entries += (size_t)tr->aliaswgt[i];
+                pr->partitionData[model]->numInformativePatterns++;
+            }
 
-    compressedEntries = entries / PLL_PCF;
+        compressedEntries = entries / PLL_PCF;
 
-    if (entries % PLL_PCF != 0)
-      compressedEntries++;
+        if (entries % PLL_PCF != 0)
+            compressedEntries++;
 
 #if (defined(__SSE3) || defined(__AVX))
-    if (compressedEntries % INTS_PER_VECTOR != 0)
-      compressedEntriesPadded =
-          compressedEntries +
-          (INTS_PER_VECTOR - (compressedEntries % INTS_PER_VECTOR));
-    else
-      compressedEntriesPadded = compressedEntries;
+        if (compressedEntries % INTS_PER_VECTOR != 0)
+            compressedEntriesPadded =
+                compressedEntries +
+                (INTS_PER_VECTOR - (compressedEntries % INTS_PER_VECTOR));
+        else
+            compressedEntriesPadded = compressedEntries;
 #else
-    compressedEntriesPadded = compressedEntries;
+        compressedEntriesPadded = compressedEntries;
 #endif
 
-    rax_posix_memalign((void **)&(pr->partitionData[model]->parsVect),
-                       PLL_BYTE_ALIGNMENT,
-                       (size_t)compressedEntriesPadded * states * totalNodes *
-                           sizeof(parsimonyNumber));
+        rax_posix_memalign((void **)&(pr->partitionData[model]->parsVect),
+                           PLL_BYTE_ALIGNMENT,
+                           (size_t)compressedEntriesPadded * states *
+                               totalNodes * sizeof(parsimonyNumber));
 
-    for (i = 0; i < compressedEntriesPadded * states * totalNodes; i++)
-      pr->partitionData[model]->parsVect[i] = 0;
+        for (i = 0; i < compressedEntriesPadded * states * totalNodes; i++)
+            pr->partitionData[model]->parsVect[i] = 0;
 
-    if (perSiteScores) {
-      /* for per site parsimony score at each node */
-      rax_posix_memalign(
-          (void **)&(pr->partitionData[model]->perSitePartialPars),
-          PLL_BYTE_ALIGNMENT,
-          totalNodes * (size_t)compressedEntriesPadded * PLL_PCF *
-              sizeof(parsimonyNumber));
-      for (i = 0; i < totalNodes * (size_t)compressedEntriesPadded * PLL_PCF;
-           ++i)
-        pr->partitionData[model]->perSitePartialPars[i] = 0;
-    }
+        if (perSiteScores) {
+            /* for per site parsimony score at each node */
+            rax_posix_memalign(
+                (void **)&(pr->partitionData[model]->perSitePartialPars),
+                PLL_BYTE_ALIGNMENT,
+                totalNodes * (size_t)compressedEntriesPadded * PLL_PCF *
+                    sizeof(parsimonyNumber));
+            for (i = 0;
+                 i < totalNodes * (size_t)compressedEntriesPadded * PLL_PCF;
+                 ++i)
+                pr->partitionData[model]->perSitePartialPars[i] = 0;
+        }
 
-    for (i = 0; i < (size_t)tr->mxtips; i++) {
-      size_t w = 0, compressedIndex = 0, compressedCounter = 0, index = 0;
+        for (i = 0; i < (size_t)tr->mxtips; i++) {
+            size_t w = 0, compressedIndex = 0, compressedCounter = 0, index = 0;
 
-      for (k = 0; k < states; k++) {
-        compressedTips[k] =
-            &(pr->partitionData[model]
-                  ->parsVect[(compressedEntriesPadded * states * (i + 1)) +
-                             (compressedEntriesPadded * k)]);
-        compressedValues[k] = 0;
-      }
-
-      for (index = lower; index < (size_t)upper; index++) {
-        if (informative[index]) {
-          const unsigned int *bitValue =
-              getBitVector(pr->partitionData[model]->dataType);
-
-          parsimonyNumber value = bitValue[tr->yVector[i + 1][index]];
-
-          for (w = 0; w < (size_t)tr->aliaswgt[index]; w++) {
             for (k = 0; k < states; k++) {
-              if (value & mask32[k])
-                compressedValues[k] |= mask32[compressedCounter];
-            }
-
-            compressedCounter++;
-
-            if (compressedCounter == PLL_PCF) {
-              for (k = 0; k < states; k++) {
-                compressedTips[k][compressedIndex] = compressedValues[k];
+                compressedTips[k] =
+                    &(pr->partitionData[model]
+                          ->parsVect[(compressedEntriesPadded * states *
+                                      (i + 1)) +
+                                     (compressedEntriesPadded * k)]);
                 compressedValues[k] = 0;
-              }
-
-              compressedCounter = 0;
-              compressedIndex++;
             }
-          }
+
+            for (index = lower; index < (size_t)upper; index++) {
+                if (informative[index]) {
+                    const unsigned int *bitValue =
+                        getBitVector(pr->partitionData[model]->dataType);
+
+                    parsimonyNumber value = bitValue[tr->yVector[i + 1][index]];
+
+                    for (w = 0; w < (size_t)tr->aliaswgt[index]; w++) {
+                        for (k = 0; k < states; k++) {
+                            if (value & mask32[k])
+                                compressedValues[k] |=
+                                    mask32[compressedCounter];
+                        }
+
+                        compressedCounter++;
+
+                        if (compressedCounter == PLL_PCF) {
+                            for (k = 0; k < states; k++) {
+                                compressedTips[k][compressedIndex] =
+                                    compressedValues[k];
+                                compressedValues[k] = 0;
+                            }
+
+                            compressedCounter = 0;
+                            compressedIndex++;
+                        }
+                    }
+                }
+            }
+
+            for (; compressedIndex < compressedEntriesPadded;
+                 compressedIndex++) {
+                for (; compressedCounter < PLL_PCF; compressedCounter++)
+                    for (k = 0; k < states; k++)
+                        compressedValues[k] |= mask32[compressedCounter];
+
+                for (k = 0; k < states; k++) {
+                    compressedTips[k][compressedIndex] = compressedValues[k];
+                    compressedValues[k] = 0;
+                }
+
+                compressedCounter = 0;
+            }
         }
-      }
 
-      for (; compressedIndex < compressedEntriesPadded; compressedIndex++) {
-        for (; compressedCounter < PLL_PCF; compressedCounter++)
-          for (k = 0; k < states; k++)
-            compressedValues[k] |= mask32[compressedCounter];
+        pr->partitionData[model]->parsimonyLength = compressedEntriesPadded;
 
-        for (k = 0; k < states; k++) {
-          compressedTips[k][compressedIndex] = compressedValues[k];
-          compressedValues[k] = 0;
-        }
-
-        compressedCounter = 0;
-      }
+        rax_free(compressedTips);
+        rax_free(compressedValues);
     }
 
-    pr->partitionData[model]->parsimonyLength = compressedEntriesPadded;
+    rax_posix_memalign((void **)&(tr->parsimonyScore), PLL_BYTE_ALIGNMENT,
+                       sizeof(unsigned int) * totalNodes);
 
-    rax_free(compressedTips);
-    rax_free(compressedValues);
-  }
-
-  rax_posix_memalign((void **)&(tr->parsimonyScore), PLL_BYTE_ALIGNMENT,
-                     sizeof(unsigned int) * totalNodes);
-
-  for (i = 0; i < totalNodes; i++)
-    tr->parsimonyScore[i] = 0;
+    for (i = 0; i < totalNodes; i++)
+        tr->parsimonyScore[i] = 0;
 }
 
 void _allocateParsimonyDataStructuresTBR(pllInstance *tr, partitionList *pr,
                                          int perSiteScores) {
-  int i;
-  int *informative =
-      (int *)rax_malloc(sizeof(int) * (size_t)tr->originalCrunchedLength);
-  determineUninformativeSites(tr, pr, informative);
+    int i;
+    int *informative =
+        (int *)rax_malloc(sizeof(int) * (size_t)tr->originalCrunchedLength);
+    determineUninformativeSites(tr, pr, informative);
 
-  if (pllCostMatrix) {
-    for (int i = 0; i < pr->numberOfPartitions; i++) {
-      pr->partitionData[i]->informativePtnWgt = NULL;
-      pr->partitionData[i]->informativePtnScore = NULL;
+    if (pllCostMatrix) {
+        for (int i = 0; i < pr->numberOfPartitions; i++) {
+            pr->partitionData[i]->informativePtnWgt = NULL;
+            pr->partitionData[i]->informativePtnScore = NULL;
+        }
     }
-  }
 
-  compressDNA(tr, pr, informative, perSiteScores);
-  // cout << "Allocate parismony data structures\n";
-  for (i = 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
-    nodeptr p = tr->nodep[i];
-    p->recalculate = 0;
-    p->xPars = 1;
-    if (i > tr->mxtips) {
-      p->next->xPars = 0;
-      p->next->next->xPars = 0;
+    compressDNA(tr, pr, informative, perSiteScores);
+    // cout << "Allocate parismony data structures\n";
+    for (i = 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
+        nodeptr p = tr->nodep[i];
+        p->recalculate = 0;
+        p->xPars = 1;
+        if (i > tr->mxtips) {
+            p->next->xPars = 0;
+            p->next->next->xPars = 0;
+        }
     }
-  }
 
-  tr->ti = (int *)rax_malloc(sizeof(int) * 4 * (size_t)tr->mxtips);
+    tr->ti = (int *)rax_malloc(sizeof(int) * 4 * (size_t)tr->mxtips);
 
-  rax_free(informative);
+    rax_free(informative);
 }
 
 int pllSaveCurrentTreeTBRParsimony(pllInstance *tr, partitionList *pr,
                                    int cur_search_pars) {
-  iqtree->saveCurrentTree(-cur_search_pars);
-  return (int)(cur_search_pars);
+    iqtree->saveCurrentTree(-cur_search_pars);
+    return (int)(cur_search_pars);
 }
 
 static void reorderNodes(pllInstance *tr, nodeptr *np, nodeptr p, int *count,
                          bool resetParent = false) {
-  if ((p->number <= tr->mxtips))
-    return;
-  else {
-    tr->nodep[*count + tr->mxtips + 1] = p;
-    *count = *count + 1;
-    assert(p->xPars || resetParent);
-    if (resetParent)
-      p->next->back->par = p->next->next->back->par = p;
+    if ((p->number <= tr->mxtips))
+        return;
+    else {
+        tr->nodep[*count + tr->mxtips + 1] = p;
+        *count = *count + 1;
+        assert(p->xPars || resetParent);
+        if (resetParent)
+            p->next->back->par = p->next->next->back->par = p;
 
-    reorderNodes(tr, np, p->next->back, count, resetParent);
-    reorderNodes(tr, np, p->next->next->back, count, resetParent);
-  }
+        reorderNodes(tr, np, p->next->back, count, resetParent);
+        reorderNodes(tr, np, p->next->next->back, count, resetParent);
+    }
 }
 static void nodeRectifierPars(pllInstance *tr, bool reset = false) {
-  nodeptr *np = (nodeptr *)rax_malloc(2 * tr->mxtips * sizeof(nodeptr));
-  int i;
-  int count = 0;
-  tr->start = tr->nodep[1];
-  tr->rooted = PLL_FALSE;
-  /* TODO why is tr->rooted set to PLL_FALSE here ?*/
-  if (reset) {
-    tr->curRoot = tr->nodep[1];
-    tr->curRootBack = tr->nodep[1]->back;
-    tr->curRoot->par = NULL;
-    tr->start->back->par = tr->start;
-  }
+    nodeptr *np = (nodeptr *)rax_malloc(2 * tr->mxtips * sizeof(nodeptr));
+    int i;
+    int count = 0;
+    tr->start = tr->nodep[1];
+    tr->rooted = PLL_FALSE;
+    /* TODO why is tr->rooted set to PLL_FALSE here ?*/
+    if (reset) {
+        tr->curRoot = tr->nodep[1];
+        tr->curRootBack = tr->nodep[1]->back;
+        tr->curRoot->par = NULL;
+        tr->start->back->par = tr->start;
+    }
 
-  for (i = tr->mxtips + 1; i <= (tr->mxtips + tr->mxtips - 1); i++)
-    np[i] = tr->nodep[i];
+    for (i = tr->mxtips + 1; i <= (tr->mxtips + tr->mxtips - 1); i++)
+        np[i] = tr->nodep[i];
 
-  reorderNodes(tr, np, tr->curRoot, &count, reset);
-  reorderNodes(tr, np, tr->curRoot->back, &count, reset);
+    reorderNodes(tr, np, tr->curRoot, &count, reset);
+    reorderNodes(tr, np, tr->curRoot->back, &count, reset);
 
-  rax_free(np);
+    rax_free(np);
 }
 
 static bool restoreTreeRearrangeParsimonyTBR(pllInstance *tr, partitionList *pr,
                                              int perSiteScores) {
-  nodeptr q, r, rb, qb;
+    nodeptr q, r, rb, qb;
 
-  if (!pllTbrRemoveBranch(tr, pr, tr->TBR_removeBranch)) {
-    return PLL_FALSE;
-  }
-  q = tr->TBR_insertBranch1;
-  r = tr->TBR_insertBranch2;
-  q = (q->xPars ? q : q->back);
-  r = (r->xPars ? r : r->back);
-  if (!pllTbrConnectSubtrees(tr, q, r, &tr->TBR_removeBranch, &qb, &rb)) {
-    /* Undo remove branch. This operation should be done without errors. */
-    // assert(pllTbrConnectSubtreesML (tr, pr, q, r));
-    return PLL_FALSE;
-  }
-  evaluateParsimonyTBR(tr, pr, q, r, tr->TBR_removeBranch, perSiteScores);
-  tr->curRoot = tr->TBR_removeBranch;
-  tr->curRootBack = tr->TBR_removeBranch->back;
+    if (!pllTbrRemoveBranch(tr, pr, tr->TBR_removeBranch)) {
+        return PLL_FALSE;
+    }
+    q = tr->TBR_insertBranch1;
+    r = tr->TBR_insertBranch2;
+    q = (q->xPars ? q : q->back);
+    r = (r->xPars ? r : r->back);
+    if (!pllTbrConnectSubtrees(tr, q, r, &tr->TBR_removeBranch, &qb, &rb)) {
+        return PLL_FALSE;
+    }
+    evaluateParsimonyTBR(tr, pr, q, r, tr->TBR_removeBranch, perSiteScores);
+    tr->curRoot = tr->TBR_removeBranch;
+    tr->curRootBack = tr->TBR_removeBranch->back;
 
-  return PLL_TRUE;
+    return PLL_TRUE;
 }
 
 /**
@@ -995,210 +1011,187 @@ static bool restoreTreeRearrangeParsimonyTBR(pllInstance *tr, partitionList *pr,
  * @return PLL_TRUE if OK, PLL_FALSE and sets errno in case of error
  */
 int pllTbrRemoveBranch(pllInstance *tr, partitionList *pr, nodeptr p) {
-  // cout << "Remove\n";
-  int i;
-  nodeptr p1, p2, q1, q2;
-  nodeptr tmpNode;
-  // double * nextZP, * nextZQ;
-  // int numBranchLengths;
+    int i;
+    nodeptr p1, p2, q1, q2;
+    nodeptr tmpNode;
 
-  // Evaluate pre-conditions
-  // P1 : ( p in tr )
-  // for (tmpNode = tr->start->next->back; tmpNode != tr->start && tmpNode != p;
-  //     tmpNode = tmpNode->next->back)
-  //   ;
-  // if(tmpNode != p) {
-  //     // errno = PLL_TBR_INVALID_NODE;
-  //     cout << "p is not in tr\n";
-  //     return PLL_FALSE;
-  // }
-  // P2 : ( p is an inner branch )
-  if (!(p->number > tr->mxtips && p->back->number > tr->mxtips)) {
-    // errno = PLL_TBR_NOT_INNER_BRANCH;
-    cout << "p is not an inner branch\n";
-    return PLL_FALSE;
-  }
+    // Evaluate pre-conditions
+    // P1 : ( p in tr )
 
-  p1 = p->next->back;
-  p2 = p->next->next->back;
-  q1 = p->back->next->back;
-  q2 = p->back->next->next->back;
+    // for (tmpNode = tr->start->next->back;
+    //      tmpNode != tr->start && tmpNode != p;
+    //      tmpNode = tmpNode->next->back) ;
+    //
+    // if(tmpNode != p) {
+    //     // errno = PLL_TBR_INVALID_NODE;
+    //     cout << "p is not in tr\n";
+    //     return PLL_FALSE;
+    // }
 
-  // // Connect p neighbors (sum branches)
-  // numBranchLengths = pr->perGeneBranchLengths ? pr->numberOfPartitions : 1;
-  // nextZP = (double *) rax_malloc ( (size_t) numBranchLengths *
-  // sizeof(double)); if (!nextZP) {
-  //     return PLL_FALSE;
-  // }
-  // nextZQ = (double *) rax_malloc ( (size_t) numBranchLengths *
-  // sizeof(double)); if (!nextZQ) {
-  //     free(nextZP);
-  //     return PLL_FALSE;
-  // }
+    // P2 : ( p is an inner branch )
+    if (!(p->number > tr->mxtips && p->back->number > tr->mxtips)) {
+        // errno = PLL_TBR_NOT_INNER_BRANCH;
+        return PLL_FALSE;
+    }
 
-  // for (i = 0; i < numBranchLengths; i++)
-  // {
-  //     nextZP[i] = exp(log(p1->z[i]) + log(p2->z[i]));
-  //     nextZQ[i] = exp(log(q1->z[i]) + log(q2->z[i]));
-  //
-  hookupDefault(p1, p2);
-  hookupDefault(q1, q2);
+    p1 = p->next->back;
+    p2 = p->next->next->back;
+    q1 = p->back->next->back;
+    q2 = p->back->next->next->back;
 
-  // free(nextZP);
-  // free(nextZQ);
+    hookupDefault(p1, p2);
+    hookupDefault(q1, q2);
 
-  // Disconnect p->p* branch
-  p->next->back = 0;
-  p->next->next->back = 0;
-  p->back->next->back = 0;
-  p->back->next->next->back = 0;
+    // Disconnect p->p* branch
+    p->next->back = 0;
+    p->next->next->back = 0;
+    p->back->next->back = 0;
+    p->back->next->next->back = 0;
 
-  // Evaluate post-conditions?
+    // Evaluate post-conditions?
 
-  return PLL_TRUE;
+    return PLL_TRUE;
 }
 
 static int pllTbrConnectSubtrees(pllInstance *tr, nodeptr p, nodeptr q,
                                  nodeptr *freeBranch, nodeptr *pb,
                                  nodeptr *qb) {
-  int i;
-  nodeptr tmpNode;
+    int i;
+    nodeptr tmpNode;
 
-  *pb = 0;
-  *qb = 0;
+    *pb = 0;
+    *qb = 0;
 
-  // Evaluate preconditions
+    // Evaluate preconditions
 
-  // p and q must be connected and independent branches
-  if (!(p && q && (p != q) && p->back && q->back && (p->back != q) &&
-        (q->back != p))) {
-    // errno = PLL_TBR_INVALID_NODE;
-    return PLL_FALSE;
-  }
-
-  // // p and q must belong to different subtrees. We check that we cannot reach
-  // q starting from p for (tmpNode = p->next->back; tmpNode != p && tmpNode !=
-  // q;
-  //     tmpNode = tmpNode->next->back)
-  //   ;
-  // if (tmpNode == q)
-  //   {
-  //     // p and q are in the same subtree
-  //     // errno = PLL_TBR_INVALID_NODE;
-  //     return PLL_FALSE;
-  //   }
-
-  (*pb) = p->back;
-  (*qb) = q->back;
-  tmpNode = 0;
-  assert(freeBranch != NULL);
-  if (!freeBranch) {
-    // Must exist an unconnected branch
-    for (i = 1; i <= (2 * tr->mxtips - 3); i++) {
-      if (!(tr->nodep[i]->back && tr->nodep[i]->next->back)) {
-        tmpNode = tr->nodep[i];
-
-        // It should have one and only one connected node
-        if (tmpNode->next->back &&
-            !(tmpNode->back || tmpNode->next->next->back)) {
-          tmpNode = tmpNode->next->back;
-        } else if (tmpNode->next->next->back &&
-                   !(tmpNode->back || tmpNode->next->back)) {
-          tmpNode = tmpNode->next->next->back;
-        } else if (!(tmpNode->back || tmpNode->next->back ||
-                     tmpNode->next->next->back)) {
-          // There is no missing branch
-          // errno = PLL_TBR_INVALID_NODE;
-          return PLL_FALSE;
-        }
-        break;
-      }
+    // p and q must be connected and independent branches
+    if (!(p && q && (p != q) && p->back && q->back && (p->back != q) &&
+          (q->back != p))) {
+        // errno = PLL_TBR_INVALID_NODE;
+        return PLL_FALSE;
     }
-  }
 
-  if (!tmpNode && !freeBranch) {
-    // There is no missing branch
-    // errno = PLL_TBR_MISSING_FREE_BRANCH;
-    return PLL_FALSE;
-  }
+    // p and q must belong to different subtrees. We check that we cannot
+    // reach q starting from p
 
-  if (!freeBranch)
-    (*freeBranch) = tmpNode;
-  if ((*freeBranch)->back->xPars)
-    (*freeBranch) = (*freeBranch)->back;
-  assert((*freeBranch)->xPars);
+    // for (tmpNode = p->next->back; tmpNode != p &&
+    // tmpNode != q;
+    //     tmpNode = tmpNode->next->back)
+    //   ;
+    // if (tmpNode == q)
+    //   {
+    //     // p and q are in the same subtree
+    //     // errno = PLL_TBR_INVALID_NODE;
+    //     return PLL_FALSE;
+    //   }
 
-  // Join subtrees
-  // assert(p->xPars || (*pb)->xPars);
-  // assert(q->xPars || (*qb)->xPars);
-  hookupDefault(p, (*freeBranch)->next);
-  hookupDefault((*pb), (*freeBranch)->next->next);
-  hookupDefault(q, (*freeBranch)->back->next);
-  hookupDefault((*qb), (*freeBranch)->back->next->next);
+    (*pb) = p->back;
+    (*qb) = q->back;
+    tmpNode = 0;
+    if (!freeBranch) {
+        // Must exist an unconnected branch
+        for (i = 1; i <= (2 * tr->mxtips - 3); i++) {
+            if (!(tr->nodep[i]->back && tr->nodep[i]->next->back)) {
+                tmpNode = tr->nodep[i];
 
-  return PLL_TRUE;
+                // It should have one and only one connected node
+                if (tmpNode->next->back &&
+                    !(tmpNode->back || tmpNode->next->next->back)) {
+                    tmpNode = tmpNode->next->back;
+                } else if (tmpNode->next->next->back &&
+                           !(tmpNode->back || tmpNode->next->back)) {
+                    tmpNode = tmpNode->next->next->back;
+                } else if (!(tmpNode->back || tmpNode->next->back ||
+                             tmpNode->next->next->back)) {
+                    // There is no missing branch
+                    // errno = PLL_TBR_INVALID_NODE;
+                    return PLL_FALSE;
+                }
+                break;
+            }
+        }
+    }
+
+    if (!tmpNode && !freeBranch) {
+        // There is no missing branch
+        // errno = PLL_TBR_MISSING_FREE_BRANCH;
+        return PLL_FALSE;
+    }
+
+    if (!freeBranch)
+        (*freeBranch) = tmpNode;
+    if ((*freeBranch)->back->xPars)
+        (*freeBranch) = (*freeBranch)->back;
+    assert((*freeBranch)->xPars);
+
+    // Join subtrees
+    hookupDefault(p, (*freeBranch)->next);
+    hookupDefault((*pb), (*freeBranch)->next->next);
+    hookupDefault(q, (*freeBranch)->back->next);
+    hookupDefault((*qb), (*freeBranch)->back->next->next);
+
+    return PLL_TRUE;
 }
 static void printTravInfo(int distInsBran1, int distInsBran2) {
-  if (numDrawTrees == 10) {
-    return;
-  }
-  ofstream out("TBRtree.txt", ios_base::app);
-  out << "Distance between insertBranch1 and removeBranch (-1 means leaf): "
-      << distInsBran1 << '\n';
-  out << "Distance between insertBranch2 and removeBranch: " << distInsBran2
-      << "\n\n";
-  out.close();
+    if (numDrawTrees == 10) {
+        return;
+    }
+    ofstream out("TBRtree.txt", ios_base::app);
+    out << "Distance between insertBranch1 and removeBranch (-1 means leaf): "
+        << distInsBran1 << '\n';
+    out << "Distance between insertBranch2 and removeBranch: " << distInsBran2
+        << "\n\n";
+    out.close();
 }
 static void updateLastTreeString(pllInstance *tr, partitionList *pr) {
-  if (numDrawTrees == 10) {
-    return;
-  }
-  pllTreeToNewick(tr->tree_string, tr, pr, tr->start->back, PLL_TRUE, PLL_TRUE,
-                  0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
-  lastTreeString = string(tr->tree_string);
+    if (numDrawTrees == 10) {
+        return;
+    }
+    pllTreeToNewick(tr->tree_string, tr, pr, tr->start->back, PLL_TRUE,
+                    PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+    lastTreeString = string(tr->tree_string);
 }
 static void drawTreeTBR(pllInstance *tr, partitionList *pr) {
-  if (numDrawTrees == 10)
-    return;
-  ofstream out;
-  if (numDrawTrees == 0) {
-    out.open("TBRtree.txt");
+    if (numDrawTrees == 10)
+        return;
+    ofstream out;
+    if (numDrawTrees == 0) {
+        out.open("TBRtree.txt");
+        out.close();
+    }
+    out.open("TBRtree.txt", ios_base::app);
+    numDrawTrees++;
+    double epsilon = 1.0 / iqtree->getAlnNSite();
+    iqtree->readTreeString(lastTreeString);
+    iqtree->initializeAllPartialPars();
+    iqtree->clearAllPartialLH();
+    int curScore = iqtree->computeParsimony();
+    out << "TREE BEFORE ----------------------------------------------------: "
+        << curScore << "\n";
+    iqtree->sortTaxa();
+    iqtree->drawTree(out, WT_BR_SCALE, epsilon);
+
+    pllTreeToNewick(tr->tree_string, tr, pr, tr->start->back, PLL_TRUE,
+                    PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+    string treeString = string(tr->tree_string);
+    iqtree->readTreeString(treeString);
+    iqtree->initializeAllPartialPars();
+    iqtree->clearAllPartialLH();
+    curScore = iqtree->computeParsimony();
+    out << "TREE AFTER ----------------------------------------------------: "
+        << curScore << "\n";
+
+    iqtree->sortTaxa();
+    iqtree->drawTree(out, WT_BR_SCALE, epsilon);
     out.close();
-  }
-  out.open("TBRtree.txt", ios_base::app);
-  numDrawTrees++;
-  double epsilon = 1.0 / iqtree->getAlnNSite();
-  iqtree->readTreeString(lastTreeString);
-  iqtree->initializeAllPartialPars();
-  iqtree->clearAllPartialLH();
-  int curScore = iqtree->computeParsimony();
-  out << "TREE BEFORE ----------------------------------------------------: "
-      << curScore << "\n";
-  iqtree->sortTaxa();
-  iqtree->drawTree(out, WT_BR_SCALE, epsilon);
-
-  pllTreeToNewick(tr->tree_string, tr, pr, tr->start->back, PLL_TRUE, PLL_TRUE,
-                  0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
-  string treeString = string(tr->tree_string);
-  iqtree->readTreeString(treeString);
-  iqtree->initializeAllPartialPars();
-  iqtree->clearAllPartialLH();
-  curScore = iqtree->computeParsimony();
-  out << "TREE AFTER ----------------------------------------------------: "
-      << curScore << "\n";
-
-  iqtree->sortTaxa();
-  iqtree->drawTree(out, WT_BR_SCALE, epsilon);
-  out.close();
 }
 
-/** @ingroup rearrangementGroup
- @brief Internal function for testing and saving a TBR move
+/** Based on PLL
+ @brief Internal function for testing and saving a TBR move (if yeild better
+ score)
 
- Checks the likelihood of the placement of the pruned subtree specified by \a p
- to node \a q. If the likelihood is better than some in the sorted list
- \a bestList, or if there is still free space in \a bestList, then the TBR
- move is recorded (in \a bestList)
+ Checks the parsimony score when apply the given TBR move: Connect branch1 and
+ branch2 together using freeBranch
 
  @param tr
  PLL instance
@@ -1212,197 +1205,162 @@ static void drawTreeTBR(pllInstance *tr, partitionList *pr) {
  @param branch2
  Branch on the other detached subtree
 
- @param bestList
- Where to store the TBR move
+ @param freeBranch
+ Branch that is disconnected before
 
- @note Internal function which is not part of the PLL API and therefore should
- not be called by the user
+ @param perSiteScores
+ Calculate score for each site (Bootstrapping)
 
  @return
+ PLL_TRUE if success, PLL_FALSE otherwise
  */
 static int pllTestTBRMove(pllInstance *tr, partitionList *pr, nodeptr branch1,
                           nodeptr branch2, nodeptr *freeBranch,
                           int perSiteScores) {
-  int i;
-  // double b1z[PLL_NUM_BRANCHES], b2z[PLL_NUM_BRANCHES];
-  // int numPartitions = pr->perGeneBranchLengths ? pr->numberOfPartitions : 1;
-  // pllRearrangeInfo rearr;
+    int i;
 
-  // for (i = 0; i < numPartitions; i++)
-  //   {
-  //     b1z[i] = branch1->z[i];
-  //     b2z[i] = branch2->z[i];
-  //   }
-  branch1 = (branch1->xPars ? branch1 : branch1->back);
-  branch2 = (branch2->xPars ? branch2 : branch2->back);
-  freeBranch = ((*freeBranch)->xPars ? freeBranch : (&((*freeBranch)->back)));
-  assert((*freeBranch)->xPars);
-  nodeptr tmpNode = branch1->back;
-  nodeptr pb, qb;
-  // TODO: We can make here two types of insertions in function of
-  // tr->thoroughInsertion
-  if (!pllTbrConnectSubtrees(tr, branch1, branch2, freeBranch, &pb, &qb)) {
-    cout << "Can't connect subtrees in test\n";
-    return PLL_FALSE;
-  }
+    branch1 = (branch1->xPars ? branch1 : branch1->back);
+    branch2 = (branch2->xPars ? branch2 : branch2->back);
+    freeBranch = ((*freeBranch)->xPars ? freeBranch : (&((*freeBranch)->back)));
+    // assert((*freeBranch)->xPars);
+    nodeptr tmpNode = branch1->back;
+    nodeptr pb, qb;
 
-  // pllEvaluateLikelihood (tr, pr, tr->start, PLL_TRUE, PLL_FALSE);
-  nodeptr TBR_removeBranch = NULL;
-  // if (mp != tr->bestParsimony)
-  // {
-  if (branch1->back->next->back == tmpNode) {
-    TBR_removeBranch = branch1->back->next->next;
-  } else {
-    TBR_removeBranch = branch1->back->next;
-  }
-  // }
-  // unsigned int mp = _evaluateParsimony(tr, pr, TBR_removeBranch, PLL_FALSE,
-  // PLL_FALSE); unsigned int mp = _evaluateParsimony(tr, pr, tr->start,
-  // PLL_TRUE, PLL_FALSE); cout << "Here\n";
-  unsigned int mp = evaluateParsimonyTBR(tr, pr, branch1, branch2,
-                                         TBR_removeBranch, perSiteScores);
-  tr->curRoot = TBR_removeBranch;
-  tr->curRootBack = TBR_removeBranch->back;
-  if (perSiteScores) {
-    // If UFBoot is enabled ...
-    pllSaveCurrentTreeTBRParsimony(tr, pr, mp); // run UFBoot
-  }
+    // TODO:
+    // Consider a different way of connecting branch1 and branch2 (Like NNI)
+    if (!pllTbrConnectSubtrees(tr, branch1, branch2, freeBranch, &pb, &qb)) {
+        cout << "Can't connect subtrees in test\n";
+        return PLL_FALSE;
+    }
 
-  // cout << "SCORE: " << tr->bestParsimony << '\n';
-  if (globalParam->tbr_test_draw == true) {
-    drawTreeTBR(tr, pr);
-  }
-  if (mp < tr->bestParsimony)
-    bestTreeScoreHits = 1;
-  else if (mp == tr->bestParsimony)
-    bestTreeScoreHits++;
-  if ((mp < tr->bestParsimony) ||
-      ((mp == tr->bestParsimony) &&
-       (random_double() <= 1.0 / bestTreeScoreHits))) {
-    tr->bestParsimony = mp;
-    tr->TBR_insertBranch1 = branch1;
-    tr->TBR_insertBranch2 = branch2;
-    tr->TBR_removeBranch = TBR_removeBranch;
-  }
-  // memcpy (rearr.TBR.zp, rearr.TBR.insertBranch1->z, numPartitions *
-  // sizeof(double)); memcpy (rearr.TBR.zpb, rearr.TBR.insertBranch1->back->z,
-  // numPartitions * sizeof(double)); memcpy (rearr.TBR.zq,
-  // rearr.TBR.insertBranch2->z, numPartitions * sizeof(double)); memcpy
-  // (rearr.TBR.zqb, rearr.TBR.insertBranch2->back->z, numPartitions *
-  // sizeof(double)); memcpy (rearr.TBR.zr, rearr.TBR.removeBranch->z,
-  // numPartitions * sizeof(double));
+    nodeptr TBR_removeBranch = NULL;
+    if (branch1->back->next->back == tmpNode) {
+        TBR_removeBranch = branch1->back->next->next;
+    } else {
+        TBR_removeBranch = branch1->back->next;
+    }
+    unsigned int mp = evaluateParsimonyTBR(tr, pr, branch1, branch2,
+                                           TBR_removeBranch, perSiteScores);
+    tr->curRoot = TBR_removeBranch;
+    tr->curRootBack = TBR_removeBranch->back;
+    if (perSiteScores) {
+        // If UFBoot is enabled ...
+        pllSaveCurrentTreeTBRParsimony(tr, pr, mp); // run UFBoot
+    }
 
-  // pllStoreRearrangement (bestList, &rearr);
+    if (globalParam->tbr_test_draw == true) {
+        drawTreeTBR(tr, pr);
+    }
+    if (mp < tr->bestParsimony)
+        bestTreeScoreHits = 1;
+    else if (mp == tr->bestParsimony)
+        bestTreeScoreHits++;
+    if ((mp < tr->bestParsimony) ||
+        ((mp == tr->bestParsimony) &&
+         (random_double() <= 1.0 / bestTreeScoreHits))) {
+        tr->bestParsimony = mp;
+        tr->TBR_insertBranch1 = branch1;
+        tr->TBR_insertBranch2 = branch2;
+        tr->TBR_removeBranch = TBR_removeBranch;
+    }
 
-  /* restore */
-  int restoreTopologyOK = pllTbrRemoveBranch(tr, pr, TBR_removeBranch);
+    /* restore */
+    int restoreTopologyOK = pllTbrRemoveBranch(tr, pr, TBR_removeBranch);
 
-  assert(restoreTopologyOK);
+    assert(restoreTopologyOK);
 
-  // for (i = 0; i < numPartitions; i++)
-  //   {
-  //     branch1->z[i] = branch1->back->z[i] = b1z[i];
-  //     branch2->z[i] = branch2->back->z[i] = b2z[i];
-  //   }
-
-  return PLL_TRUE;
+    return PLL_TRUE;
 }
 
-/** @ingroup rearrangementGroup
+/**
  @brief Internal function for recursively traversing a tree and testing a
- possible subtree insertion
+ possible TBR move insertion
 
  Recursively traverses the tree rooted at \a q in the direction of \a
- q->next->back and \a q->next->next->back and at each node tests the placement
- of the pruned subtree rooted at \a p by calling the function \a
- pllTestInsertBIG, which in turn saves the computed SPR in \a bestList if a)
- there is still space in the \a bestList or b) if the likelihood of the SPR is
- better than any of the ones in \a bestList.
+ q->next->back, \a q->next->next->back, \a p->next->back and \a
+ p->next->next->back and at each node tests a TBR move between branches 'p' and
+ 'q'.
 
- Tests a TBR move between branches 'p' and 'q'.
-
- @note This function is not part of the API and should not be called by the
- user.
+ @note
+ mintravP/Q, maxtravP/Q is version 1. (Version 2 is what curretly used)
+ Distance from removeBranch to each of the inserted branch is in
+ [mintrav,maxtrav] (Not the sum of the 2 distances)
  */
 static void pllTraverseUpdateTBR(pllInstance *tr, partitionList *pr, nodeptr p,
                                  nodeptr q, nodeptr *r, int mintravP,
                                  int maxtravP, int mintravQ, int maxtravQ,
                                  int perSiteScores) {
 
-  if (mintravP <= 1 && mintravQ <= 1) {
-    assert((pllTestTBRMove(tr, pr, p, q, r, perSiteScores)));
-  }
+    if (mintravP <= 1 && mintravQ <= 1) {
+        assert((pllTestTBRMove(tr, pr, p, q, r, perSiteScores)));
+    }
 
-  /* traverse q subtree */
-  if ((!isTip(q->number, tr->mxtips)) && (maxtravQ - 1 > 0)) {
-    pllTraverseUpdateTBR(tr, pr, p, q->next->back, r, mintravP, maxtravP,
-                         mintravQ - 1, maxtravQ - 1, perSiteScores);
-    pllTraverseUpdateTBR(tr, pr, p, q->next->next->back, r, mintravP, maxtravP,
-                         mintravQ - 1, maxtravQ - 1, perSiteScores);
-  }
+    /* traverse q subtree */
+    if ((!isTip(q->number, tr->mxtips)) && (maxtravQ - 1 > 0)) {
+        pllTraverseUpdateTBR(tr, pr, p, q->next->back, r, mintravP, maxtravP,
+                             mintravQ - 1, maxtravQ - 1, perSiteScores);
+        pllTraverseUpdateTBR(tr, pr, p, q->next->next->back, r, mintravP,
+                             maxtravP, mintravQ - 1, maxtravQ - 1,
+                             perSiteScores);
+    }
 
-  /* last, we traverse the p subtree */
-  if ((!isTip(p->number, tr->mxtips)) && (maxtravP - 1 > 0)) {
-    pllTraverseUpdateTBR(tr, pr, p->next->back, q, r, mintravP - 1,
-                         maxtravP - 1, mintravQ, maxtravQ, perSiteScores);
-    pllTraverseUpdateTBR(tr, pr, p->next->next->back, q, r, mintravP - 1,
-                         maxtravP - 1, mintravQ, maxtravQ, perSiteScores);
-  }
+    /* last, we traverse the p subtree */
+    if ((!isTip(p->number, tr->mxtips)) && (maxtravP - 1 > 0)) {
+        pllTraverseUpdateTBR(tr, pr, p->next->back, q, r, mintravP - 1,
+                             maxtravP - 1, mintravQ, maxtravQ, perSiteScores);
+        pllTraverseUpdateTBR(tr, pr, p->next->next->back, q, r, mintravP - 1,
+                             maxtravP - 1, mintravQ, maxtravQ, perSiteScores);
+    }
 }
 
-/** @ingroup rearrangementGroup
+/**
  @brief Internal function for recursively traversing a tree and testing a
- possible subtree insertion
+ possible TBR move insertion
 
  Recursively traverses the tree rooted at \a q in the direction of \a
- q->next->back and \a q->next->next->back and at each node tests the placement
- of the pruned subtree rooted at \a p by calling the function \a
- pllTestInsertBIG, which in turn saves the computed SPR in \a bestList if a)
- there is still space in the \a bestList or b) if the likelihood of the SPR is
- better than any of the ones in \a bestList.
+ q->next->back, \a q->next->next->back, \a p->next->back and \a
+ p->next->next->back and at each node tests a TBR move between branches 'p' and
+ 'q'.
 
- Tests a TBR move between branches 'p' and 'q'.
-
- @note This function is not part of the API and should not be called by the
- user.
+ @note
+ Version 2 is Sum of distance of 2 inserted branch is in [mintrav, maxtrav]
  */
 static void pllTraverseUpdateTBRVer2(pllInstance *tr, partitionList *pr,
                                      nodeptr p, nodeptr q, nodeptr *r,
                                      int mintrav, int maxtrav, int distP,
                                      int distQ, int perSiteScores) {
 
-  if (mintrav <= 0) {
-    assert((pllTestTBRMove(tr, pr, p, q, r, perSiteScores)));
-    if (globalParam->tbr_test_draw == true) {
-      printTravInfo(distP, distQ);
+    if (mintrav <= 0) {
+        assert((pllTestTBRMove(tr, pr, p, q, r, perSiteScores)));
+        if (globalParam->tbr_test_draw == true) {
+            printTravInfo(distP, distQ);
+        }
     }
-  }
 
-  /* traverse q subtree */
-  if ((!isTip(q->number, tr->mxtips)) && (maxtrav - 1 >= 0)) {
-    pllTraverseUpdateTBRVer2(tr, pr, p, q->next->back, r, mintrav - 1,
-                             maxtrav - 1, distP, distQ + 1, perSiteScores);
-    pllTraverseUpdateTBRVer2(tr, pr, p, q->next->next->back, r, mintrav - 1,
-                             maxtrav - 1, distP, distQ + 1, perSiteScores);
-  }
+    /* traverse q subtree */
+    if ((!isTip(q->number, tr->mxtips)) && (maxtrav - 1 >= 0)) {
+        pllTraverseUpdateTBRVer2(tr, pr, p, q->next->back, r, mintrav - 1,
+                                 maxtrav - 1, distP, distQ + 1, perSiteScores);
+        pllTraverseUpdateTBRVer2(tr, pr, p, q->next->next->back, r, mintrav - 1,
+                                 maxtrav - 1, distP, distQ + 1, perSiteScores);
+    }
 
-  /* last, we traverse the p subtree */
-  if ((!isTip(p->number, tr->mxtips)) && (maxtrav - 1 >= 0)) {
-    pllTraverseUpdateTBRVer2(tr, pr, p->next->back, q, r, mintrav - 1,
-                             maxtrav - 1, distP + 1, distQ, perSiteScores);
-    pllTraverseUpdateTBRVer2(tr, pr, p->next->next->back, q, r, mintrav - 1,
-                             maxtrav - 1, distP + 1, distQ, perSiteScores);
-  }
+    /* last, we traverse the p subtree */
+    if ((!isTip(p->number, tr->mxtips)) && (maxtrav - 1 >= 0)) {
+        pllTraverseUpdateTBRVer2(tr, pr, p->next->back, q, r, mintrav - 1,
+                                 maxtrav - 1, distP + 1, distQ, perSiteScores);
+        pllTraverseUpdateTBRVer2(tr, pr, p->next->next->back, q, r, mintrav - 1,
+                                 maxtrav - 1, distP + 1, distQ, perSiteScores);
+    }
 }
 
-/** @ingroup rearrangementGroup
- @brief Compute a list of possible TBR moves
+/** Based on PLL
+ @brief Find best TBR move given removeBranch
 
- Iteratively tries all possible TBR moves that can be performed by
- pruning the branch at \a p and testing all possible placements
- in a radius of at least \a mintrav nodes and at most \a maxtrav nodes from
- \a p. Note that \a tr->thoroughInsertion affects the behaviour of the function
-(see note).
+ Recursively tries all possible TBR moves that can be performed by
+ pruning the branch at \a p and testing all possible 2 inserted branches
+ in a distance of at least \a mintrav nodes and at most \a maxtrav nodes from
+ each other
 
  @param tr
  PLL instance
@@ -1414,117 +1372,103 @@ static void pllTraverseUpdateTBRVer2(pllInstance *tr, partitionList *pr,
  Node specifying the pruned branch.
 
  @param mintrav
- Minimum distance from \a p where to try inserting the pruned branch
+ Minimum distance of 2 inserted branches
 
  @param maxtrav
- Maximum distance from \a p where to try inserting the pruned branch
+ Maximum distance of 2 inserted branches
 
-//  @param[out] bestList
-//  Sorted list of the best rearrangements
+ @param perSiteScores
+ Calculate scores for each site (Bootstrapping)
+
+ @note
+ Version 1 called pllTraverseUpdateTBR (currently used Version 2)
  */
 static int pllComputeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
                          int mintrav, int maxtrav, int perSiteScores) {
-  // tr->startLH = tr->endLH = tr->likelihood;
 
-  // /* TODO: Add cutoff code */
+    nodeptr p1, p2, q, q1, q2;
+    int i, numPartitions;
 
-  // tr->bestOfNode = PLL_UNLIKELY;
+    q = p->back;
 
-  nodeptr p1, p2, q, q1, q2;
-  // double p1z[PLL_NUM_BRANCHES], p2z[PLL_NUM_BRANCHES], q1z[PLL_NUM_BRANCHES],
-  //     q2z[PLL_NUM_BRANCHES], rz[PLL_NUM_BRANCHES];
-  int i, numPartitions;
-
-  q = p->back;
-
-  if (isTip(p->number, tr->mxtips) || isTip(q->number, tr->mxtips)) {
-    // errno = PLL_TBR_NOT_INNER_BRANCH;
-    return PLL_FALSE;
-  }
-
-  // numPartitions = pr->perGeneBranchLengths ? pr->numberOfPartitions : 1;
-
-  p1 = p->next->back;
-  p2 = p->next->next->back;
-  q1 = q->next->back;
-  q2 = q->next->next->back;
-
-  // /* save branch lengths before splitting the tree in two components */
-  // for (i = 0; i < numPartitions; ++i)
-  //   {
-  //     p1z[i] = p1->z[i];
-  //     p2z[i] = p2->z[i];
-  //     q1z[i] = q1->z[i];
-  //     q2z[i] = q2->z[i];
-  //     rz[i] = p->z[i];
-  //   }
-
-  if (maxtrav < 1 || mintrav > maxtrav)
-    return PLL_BADREAR;
-  q = p->back;
-
-  if (!isTip(p1->number, tr->mxtips) || !isTip(p2->number, tr->mxtips)) {
-    /* split the tree in two components */
-    if (!pllTbrRemoveBranch(tr, pr, p))
-      return PLL_BADREAR;
-    /* p1 and p2 are now connected */
-    assert(p1->back == p2 && p2->back == p1);
-
-    /* recursively traverse and perform TBR */
-    pllTraverseUpdateTBR(tr, pr, p1, q1, &p, mintrav, maxtrav, mintrav, maxtrav,
-                         perSiteScores);
-    if (!isTip(q2->number, tr->mxtips)) {
-      pllTraverseUpdateTBR(tr, pr, q2->next->back, p1, &p, mintrav - 1,
-                           maxtrav - 1, mintrav, maxtrav, perSiteScores);
-      pllTraverseUpdateTBR(tr, pr, q2->next->next->back, p1, &p, mintrav - 1,
-                           maxtrav - 1, mintrav, maxtrav, perSiteScores);
+    if (isTip(p->number, tr->mxtips) || isTip(q->number, tr->mxtips)) {
+        // p -- q is not an internal branch
+        return PLL_FALSE;
     }
 
-    if (!isTip(p2->number, tr->mxtips)) {
-      pllTraverseUpdateTBR(tr, pr, p2->next->back, q1, &p, mintrav - 1,
-                           maxtrav - 1, mintrav, maxtrav, perSiteScores);
-      pllTraverseUpdateTBR(tr, pr, p2->next->next->back, q1, &p, mintrav - 1,
-                           maxtrav - 1, mintrav, maxtrav, perSiteScores);
-      if (!isTip(q2->number, tr->mxtips)) {
-        pllTraverseUpdateTBR(tr, pr, p2->next->back, q2->next->back, &p,
-                             mintrav - 1, maxtrav - 1, mintrav - 1, maxtrav - 1,
-                             perSiteScores);
-        pllTraverseUpdateTBR(tr, pr, p2->next->back, q2->next->next->back, &p,
-                             mintrav - 1, maxtrav - 1, mintrav - 1, maxtrav - 1,
-                             perSiteScores);
-        pllTraverseUpdateTBR(tr, pr, p2->next->next->back, q2->next->back, &p,
-                             mintrav - 1, maxtrav - 1, mintrav - 1, maxtrav - 1,
-                             perSiteScores);
-        pllTraverseUpdateTBR(tr, pr, p2->next->next->back, q2->next->next->back,
-                             &p, mintrav - 1, maxtrav - 1, mintrav - 1,
-                             maxtrav - 1, perSiteScores);
-      }
-    }
-    nodeptr pb, qb, freeBranch;
-    /* restore the topology as it was before the split */
-    freeBranch = (p->xPars ? p : q);
-    p1 = (p1->xPars ? p1 : p1->back);
-    q1 = (q1->xPars ? q1 : q1->back);
-    int restoreTopoOK =
-        pllTbrConnectSubtrees(tr, p1, q1, &freeBranch, &pb, &qb);
-    evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, perSiteScores);
-    tr->curRoot = freeBranch;
-    tr->curRootBack = freeBranch->back;
-    assert(restoreTopoOK);
-    // _newviewParsimony(tr, pr, p, 0);
-  }
+    p1 = p->next->back;
+    p2 = p->next->next->back;
+    q1 = q->next->back;
+    q2 = q->next->next->back;
 
-  return PLL_TRUE;
+    if (maxtrav < 1 || mintrav > maxtrav)
+        return PLL_BADREAR;
+
+    if (!isTip(p1->number, tr->mxtips) || !isTip(p2->number, tr->mxtips)) {
+        /* split the tree in two components */
+        if (!pllTbrRemoveBranch(tr, pr, p))
+            return PLL_BADREAR;
+        /* p1 and p2 are now connected */
+        assert(p1->back == p2 && p2->back == p1);
+
+        /* recursively traverse and perform TBR */
+        pllTraverseUpdateTBR(tr, pr, p1, q1, &p, mintrav, maxtrav, mintrav,
+                             maxtrav, perSiteScores);
+        if (!isTip(q2->number, tr->mxtips)) {
+            pllTraverseUpdateTBR(tr, pr, q2->next->back, p1, &p, mintrav - 1,
+                                 maxtrav - 1, mintrav, maxtrav, perSiteScores);
+            pllTraverseUpdateTBR(tr, pr, q2->next->next->back, p1, &p,
+                                 mintrav - 1, maxtrav - 1, mintrav, maxtrav,
+                                 perSiteScores);
+        }
+
+        if (!isTip(p2->number, tr->mxtips)) {
+            pllTraverseUpdateTBR(tr, pr, p2->next->back, q1, &p, mintrav - 1,
+                                 maxtrav - 1, mintrav, maxtrav, perSiteScores);
+            pllTraverseUpdateTBR(tr, pr, p2->next->next->back, q1, &p,
+                                 mintrav - 1, maxtrav - 1, mintrav, maxtrav,
+                                 perSiteScores);
+            if (!isTip(q2->number, tr->mxtips)) {
+                pllTraverseUpdateTBR(tr, pr, p2->next->back, q2->next->back, &p,
+                                     mintrav - 1, maxtrav - 1, mintrav - 1,
+                                     maxtrav - 1, perSiteScores);
+                pllTraverseUpdateTBR(tr, pr, p2->next->back,
+                                     q2->next->next->back, &p, mintrav - 1,
+                                     maxtrav - 1, mintrav - 1, maxtrav - 1,
+                                     perSiteScores);
+                pllTraverseUpdateTBR(tr, pr, p2->next->next->back,
+                                     q2->next->back, &p, mintrav - 1,
+                                     maxtrav - 1, mintrav - 1, maxtrav - 1,
+                                     perSiteScores);
+                pllTraverseUpdateTBR(tr, pr, p2->next->next->back,
+                                     q2->next->next->back, &p, mintrav - 1,
+                                     maxtrav - 1, mintrav - 1, maxtrav - 1,
+                                     perSiteScores);
+            }
+        }
+        nodeptr pb, qb, freeBranch;
+        /* restore the topology as it was before the split */
+        freeBranch = (p->xPars ? p : q);
+        p1 = (p1->xPars ? p1 : p1->back);
+        q1 = (q1->xPars ? q1 : q1->back);
+        int restoreTopoOK =
+            pllTbrConnectSubtrees(tr, p1, q1, &freeBranch, &pb, &qb);
+        evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, perSiteScores);
+        tr->curRoot = freeBranch;
+        tr->curRootBack = freeBranch->back;
+        assert(restoreTopoOK);
+    }
+
+    return PLL_TRUE;
 }
 
-/** @ingroup rearrangementGroup
- @brief Compute a list of possible TBR moves
+/** Based on PLL
+ @brief Find best TBR move given removeBranch
 
- Iteratively tries all possible TBR moves that can be performed by
- pruning the branch at \a p and testing all possible placements
- in a radius of at least \a mintrav nodes and at most \a maxtrav nodes from
- \a p. Note that \a tr->thoroughInsertion affects the behaviour of the function
-(see note).
+ Recursively tries all possible TBR moves that can be performed by
+ pruning the branch at \a p and testing all possible 2 inserted branches
+ in a distance of at least \a mintrav nodes and at most \a maxtrav nodes from
+ each other
 
  @param tr
  PLL instance
@@ -1536,243 +1480,230 @@ static int pllComputeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
  Node specifying the pruned branch.
 
  @param mintrav
- Minimum distance from \a p where to try inserting the pruned branch
+ Minimum distance of 2 inserted branches
 
  @param maxtrav
- Maximum distance from \a p where to try inserting the pruned branch
+ Maximum distance of 2 inserted branches
 
-//  @param[out] bestList
-//  Sorted list of the best rearrangements
+ @param perSiteScores
+ Calculate scores for each site (Bootstrapping)
+
+ @note
+ Version 2 called pllTraverseUpdateTBRVer2.
  */
 static int pllComputeTBRVer2(pllInstance *tr, partitionList *pr, nodeptr p,
                              int mintrav, int maxtrav, int perSiteScores) {
-  // tr->startLH = tr->endLH = tr->likelihood;
 
-  // /* TODO: Add cutoff code */
+    nodeptr p1, p2, q, q1, q2;
+    int i, numPartitions;
 
-  // tr->bestOfNode = PLL_UNLIKELY;
+    q = p->back;
 
-  nodeptr p1, p2, q, q1, q2;
-  // double p1z[PLL_NUM_BRANCHES], p2z[PLL_NUM_BRANCHES], q1z[PLL_NUM_BRANCHES],
-  //     q2z[PLL_NUM_BRANCHES], rz[PLL_NUM_BRANCHES];
-  int i, numPartitions;
-
-  q = p->back;
-
-  if (isTip(p->number, tr->mxtips) || isTip(q->number, tr->mxtips)) {
-    // errno = PLL_TBR_NOT_INNER_BRANCH;
-    return PLL_FALSE;
-  }
-
-  // numPartitions = pr->perGeneBranchLengths ? pr->numberOfPartitions : 1;
-
-  p1 = p->next->back;
-  p2 = p->next->next->back;
-  q1 = q->next->back;
-  q2 = q->next->next->back;
-
-  // /* save branch lengths before splitting the tree in two components */
-  // for (i = 0; i < numPartitions; ++i)
-  //   {
-  //     p1z[i] = p1->z[i];
-  //     p2z[i] = p2->z[i];
-  //     q1z[i] = q1->z[i];
-  //     q2z[i] = q2->z[i];
-  //     rz[i] = p->z[i];
-  //   }
-
-  if (maxtrav < 1 || mintrav > maxtrav)
-    return PLL_BADREAR;
-  q = p->back;
-
-  if (!isTip(p1->number, tr->mxtips) || !isTip(p2->number, tr->mxtips)) {
-    if (globalParam->tbr_test_draw == true) {
-      updateLastTreeString(tr, pr);
-    }
-    /* split the tree in two components */
-    if (!pllTbrRemoveBranch(tr, pr, p))
-      return PLL_BADREAR;
-    /* p1 and p2 are now connected */
-    assert(p1->back == p2 && p2->back == p1);
-
-    /* recursively traverse and perform TBR */
-    pllTraverseUpdateTBRVer2(tr, pr, p1, q1, &p, mintrav, maxtrav, 0, 0,
-                             perSiteScores);
-    if (!isTip(q2->number, tr->mxtips)) {
-      pllTraverseUpdateTBRVer2(tr, pr, q2->next->back, p1, &p, mintrav - 1,
-                               maxtrav - 1, 1, 0, perSiteScores);
-      pllTraverseUpdateTBRVer2(tr, pr, q2->next->next->back, p1, &p,
-                               mintrav - 1, maxtrav - 1, 1, 0, perSiteScores);
+    if (isTip(p->number, tr->mxtips) || isTip(q->number, tr->mxtips)) {
+        // errno = PLL_TBR_NOT_INNER_BRANCH;
+        return PLL_FALSE;
     }
 
-    if (!isTip(p2->number, tr->mxtips)) {
-      pllTraverseUpdateTBRVer2(tr, pr, p2->next->back, q1, &p, mintrav - 1,
-                               maxtrav - 1, 1, 0, perSiteScores);
-      pllTraverseUpdateTBRVer2(tr, pr, p2->next->next->back, q1, &p,
-                               mintrav - 1, maxtrav - 1, 1, 0, perSiteScores);
-      if (!isTip(q2->number, tr->mxtips)) {
-        pllTraverseUpdateTBRVer2(tr, pr, p2->next->back, q2->next->back, &p,
-                                 mintrav - 2, maxtrav - 2, 1, 1, perSiteScores);
-        pllTraverseUpdateTBRVer2(tr, pr, p2->next->back, q2->next->next->back,
-                                 &p, mintrav - 2, maxtrav - 2, 1, 1,
+    p1 = p->next->back;
+    p2 = p->next->next->back;
+    q1 = q->next->back;
+    q2 = q->next->next->back;
+
+    if (maxtrav < 1 || mintrav > maxtrav)
+        return PLL_BADREAR;
+    q = p->back;
+
+    if (!isTip(p1->number, tr->mxtips) || !isTip(p2->number, tr->mxtips)) {
+        if (globalParam->tbr_test_draw == true) {
+            updateLastTreeString(tr, pr);
+        }
+        /* split the tree in two components */
+        if (!pllTbrRemoveBranch(tr, pr, p))
+            return PLL_BADREAR;
+        /* p1 and p2 are now connected */
+        assert(p1->back == p2 && p2->back == p1);
+
+        /* recursively traverse and perform TBR */
+        pllTraverseUpdateTBRVer2(tr, pr, p1, q1, &p, mintrav, maxtrav, 0, 0,
                                  perSiteScores);
-        pllTraverseUpdateTBRVer2(tr, pr, p2->next->next->back, q2->next->back,
-                                 &p, mintrav - 2, maxtrav - 2, 1, 1,
-                                 perSiteScores);
-        pllTraverseUpdateTBRVer2(tr, pr, p2->next->next->back,
-                                 q2->next->next->back, &p, mintrav - 2,
-                                 maxtrav - 2, 1, 1, perSiteScores);
-      }
-    }
-    nodeptr pb, qb, freeBranch;
-    /* restore the topology as it was before the split */
-    freeBranch = (p->xPars ? p : q);
-    p1 = (p1->xPars ? p1 : p1->back);
-    q1 = (q1->xPars ? q1 : q1->back);
-    int restoreTopoOK =
-        pllTbrConnectSubtrees(tr, p1, q1, &freeBranch, &pb, &qb);
-    evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, perSiteScores);
-    tr->curRoot = freeBranch;
-    tr->curRootBack = freeBranch->back;
-    assert(restoreTopoOK);
-    // _newviewParsimony(tr, pr, p, 0);
-  }
+        if (!isTip(q2->number, tr->mxtips)) {
+            pllTraverseUpdateTBRVer2(tr, pr, q2->next->back, p1, &p,
+                                     mintrav - 1, maxtrav - 1, 1, 0,
+                                     perSiteScores);
+            pllTraverseUpdateTBRVer2(tr, pr, q2->next->next->back, p1, &p,
+                                     mintrav - 1, maxtrav - 1, 1, 0,
+                                     perSiteScores);
+        }
 
-  return PLL_TRUE;
+        if (!isTip(p2->number, tr->mxtips)) {
+            pllTraverseUpdateTBRVer2(tr, pr, p2->next->back, q1, &p,
+                                     mintrav - 1, maxtrav - 1, 1, 0,
+                                     perSiteScores);
+            pllTraverseUpdateTBRVer2(tr, pr, p2->next->next->back, q1, &p,
+                                     mintrav - 1, maxtrav - 1, 1, 0,
+                                     perSiteScores);
+            if (!isTip(q2->number, tr->mxtips)) {
+                pllTraverseUpdateTBRVer2(tr, pr, p2->next->back, q2->next->back,
+                                         &p, mintrav - 2, maxtrav - 2, 1, 1,
+                                         perSiteScores);
+                pllTraverseUpdateTBRVer2(tr, pr, p2->next->back,
+                                         q2->next->next->back, &p, mintrav - 2,
+                                         maxtrav - 2, 1, 1, perSiteScores);
+                pllTraverseUpdateTBRVer2(tr, pr, p2->next->next->back,
+                                         q2->next->back, &p, mintrav - 2,
+                                         maxtrav - 2, 1, 1, perSiteScores);
+                pllTraverseUpdateTBRVer2(tr, pr, p2->next->next->back,
+                                         q2->next->next->back, &p, mintrav - 2,
+                                         maxtrav - 2, 1, 1, perSiteScores);
+            }
+        }
+        nodeptr pb, qb, freeBranch;
+        /* restore the topology as it was before the split */
+        freeBranch = (p->xPars ? p : q);
+        p1 = (p1->xPars ? p1 : p1->back);
+        q1 = (q1->xPars ? q1 : q1->back);
+        int restoreTopoOK =
+            pllTbrConnectSubtrees(tr, p1, q1, &freeBranch, &pb, &qb);
+        evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, perSiteScores);
+        tr->curRoot = freeBranch;
+        tr->curRootBack = freeBranch->back;
+        assert(restoreTopoOK);
+    }
+
+    return PLL_TRUE;
 }
 
 static int pllTestTBRMoveLeaf(pllInstance *tr, partitionList *pr,
                               nodeptr insertBranch, nodeptr removeBranch,
                               int perSiteScores) {
-  insertBranch = (insertBranch->xPars ? insertBranch : insertBranch->back);
-  removeBranch = (removeBranch->xPars ? removeBranch : removeBranch->back);
-  nodeptr p = (isTip(removeBranch->number, tr->mxtips) ? removeBranch->back
-                                                       : removeBranch);
-  // Connect
-  nodeptr i1 = insertBranch;
-  nodeptr i2 = i1->back;
-  hookupDefault(i1, p->next);
-  hookupDefault(i2, p->next->next);
-  assert(i1->xPars);
-  assert(removeBranch->xPars);
-  unsigned int mp =
-      evaluateParsimonyTBR(tr, pr, p->back, insertBranch, p, perSiteScores);
-  tr->curRoot = removeBranch;
-  tr->curRootBack = removeBranch->back;
-  if (globalParam->tbr_test_draw == true) {
-    drawTreeTBR(tr, pr);
-  }
-  if (mp < tr->bestParsimony)
-    bestTreeScoreHits = 1;
-  else if (mp == tr->bestParsimony)
-    bestTreeScoreHits++;
+    insertBranch = (insertBranch->xPars ? insertBranch : insertBranch->back);
+    removeBranch = (removeBranch->xPars ? removeBranch : removeBranch->back);
+    nodeptr p = (isTip(removeBranch->number, tr->mxtips) ? removeBranch->back
+                                                         : removeBranch);
+    // Connect
+    nodeptr i1 = insertBranch;
+    nodeptr i2 = i1->back;
+    hookupDefault(i1, p->next);
+    hookupDefault(i2, p->next->next);
+    unsigned int mp =
+        evaluateParsimonyTBR(tr, pr, p->back, insertBranch, p, perSiteScores);
+    tr->curRoot = removeBranch;
+    tr->curRootBack = removeBranch->back;
+    if (globalParam->tbr_test_draw == true) {
+        drawTreeTBR(tr, pr);
+    }
+    if (mp < tr->bestParsimony)
+        bestTreeScoreHits = 1;
+    else if (mp == tr->bestParsimony)
+        bestTreeScoreHits++;
 
-  if ((mp < tr->bestParsimony) ||
-      ((mp == tr->bestParsimony) &&
-       (random_double() <= 1.0 / bestTreeScoreHits))) {
-    tr->bestParsimony = mp;
-    tr->TBR_insertBranch1 =
-        (insertBranch->xPars ? insertBranch : insertBranch->back);
-    tr->TBR_removeBranch = p;
-  }
+    if ((mp < tr->bestParsimony) ||
+        ((mp == tr->bestParsimony) &&
+         (random_double() <= 1.0 / bestTreeScoreHits))) {
+        tr->bestParsimony = mp;
+        tr->TBR_insertBranch1 =
+            (insertBranch->xPars ? insertBranch : insertBranch->back);
+        tr->TBR_removeBranch = p;
+    }
 
-  // Remove
-  hookupDefault(p->next->back, p->next->next->back);
-  p->next->back = p->next->next->back = NULL;
+    // Remove
+    hookupDefault(p->next->back, p->next->next->back);
+    p->next->back = p->next->next->back = NULL;
 
-  return PLL_TRUE;
+    return PLL_TRUE;
 }
 
 static void pllTraverseUpdateTBRLeaf(pllInstance *tr, partitionList *pr,
                                      nodeptr p, nodeptr removeBranch,
                                      int mintrav, int maxtrav, int distP,
                                      int perSiteScores) {
-  if (mintrav <= 0) {
-    assert(pllTestTBRMoveLeaf(tr, pr, p, removeBranch, perSiteScores));
-    if (globalParam->tbr_test_draw == true) {
-      printTravInfo(-1, distP);
+    if (mintrav <= 0) {
+        assert(pllTestTBRMoveLeaf(tr, pr, p, removeBranch, perSiteScores));
+        if (globalParam->tbr_test_draw == true) {
+            printTravInfo(-1, distP);
+        }
     }
-  }
-  if (!isTip(p->number, tr->mxtips) && maxtrav - 1 >= 0) {
-    pllTraverseUpdateTBRLeaf(tr, pr, p->next->back, removeBranch, mintrav - 1,
-                             maxtrav - 1, distP + 1, perSiteScores);
-    pllTraverseUpdateTBRLeaf(tr, pr, p->next->next->back, removeBranch,
-                             mintrav - 1, maxtrav - 1, distP + 1,
-                             perSiteScores);
-  }
+    if (!isTip(p->number, tr->mxtips) && maxtrav - 1 >= 0) {
+        pllTraverseUpdateTBRLeaf(tr, pr, p->next->back, removeBranch,
+                                 mintrav - 1, maxtrav - 1, distP + 1,
+                                 perSiteScores);
+        pllTraverseUpdateTBRLeaf(tr, pr, p->next->next->back, removeBranch,
+                                 mintrav - 1, maxtrav - 1, distP + 1,
+                                 perSiteScores);
+    }
 }
 
 static int pllComputeTBRLeaf(pllInstance *tr, partitionList *pr, nodeptr p,
                              int mintrav, int maxtrav, int perSiteScores) {
-  nodeptr q = p->back;
-  if (!isTip(q->number, tr->mxtips)) {
-    swap(p, q);
-    // q must be leaf
-  }
+    nodeptr q = p->back;
+    if (!isTip(q->number, tr->mxtips)) {
+        swap(p, q);
+        // q must be leaf
+    }
 
-  if (!isTip(q->number, tr->mxtips)) {
-    // Both p and q are not leaves.
-    return PLL_FALSE;
-  }
-  nodeptr p1, p2;
-  p1 = p->next->back;
-  p2 = p->next->next->back;
+    if (!isTip(q->number, tr->mxtips)) {
+        // Both p and q are not leaves.
+        return PLL_FALSE;
+    }
+    nodeptr p1, p2;
+    p1 = p->next->back;
+    p2 = p->next->next->back;
 
-  if (globalParam->tbr_test_draw == true) {
-    updateLastTreeString(tr, pr);
-  }
-  // Disconnect edge (p, p1) and (p, p2)
-  // Connect (p1, p2)
-  hookupDefault(p1, p2);
-  p->next->back = p->next->next->back = NULL;
+    if (globalParam->tbr_test_draw == true) {
+        updateLastTreeString(tr, pr);
+    }
+    // Disconnect edge (p, p1) and (p, p2)
+    // Connect (p1, p2)
+    hookupDefault(p1, p2);
+    p->next->back = p->next->next->back = NULL;
 
-  if (!isTip(p1->number, tr->mxtips)) {
-    pllTraverseUpdateTBRLeaf(tr, pr, p1->next->back, p, mintrav - 1,
-                             maxtrav - 1, 1, perSiteScores);
-    pllTraverseUpdateTBRLeaf(tr, pr, p1->next->next->back, p, mintrav - 1,
-                             maxtrav - 1, 1, perSiteScores);
-  }
+    if (!isTip(p1->number, tr->mxtips)) {
+        pllTraverseUpdateTBRLeaf(tr, pr, p1->next->back, p, mintrav - 1,
+                                 maxtrav - 1, 1, perSiteScores);
+        pllTraverseUpdateTBRLeaf(tr, pr, p1->next->next->back, p, mintrav - 1,
+                                 maxtrav - 1, 1, perSiteScores);
+    }
 
-  if (!isTip(p2->number, tr->mxtips)) {
-    pllTraverseUpdateTBRLeaf(tr, pr, p2->next->back, p, mintrav - 1,
-                             maxtrav - 1, 1, perSiteScores);
-    pllTraverseUpdateTBRLeaf(tr, pr, p2->next->next->back, p, mintrav - 1,
-                             maxtrav - 1, 1, perSiteScores);
-  }
+    if (!isTip(p2->number, tr->mxtips)) {
+        pllTraverseUpdateTBRLeaf(tr, pr, p2->next->back, p, mintrav - 1,
+                                 maxtrav - 1, 1, perSiteScores);
+        pllTraverseUpdateTBRLeaf(tr, pr, p2->next->next->back, p, mintrav - 1,
+                                 maxtrav - 1, 1, perSiteScores);
+    }
 
-  // Connect p to p1 and p2 again
-  hookupDefault(p->next, p1);
-  hookupDefault(p->next->next, p2);
-  p1 = (p1->xPars ? p1 : p2);
-  assert(p1->xPars);
-  evaluateParsimonyTBR(tr, pr, q, p1, q, perSiteScores);
-  tr->curRoot = q;
-  tr->curRootBack = q->back;
-  return PLL_TRUE;
+    // Connect p to p1 and p2 again
+    hookupDefault(p->next, p1);
+    hookupDefault(p->next->next, p2);
+    p1 = (p1->xPars ? p1 : p2);
+    // assert(p1->xPars);
+    evaluateParsimonyTBR(tr, pr, q, p1, q, perSiteScores);
+    tr->curRoot = q;
+    tr->curRootBack = q->back;
+    return PLL_TRUE;
 }
 
 static bool restoreTreeRearrangeParsimonyTBRLeaf(pllInstance *tr,
                                                  partitionList *pr,
                                                  int perSiteScores) {
 
-  hookupDefault(tr->TBR_removeBranch->next->back,
-                tr->TBR_removeBranch->next->next->back);
+    hookupDefault(tr->TBR_removeBranch->next->back,
+                  tr->TBR_removeBranch->next->next->back);
 
-  nodeptr r = tr->TBR_insertBranch1;
-  nodeptr rb = r->back;
-  if (!r->xPars) {
-    swap(r, rb);
-  }
-  assert(r->xPars);
-  assert(tr->TBR_removeBranch->xPars);
-  hookupDefault(r, tr->TBR_removeBranch->next);
-  hookupDefault(rb, tr->TBR_removeBranch->next->next);
-  evaluateParsimonyTBR(tr, pr, tr->TBR_removeBranch->back, r,
-                       tr->TBR_removeBranch, perSiteScores);
-  tr->curRoot = tr->TBR_removeBranch;
-  tr->curRootBack = tr->TBR_removeBranch->back;
+    nodeptr r = tr->TBR_insertBranch1;
+    nodeptr rb = r->back;
+    if (!r->xPars) {
+        swap(r, rb);
+    }
+    assert(r->xPars);
+    assert(tr->TBR_removeBranch->xPars);
+    hookupDefault(r, tr->TBR_removeBranch->next);
+    hookupDefault(rb, tr->TBR_removeBranch->next->next);
+    evaluateParsimonyTBR(tr, pr, tr->TBR_removeBranch->back, r,
+                         tr->TBR_removeBranch, perSiteScores);
+    tr->curRoot = tr->TBR_removeBranch;
+    tr->curRootBack = tr->TBR_removeBranch->back;
 
-  return PLL_TRUE;
+    return PLL_TRUE;
 }
 
 void testTBROnUserTree(Params &params) {}
@@ -1848,325 +1779,288 @@ string(ptree->pllInst->tree_string); ptree->readTreeString(treeString);
 
 int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
                             int maxtrav, IQTree *_iqtree) {
-  int perSiteScores = globalParam->gbo_replicates > 0;
+    int perSiteScores = globalParam->gbo_replicates > 0;
 
-  iqtree = _iqtree; // update pointer to IQTree
+    iqtree = _iqtree; // update pointer to IQTree
 
-  if (globalParam->ratchet_iter >= 0 &&
-      (iqtree->on_ratchet_hclimb1 || iqtree->on_ratchet_hclimb2)) {
-    // oct 23: in non-ratchet iteration, allocate is not triggered
-    _updateInternalPllOnRatchet(tr, pr);
-    _allocateParsimonyDataStructuresTBR(
-        tr, pr, perSiteScores); // called once if not running ratchet
-  } else if (first_call || (iqtree && iqtree->on_opt_btree))
-    _allocateParsimonyDataStructuresTBR(
-        tr, pr, perSiteScores); // called once if not running ratchet
+    if (globalParam->ratchet_iter >= 0 &&
+        (iqtree->on_ratchet_hclimb1 || iqtree->on_ratchet_hclimb2)) {
+        // oct 23: in non-ratchet iteration, allocate is not triggered
+        _updateInternalPllOnRatchet(tr, pr);
+        _allocateParsimonyDataStructuresTBR(
+            tr, pr, perSiteScores); // called once if not running ratchet
+    } else if (first_call || (iqtree && iqtree->on_opt_btree))
+        _allocateParsimonyDataStructuresTBR(
+            tr, pr, perSiteScores); // called once if not running ratchet
 
-  if (first_call) {
-    first_call = false;
-  }
-
-  //	if(((globalParam->ratchet_iter >= 0 || globalParam->optimize_boot_trees)
-  //&& (!globalParam->hclimb1_nni)) || (!iqtree)){ 		iqtree =
-  //_iqtree;
-  //		// consider updating tr->yVector, then tr->aliaswgt (similar as
-  // in pllLoadAlignment) 		if((globalParam->ratchet_iter >= 0  ||
-  // globalParam->optimize_boot_trees) && (!globalParam->hclimb1_nni))
-  //			_updateInternalPllOnRatchet(tr, pr);
-  //		_allocateParsimonyDataStructuresTBR(tr, pr, perSiteScores); //
-  // called once if not running ratchet
-  //	}
-
-  int i;
-  unsigned int randomMP, startMP;
-
-  assert(!tr->constrained);
-
-  nodeRectifierPars(tr, true);
-  tr->bestParsimony = UINT_MAX;
-  tr->bestParsimony =
-      _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
-
-  assert(-iqtree->curScore == tr->bestParsimony);
-
-  //	cout << "\ttr->bestParsimony (initial tree) = " << tr->bestParsimony <<
-  // endl;
-  /*
-  // Diep: to be investigated
-  tr->bestParsimony = -iqtree->logl_cutoff;
-  _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
-  */
-
-  // *perm        = (int *)rax_malloc((size_t)(tr->mxtips + tr->mxtips - 1) *
-  // sizeof(int));
-  //	makePermutationFast(perm, tr->mxtips + tr->mxtips - 2, tr);
-
-  unsigned int bestIterationScoreHits = 1;
-  randomMP = tr->bestParsimony;
-
-  // nodeRectifierPars(tr);
-  // _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
-  do {
-    nodeRectifierPars(tr, false);
-    startMP = randomMP;
-
-    for (i = 1; i <= tr->mxtips; i++) {
-      tr->TBR_removeBranch = tr->TBR_insertBranch1 = NULL;
-      bestTreeScoreHits = 1;
-      pllComputeTBRLeaf(tr, pr, tr->nodep[i]->back, mintrav, maxtrav,
-                        perSiteScores);
-      if (tr->bestParsimony == randomMP)
-        bestIterationScoreHits++;
-      if (tr->bestParsimony < randomMP)
-        bestIterationScoreHits = 1;
-      if (((tr->bestParsimony < randomMP) ||
-           ((tr->bestParsimony == randomMP) &&
-            (random_double() <= 1.0 / bestIterationScoreHits))) &&
-          tr->TBR_removeBranch && tr->TBR_insertBranch1) {
-        restoreTreeRearrangeParsimonyTBRLeaf(tr, pr, perSiteScores);
-        randomMP = tr->bestParsimony;
-      }
+    if (first_call) {
+        first_call = false;
     }
 
-    for (i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
-      //		for(j = 1; j <= tr->mxtips + tr->mxtips - 2; j++){
-      //			i = perm[j];
-      tr->TBR_removeBranch = NULL;
-      tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
-      bestTreeScoreHits = 1;
-      // assert(tr->nodep[i]->xPars);
-      pllComputeTBRVer2(tr, pr, tr->nodep[i], mintrav, maxtrav, perSiteScores);
-      if (tr->bestParsimony == randomMP)
-        bestIterationScoreHits++;
-      if (tr->bestParsimony < randomMP)
-        bestIterationScoreHits = 1;
-      if (((tr->bestParsimony < randomMP) ||
-           ((tr->bestParsimony == randomMP) &&
-            (random_double() <= 1.0 / bestIterationScoreHits))) &&
-          tr->TBR_removeBranch && tr->TBR_insertBranch1 &&
-          tr->TBR_insertBranch2) {
-        restoreTreeRearrangeParsimonyTBR(tr, pr, perSiteScores);
-        randomMP = tr->bestParsimony;
-      }
-    }
-  } while (randomMP < startMP);
-  return startMP;
+    int i;
+    unsigned int randomMP, startMP;
+
+    assert(!tr->constrained);
+
+    nodeRectifierPars(tr, true);
+    tr->bestParsimony = UINT_MAX;
+    tr->bestParsimony =
+        _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
+
+    assert(-iqtree->curScore == tr->bestParsimony);
+
+    unsigned int bestIterationScoreHits = 1;
+    randomMP = tr->bestParsimony;
+
+    do {
+        nodeRectifierPars(tr, false);
+        startMP = randomMP;
+
+        for (i = 1; i <= tr->mxtips; i++) {
+            tr->TBR_removeBranch = tr->TBR_insertBranch1 = NULL;
+            bestTreeScoreHits = 1;
+            pllComputeTBRLeaf(tr, pr, tr->nodep[i]->back, mintrav, maxtrav,
+                              perSiteScores);
+            if (tr->bestParsimony == randomMP)
+                bestIterationScoreHits++;
+            if (tr->bestParsimony < randomMP)
+                bestIterationScoreHits = 1;
+            if (((tr->bestParsimony < randomMP) ||
+                 ((tr->bestParsimony == randomMP) &&
+                  (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                tr->TBR_removeBranch && tr->TBR_insertBranch1) {
+                restoreTreeRearrangeParsimonyTBRLeaf(tr, pr, perSiteScores);
+                randomMP = tr->bestParsimony;
+            }
+        }
+
+        for (i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
+            tr->TBR_removeBranch = NULL;
+            tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
+            bestTreeScoreHits = 1;
+            pllComputeTBRVer2(tr, pr, tr->nodep[i], mintrav, maxtrav,
+                              perSiteScores);
+            if (tr->bestParsimony == randomMP)
+                bestIterationScoreHits++;
+            if (tr->bestParsimony < randomMP)
+                bestIterationScoreHits = 1;
+            if (((tr->bestParsimony < randomMP) ||
+                 ((tr->bestParsimony == randomMP) &&
+                  (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                tr->TBR_removeBranch && tr->TBR_insertBranch1 &&
+                tr->TBR_insertBranch2) {
+                restoreTreeRearrangeParsimonyTBR(tr, pr, perSiteScores);
+                randomMP = tr->bestParsimony;
+            }
+        }
+    } while (randomMP < startMP);
+    return startMP;
 }
+
 static void makePermutationFast(int *perm, int n, pllInstance *tr) {
-  int i, j, k;
+    int i, j, k;
 
-  for (i = 1; i <= n; i++)
-    perm[i] = i;
+    for (i = 1; i <= n; i++)
+        perm[i] = i;
 
-  for (i = 1; i <= n; i++) {
-    double d = randum(&tr->randomNumberSeed);
+    for (i = 1; i <= n; i++) {
+        double d = randum(&tr->randomNumberSeed);
 
-    k = (int)((double)(n + 1 - i) * d);
+        k = (int)((double)(n + 1 - i) * d);
 
-    j = perm[i];
+        j = perm[i];
 
-    perm[i] = perm[i + k];
-    perm[i + k] = j;
-  }
+        perm[i] = perm[i + k];
+        perm[i + k] = j;
+    }
 }
 
 static void insertParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
                             nodeptr q, int perSiteScores) {
-  nodeptr r;
+    nodeptr r;
 
-  r = q->back;
+    r = q->back;
 
-  hookupDefault(p->next, q);
-  hookupDefault(p->next->next, r);
-  _newviewParsimony(tr, pr, p, perSiteScores);
+    hookupDefault(p->next, q);
+    hookupDefault(p->next->next, r);
+    _newviewParsimony(tr, pr, p, perSiteScores);
 }
 
 static nodeptr buildNewTip(pllInstance *tr, nodeptr p) {
-  nodeptr q;
+    nodeptr q;
 
-  q = tr->nodep[(tr->nextnode)++];
-  hookupDefault(p, q);
-  q->next->back = (nodeptr)NULL;
-  q->next->next->back = (nodeptr)NULL;
+    q = tr->nodep[(tr->nextnode)++];
+    hookupDefault(p, q);
+    q->next->back = (nodeptr)NULL;
+    q->next->next->back = (nodeptr)NULL;
 
-  return q;
+    return q;
 }
 
 static void buildSimpleTree(pllInstance *tr, partitionList *pr, int ip, int iq,
                             int ir) {
-  nodeptr p, s;
-  int i;
+    nodeptr p, s;
+    int i;
 
-  i = PLL_MIN(ip, iq);
-  if (ir < i)
-    i = ir;
-  tr->start = tr->nodep[i];
-  tr->ntips = 3;
-  p = tr->nodep[ip];
-  hookupDefault(p, tr->nodep[iq]);
-  s = buildNewTip(tr, tr->nodep[ir]);
-  insertParsimony(tr, pr, s, p, PLL_FALSE);
+    i = PLL_MIN(ip, iq);
+    if (ir < i)
+        i = ir;
+    tr->start = tr->nodep[i];
+    tr->ntips = 3;
+    p = tr->nodep[ip];
+    hookupDefault(p, tr->nodep[iq]);
+    s = buildNewTip(tr, tr->nodep[ir]);
+    insertParsimony(tr, pr, s, p, PLL_FALSE);
 }
 
 static void stepwiseAddition(pllInstance *tr, partitionList *pr, nodeptr p,
                              nodeptr q) {
-  nodeptr r = q->back;
+    nodeptr r = q->back;
 
-  unsigned int mp;
+    unsigned int mp;
 
-  int counter = 4;
+    int counter = 4;
 
-  p->next->back = q;
-  q->back = p->next;
+    p->next->back = q;
+    q->back = p->next;
 
-  p->next->next->back = r;
-  r->back = p->next->next;
+    p->next->next->back = r;
+    r->back = p->next->next;
 
-  computeTraversalInfoParsimony(p, tr->ti, &counter, tr->mxtips, PLL_FALSE,
-                                PLL_FALSE);
-  tr->ti[0] = counter;
-  tr->ti[1] = p->number;
-  tr->ti[2] = p->back->number;
+    computeTraversalInfoParsimony(p, tr->ti, &counter, tr->mxtips, PLL_FALSE,
+                                  PLL_FALSE);
+    tr->ti[0] = counter;
+    tr->ti[1] = p->number;
+    tr->ti[2] = p->back->number;
 
-  mp = _evaluateParsimonyIterativeFast(tr, pr, PLL_FALSE);
+    mp = _evaluateParsimonyIterativeFast(tr, pr, PLL_FALSE);
 
-  if (mp < tr->bestParsimony)
-    bestTreeScoreHits = 1;
-  else if (mp == tr->bestParsimony)
-    bestTreeScoreHits++;
+    if (mp < tr->bestParsimony)
+        bestTreeScoreHits = 1;
+    else if (mp == tr->bestParsimony)
+        bestTreeScoreHits++;
 
-  if ((mp < tr->bestParsimony) ||
-      ((mp == tr->bestParsimony) &&
-       (random_double() <= 1.0 / bestTreeScoreHits))) {
-    tr->bestParsimony = mp;
-    tr->insertNode = q;
-  }
+    if ((mp < tr->bestParsimony) ||
+        ((mp == tr->bestParsimony) &&
+         (random_double() <= 1.0 / bestTreeScoreHits))) {
+        tr->bestParsimony = mp;
+        tr->insertNode = q;
+    }
 
-  q->back = r;
-  r->back = q;
+    q->back = r;
+    r->back = q;
 
-  // TODO: why need parsimonyScore here?
-  if (q->number > tr->mxtips && tr->parsimonyScore[q->number] > 0) {
-    stepwiseAddition(tr, pr, p, q->next->back);
-    stepwiseAddition(tr, pr, p, q->next->next->back);
-  }
+    // TODO: why need parsimonyScore here?
+    if (q->number > tr->mxtips && tr->parsimonyScore[q->number] > 0) {
+        stepwiseAddition(tr, pr, p, q->next->back);
+        stepwiseAddition(tr, pr, p, q->next->next->back);
+    }
 }
 
 static void pllMakeParsimonyTreeFastTBR(pllInstance *tr, partitionList *pr,
                                         int tbr_mintrav, int tbr_maxtrav) {
-  nodeptr p, f;
-  cout << "pllMakeParsimonyTreeFastTBR\n";
-  int i, nextsp,
-      *perm = (int *)rax_malloc((size_t)(tr->mxtips + 1) * sizeof(int));
+    nodeptr p, f;
+    cout << "pllMakeParsimonyTreeFastTBR\n";
+    int i, nextsp,
+        *perm = (int *)rax_malloc((size_t)(tr->mxtips + 1) * sizeof(int));
 
-  unsigned int randomMP, startMP;
+    unsigned int randomMP, startMP;
 
-  assert(!tr->constrained);
+    assert(!tr->constrained);
 
-  makePermutationFast(perm, tr->mxtips, tr);
+    makePermutationFast(perm, tr->mxtips, tr);
 
-  tr->ntips = 0;
+    tr->ntips = 0;
 
-  tr->nextnode = tr->mxtips + 1;
+    tr->nextnode = tr->mxtips + 1;
 
-  buildSimpleTree(tr, pr, perm[1], perm[2], perm[3]);
+    buildSimpleTree(tr, pr, perm[1], perm[2], perm[3]);
 
-  f = tr->start;
+    f = tr->start;
 
-  bestTreeScoreHits = 1;
-  while (tr->ntips < tr->mxtips) {
-    nodeptr q;
+    bestTreeScoreHits = 1;
+    while (tr->ntips < tr->mxtips) {
+        nodeptr q;
 
-    tr->bestParsimony = INT_MAX;
-    nextsp = ++(tr->ntips);
-    p = tr->nodep[perm[nextsp]];
-    q = tr->nodep[(tr->nextnode)++];
-    p->back = q;
-    q->back = p;
+        tr->bestParsimony = INT_MAX;
+        nextsp = ++(tr->ntips);
+        p = tr->nodep[perm[nextsp]];
+        q = tr->nodep[(tr->nextnode)++];
+        p->back = q;
+        q->back = p;
 
-    stepwiseAddition(tr, pr, q, f->back);
-    //      cout << "tr->ntips = " << tr->ntips << endl;
+        stepwiseAddition(tr, pr, q, f->back);
+        //      cout << "tr->ntips = " << tr->ntips << endl;
 
-    {
-      nodeptr r = tr->insertNode->back;
+        {
+            nodeptr r = tr->insertNode->back;
 
-      int counter = 4;
+            int counter = 4;
 
-      hookupDefault(q->next, tr->insertNode);
-      hookupDefault(q->next->next, r);
+            hookupDefault(q->next, tr->insertNode);
+            hookupDefault(q->next->next, r);
 
-      computeTraversalInfoParsimony(q, tr->ti, &counter, tr->mxtips, PLL_FALSE,
-                                    0);
-      tr->ti[0] = counter;
+            computeTraversalInfoParsimony(q, tr->ti, &counter, tr->mxtips,
+                                          PLL_FALSE, 0);
+            tr->ti[0] = counter;
 
-      _newviewParsimonyIterativeFast(tr, pr, 0);
+            _newviewParsimonyIterativeFast(tr, pr, 0);
+        }
     }
-  }
-  rax_free(perm);
-  nodeRectifierPars(tr, true);
+    rax_free(perm);
+    nodeRectifierPars(tr, true);
 
-  tr->bestParsimony = UINT_MAX;
-  tr->bestParsimony =
-      _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, PLL_FALSE);
-  //	cout << "\ttr->bestParsimony (initial tree) = " << tr->bestParsimony <<
-  // endl;
-  /*
-  // Diep: to be investigated
-  tr->bestParsimony = -iqtree->logl_cutoff;
-  _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
-  */
+    tr->bestParsimony = UINT_MAX;
+    tr->bestParsimony =
+        _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, PLL_FALSE);
 
-  // *perm        = (int *)rax_malloc((size_t)(tr->mxtips + tr->mxtips - 1) *
-  // sizeof(int));
-  //	makePermutationFast(perm, tr->mxtips + tr->mxtips - 2, tr);
+    unsigned int bestIterationScoreHits = 1;
+    randomMP = tr->bestParsimony;
+    do {
+        nodeRectifierPars(tr, false);
+        startMP = randomMP;
 
-  unsigned int bestIterationScoreHits = 1;
-  randomMP = tr->bestParsimony;
-  do {
-    nodeRectifierPars(tr, false);
-    startMP = randomMP;
+        for (i = 1; i <= tr->mxtips; i++) {
+            tr->TBR_removeBranch = tr->TBR_insertBranch1 = NULL;
+            bestTreeScoreHits = 1;
+            pllComputeTBRLeaf(tr, pr, tr->nodep[i]->back, tbr_mintrav,
+                              tbr_maxtrav, PLL_FALSE);
+            if (tr->bestParsimony == randomMP)
+                bestIterationScoreHits++;
+            if (tr->bestParsimony < randomMP)
+                bestIterationScoreHits = 1;
+            if (((tr->bestParsimony < randomMP) ||
+                 ((tr->bestParsimony == randomMP) &&
+                  (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                tr->TBR_removeBranch && tr->TBR_insertBranch1) {
+                restoreTreeRearrangeParsimonyTBRLeaf(tr, pr, PLL_FALSE);
+                randomMP = tr->bestParsimony;
+            }
+        }
 
-    for (i = 1; i <= tr->mxtips; i++) {
-      tr->TBR_removeBranch = tr->TBR_insertBranch1 = NULL;
-      bestTreeScoreHits = 1;
-      pllComputeTBRLeaf(tr, pr, tr->nodep[i]->back, tbr_mintrav, tbr_maxtrav,
-                        PLL_FALSE);
-      if (tr->bestParsimony == randomMP)
-        bestIterationScoreHits++;
-      if (tr->bestParsimony < randomMP)
-        bestIterationScoreHits = 1;
-      if (((tr->bestParsimony < randomMP) ||
-           ((tr->bestParsimony == randomMP) &&
-            (random_double() <= 1.0 / bestIterationScoreHits))) &&
-          tr->TBR_removeBranch && tr->TBR_insertBranch1) {
-        restoreTreeRearrangeParsimonyTBRLeaf(tr, pr, PLL_FALSE);
-        randomMP = tr->bestParsimony;
-      }
-    }
-
-    for (i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
-      //		for(j = 1; j <= tr->mxtips + tr->mxtips - 2; j++){
-      //			i = perm[j];
-      tr->TBR_removeBranch = NULL;
-      tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
-      bestTreeScoreHits = 1;
-      // assert(tr->nodep[i]->xPars);
-      pllComputeTBRVer2(tr, pr, tr->nodep[i], tbr_mintrav, tbr_maxtrav,
-                        PLL_FALSE);
-      if (tr->bestParsimony == randomMP)
-        bestIterationScoreHits++;
-      if (tr->bestParsimony < randomMP)
-        bestIterationScoreHits = 1;
-      if (((tr->bestParsimony < randomMP) ||
-           ((tr->bestParsimony == randomMP) &&
-            (random_double() <= 1.0 / bestIterationScoreHits))) &&
-          tr->TBR_removeBranch && tr->TBR_insertBranch1 &&
-          tr->TBR_insertBranch2) {
-        restoreTreeRearrangeParsimonyTBR(tr, pr, PLL_FALSE);
-        randomMP = tr->bestParsimony;
-      }
-    }
-  } while (randomMP < startMP);
+        for (i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
+            //		for(j = 1; j <= tr->mxtips + tr->mxtips - 2;
+            // j++){ 			i = perm[j];
+            tr->TBR_removeBranch = NULL;
+            tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
+            bestTreeScoreHits = 1;
+            // assert(tr->nodep[i]->xPars);
+            pllComputeTBRVer2(tr, pr, tr->nodep[i], tbr_mintrav, tbr_maxtrav,
+                              PLL_FALSE);
+            if (tr->bestParsimony == randomMP)
+                bestIterationScoreHits++;
+            if (tr->bestParsimony < randomMP)
+                bestIterationScoreHits = 1;
+            if (((tr->bestParsimony < randomMP) ||
+                 ((tr->bestParsimony == randomMP) &&
+                  (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                tr->TBR_removeBranch && tr->TBR_insertBranch1 &&
+                tr->TBR_insertBranch2) {
+                restoreTreeRearrangeParsimonyTBR(tr, pr, PLL_FALSE);
+                randomMP = tr->bestParsimony;
+            }
+        }
+    } while (randomMP < startMP);
 }
 
 /** @brief Compute a randomized stepwise addition oder parsimony tree
@@ -2185,13 +2079,13 @@ static void pllMakeParsimonyTreeFastTBR(pllInstance *tr, partitionList *pr,
 void pllComputeRandomizedStepwiseAdditionParsimonyTreeTBR(
     pllInstance *tr, partitionList *partitions, int tbr_mintrav,
     int tbr_maxtrav, IQTree *_iqtree) {
-  doing_stepwise_addition = true;
-  iqtree = _iqtree; // update pointer to IQTree
-  _allocateParsimonyDataStructuresTBR(tr, partitions, PLL_FALSE);
-  //	cout << "DONE allocate..." << endl;
-  pllMakeParsimonyTreeFastTBR(tr, partitions, tbr_mintrav, tbr_maxtrav);
-  //	cout << "DONE make...." << endl;
-  _pllFreeParsimonyDataStructures(tr, partitions);
-  doing_stepwise_addition = false;
-  //	cout << "Done free..." << endl;
+    doing_stepwise_addition = true;
+    iqtree = _iqtree; // update pointer to IQTree
+    _allocateParsimonyDataStructuresTBR(tr, partitions, PLL_FALSE);
+    //	cout << "DONE allocate..." << endl;
+    pllMakeParsimonyTreeFastTBR(tr, partitions, tbr_mintrav, tbr_maxtrav);
+    //	cout << "DONE make...." << endl;
+    _pllFreeParsimonyDataStructures(tr, partitions);
+    doing_stepwise_addition = false;
+    //	cout << "Done free..." << endl;
 }
