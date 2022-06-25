@@ -9,20 +9,6 @@
 // #include <sprparsimony.h>
 #include "iqtree.h"
 
-/*
- * An alternative for pllComputeRandomizedStepwiseAdditionParsimonyTree
- * because the original one seems to have the wrong deallocation function
- */
-
-
-/**
- * TBR operations
- */
-int pllTbrRemoveBranch (pllInstance * tr, partitionList * pr, nodeptr p);
-static int pllTbrConnectSubtrees(pllInstance * tr, nodeptr p,
-                                 nodeptr q, nodeptr * freeBranch, nodeptr * pb, nodeptr * qb);
-
-
 /**
  * DTH: optimize whatever tree is stored in tr by parsimony TBR
  * @param tr: the tree instance :)
@@ -30,8 +16,8 @@ static int pllTbrConnectSubtrees(pllInstance * tr, nodeptr p,
  * @param mintrav, maxtrav are PLL limitations for TBR radius
  * @return best parsimony score found
  */
-int pllOptimizeTbrParsimony(pllInstance * tr, partitionList * pr, int mintrav, int maxtrav, IQTree *iqtree);
-
+int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
+                            int maxtrav, IQTree *iqtree);
 
 void pllComputeRandomizedStepwiseAdditionParsimonyTreeTBR(
     pllInstance *tr, partitionList *partitions, int tbr_mintrav,
