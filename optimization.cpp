@@ -16,8 +16,9 @@
 #include <iostream>
 //#include "tools.h"
 
-
-using namespace std;
+using std::cout;
+using std::cerr;
+using std::endl;
 
 const double ERROR_X = 1.0e-4;
 
