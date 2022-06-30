@@ -579,6 +579,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.tbr_mintrav = 1;
     params.tbr_maxtrav = 5;
     params.tbr_insert_nni = false;
+    params.tbr_traverse_ver1 = false;
     params.spr_better = false;
     params.tree_gen = NONE;
     params.user_file = NULL;
@@ -918,6 +919,11 @@ void parseArg(int argc, char *argv[], Params &params) {
 
             if (strcmp(argv[cnt], "-tbr_insert_nni") == 0) {
                 params.tbr_insert_nni = true;
+                continue;
+            }
+            
+            if (strcmp(argv[cnt], "-tbr_traverse_ver1") == 0) {
+                params.tbr_traverse_ver1 = true;
                 continue;
             }
 

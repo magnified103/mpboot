@@ -462,6 +462,12 @@ struct Params {
     int tbr_insert_nni;
 
     /**
+     * Each insert branches has its own [mintrav, maxtrav] condition (Default is sum of the 2 is in [mintrav, maxtrav])
+     * Use pllComputeTBRVer1() and pllTraverseUpdateTBRVer1() instead.
+     */
+    int tbr_traverse_ver1;
+
+    /**
      *  rearrangeParsimony only take the first better SPR and return
      */
     bool spr_better;
