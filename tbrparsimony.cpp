@@ -443,12 +443,12 @@ static void computeTraversalInfoParsimony(nodeptr p, int *ti, int *counter,
 static void getRecalculateNodeTBR(nodeptr root, nodeptr root1, nodeptr u,
                                   nodeptr v) {
     root->recalculate = root1->recalculate = true;
-    while (u != root && u != root1) {
+    while (u != root && u != root1 && u->recalculate == false) {
         // assert(u != NULL);
         u->recalculate = true;
         u = u->par;
     }
-    while (v != root && v != root1) {
+    while (v != root && v != root1 && v->recalculate == false) {
         // assert(v != NULL);
         v->recalculate = true;
         v = v->par;
@@ -1242,8 +1242,6 @@ static int pllTestTBRMove(pllInstance *tr, partitionList *pr, nodeptr branch1,
     nodeptr tmpNode = (insertNNI ? branch2 : branch1->back);
     nodeptr pb, qb;
 
-    // TODO:
-    // Consider a different way of connecting branch1 and branch2 (Like NNI)
     if (!pllTbrConnectSubtrees(tr, branch1, branch2, freeBranch, &pb, &qb,
                                insertNNI)) {
         cout << "Can't connect subtrees in test\n";
@@ -1296,43 +1294,31 @@ static int pllTestTBRMove(pllInstance *tr, partitionList *pr, nodeptr branch1,
  @brief Internal function for recursively traversing a tree and testing a
  possible TBR move insertion
 
- Recursively traverses the tree rooted at \a q in the direction of \a
- q->next->back, \a q->next->next->back, \a p->next->back and \a
- p->next->next->back and at each node tests a TBR move between branches 'p' and
- 'q'.
+ Recursively traverses the tree in direction of q (q->next->back and
+ q->next->next->back) and at each (p, q) tests a TBR move between branches 'p'
+ and 'q'.
 
  @note
- mintravP/Q, maxtravP/Q is version 1. (Version 2 is what curretly used)
- Distance from removeBranch to each of the inserted branch is in
- [mintrav,maxtrav] (Not the sum of the 2 distances)
+ Version 1 is each P and Q has its own [mintrav, maxtrav]
  */
-static void pllTraverseUpdateTBR(pllInstance *tr, partitionList *pr, nodeptr p,
-                                 nodeptr q, nodeptr *r, int mintravP,
-                                 int maxtravP, int mintravQ, int maxtravQ,
-                                 int perSiteScores) {
+static void pllTraverseUpdateTBRVer1Q(pllInstance *tr, partitionList *pr,
+                                      nodeptr p, nodeptr q, nodeptr *r,
+                                      int mintravQ, int maxtravQ,
+                                      int perSiteScores) {
 
-    if (mintravP <= 1 && mintravQ <= 1) {
+    if (mintravQ <= 0) {
         assert((pllTestTBRMove(tr, pr, p, q, r, perSiteScores, false)));
         if (globalParam->tbr_insert_nni == true) {
             assert((pllTestTBRMove(tr, pr, p, q, r, perSiteScores, true)));
         }
     }
 
-    /* traverse q subtree */
-    if ((!isTip(q->number, tr->mxtips)) && (maxtravQ - 1 > 0)) {
-        pllTraverseUpdateTBR(tr, pr, p, q->next->back, r, mintravP, maxtravP,
-                             mintravQ - 1, maxtravQ - 1, perSiteScores);
-        pllTraverseUpdateTBR(tr, pr, p, q->next->next->back, r, mintravP,
-                             maxtravP, mintravQ - 1, maxtravQ - 1,
-                             perSiteScores);
-    }
-
-    /* last, we traverse the p subtree */
-    if ((!isTip(p->number, tr->mxtips)) && (maxtravP - 1 > 0)) {
-        pllTraverseUpdateTBR(tr, pr, p->next->back, q, r, mintravP - 1,
-                             maxtravP - 1, mintravQ, maxtravQ, perSiteScores);
-        pllTraverseUpdateTBR(tr, pr, p->next->next->back, q, r, mintravP - 1,
-                             maxtravP - 1, mintravQ, maxtravQ, perSiteScores);
+    /* traverse the q subtree */
+    if ((!isTip(q->number, tr->mxtips)) && (maxtravQ - 1 >= 0)) {
+        pllTraverseUpdateTBRVer1Q(tr, pr, p, q->next->back, r, mintravQ - 1,
+                                  maxtravQ - 1, perSiteScores);
+        pllTraverseUpdateTBRVer1Q(tr, pr, p, q->next->next->back, r,
+                                  mintravQ - 1, maxtravQ - 1, perSiteScores);
     }
 }
 
@@ -1340,18 +1326,58 @@ static void pllTraverseUpdateTBR(pllInstance *tr, partitionList *pr, nodeptr p,
  @brief Internal function for recursively traversing a tree and testing a
  possible TBR move insertion
 
- Recursively traverses the tree rooted at \a q in the direction of \a
- q->next->back, \a q->next->next->back, \a p->next->back and \a
- p->next->next->back and at each node tests a TBR move between branches 'p' and
- 'q'.
+ Recursively traverses the tree in direction of p (p->next->back and
+ p->next->next->back) and at each (p, q) tests a TBR move between branches 'p'
+ and 'q'.
+
+ @note
+ Version 1 is each P and Q has its own [mintrav, maxtrav]
+ */
+static void pllTraverseUpdateTBRVer1P(pllInstance *tr, partitionList *pr,
+                                      nodeptr p, nodeptr q, nodeptr *r,
+                                      int mintravP, int maxtravP, int mintravQ,
+                                      int maxtravQ, int perSiteScores) {
+    if (mintravP <= 0) {
+        // Avoid insert back to where it's cut
+        if (mintravP == 0 && mintravQ == 0) {
+            if ((!isTip(q->number, tr->mxtips)) && (maxtravQ - 1 >= 0)) {
+                pllTraverseUpdateTBRVer1Q(tr, pr, p, q->next->back, r,
+                                          mintravQ - 1, maxtravQ - 1,
+                                          perSiteScores);
+                pllTraverseUpdateTBRVer1Q(tr, pr, p, q->next->next->back, r,
+                                          mintravQ - 1, maxtravQ - 1,
+                                          perSiteScores);
+            }
+        } else {
+            pllTraverseUpdateTBRVer1Q(tr, pr, p, q, r, mintravQ, maxtravQ,
+                                      perSiteScores);
+        }
+    }
+    /* traverse the p subtree */
+    if (!isTip(p->number, tr->mxtips) && maxtravP - 1 >= 0) {
+        pllTraverseUpdateTBRVer1P(tr, pr, p->next->back, q, r, mintravP - 1,
+                                  maxtravP - 1, mintravQ, maxtravQ,
+                                  perSiteScores);
+        pllTraverseUpdateTBRVer1P(tr, pr, p->next->next->back, q, r,
+                                  mintravP - 1, maxtravP - 1, mintravQ,
+                                  maxtravQ, perSiteScores);
+    }
+}
+/**
+ @brief Internal function for recursively traversing a tree and testing a
+ possible TBR move insertion
+
+ Recursively traverses the tree in direction of q (q->next->back and
+ q->next->next->back) and at each (p, q) tests a TBR move between branches 'p'
+ and 'q'.
 
  @note
  Version 2 is Sum of distance of 2 inserted branch is in [mintrav, maxtrav]
  */
-static void pllTraverseUpdateTBRVer2(pllInstance *tr, partitionList *pr,
-                                     nodeptr p, nodeptr q, nodeptr *r,
-                                     int mintrav, int maxtrav, int distP,
-                                     int distQ, int perSiteScores) {
+static void pllTraverseUpdateTBRVer2Q(pllInstance *tr, partitionList *pr,
+                                      nodeptr p, nodeptr q, nodeptr *r,
+                                      int mintrav, int maxtrav, int distP,
+                                      int distQ, int perSiteScores) {
 
     if (mintrav <= 0) {
         assert((pllTestTBRMove(tr, pr, p, q, r, perSiteScores, false)));
@@ -1363,20 +1389,40 @@ static void pllTraverseUpdateTBRVer2(pllInstance *tr, partitionList *pr,
         }
     }
 
-    /* traverse q subtree */
+    /* traverse the q subtree */
     if ((!isTip(q->number, tr->mxtips)) && (maxtrav - 1 >= 0)) {
-        pllTraverseUpdateTBRVer2(tr, pr, p, q->next->back, r, mintrav - 1,
-                                 maxtrav - 1, distP, distQ + 1, perSiteScores);
-        pllTraverseUpdateTBRVer2(tr, pr, p, q->next->next->back, r, mintrav - 1,
-                                 maxtrav - 1, distP, distQ + 1, perSiteScores);
+        pllTraverseUpdateTBRVer2Q(tr, pr, p, q->next->back, r, mintrav - 1,
+                                  maxtrav - 1, distP, distQ + 1, perSiteScores);
+        pllTraverseUpdateTBRVer2Q(tr, pr, p, q->next->next->back, r,
+                                  mintrav - 1, maxtrav - 1, distP, distQ + 1,
+                                  perSiteScores);
     }
+}
 
-    /* last, we traverse the p subtree */
+/**
+ @brief Internal function for recursively traversing a tree and testing a
+ possible TBR move insertion
+
+ Recursively traverses the tree in direction of p (p->next->back and
+ p->next->next->back) and at each (p, q) tests a TBR move between branches 'p'
+ and 'q'.
+
+ @note
+ Version 2 is Sum of distance of 2 inserted branch is in [mintrav, maxtrav]
+ */
+static void pllTraverseUpdateTBRVer2P(pllInstance *tr, partitionList *pr,
+                                      nodeptr p, nodeptr q, nodeptr *r,
+                                      int mintrav, int maxtrav, int distP,
+                                      int distQ, int perSiteScores) {
+    pllTraverseUpdateTBRVer2Q(tr, pr, p, q, r, mintrav, maxtrav, distP, distQ,
+                              perSiteScores);
+    /* traverse the p subtree */
     if ((!isTip(p->number, tr->mxtips)) && (maxtrav - 1 >= 0)) {
-        pllTraverseUpdateTBRVer2(tr, pr, p->next->back, q, r, mintrav - 1,
-                                 maxtrav - 1, distP + 1, distQ, perSiteScores);
-        pllTraverseUpdateTBRVer2(tr, pr, p->next->next->back, q, r, mintrav - 1,
-                                 maxtrav - 1, distP + 1, distQ, perSiteScores);
+        pllTraverseUpdateTBRVer2P(tr, pr, p->next->back, q, r, mintrav - 1,
+                                  maxtrav - 1, distP + 1, distQ, perSiteScores);
+        pllTraverseUpdateTBRVer2P(tr, pr, p->next->next->back, q, r,
+                                  mintrav - 1, maxtrav - 1, distP + 1, distQ,
+                                  perSiteScores);
     }
 }
 
@@ -1407,10 +1453,10 @@ static void pllTraverseUpdateTBRVer2(pllInstance *tr, partitionList *pr,
  Calculate scores for each site (Bootstrapping)
 
  @note
- Version 1 called pllTraverseUpdateTBR (currently used Version 2)
+ Version 1 called pllTraverseUpdateTBRVer1 (default use Version 2)
  */
-static int pllComputeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
-                         int mintrav, int maxtrav, int perSiteScores) {
+static int pllComputeTBRVer1(pllInstance *tr, partitionList *pr, nodeptr p,
+                             int mintrav, int maxtrav, int perSiteScores) {
 
     nodeptr p1, p2, q, q1, q2;
     int i, numPartitions;
@@ -1418,7 +1464,7 @@ static int pllComputeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
     q = p->back;
 
     if (isTip(p->number, tr->mxtips) || isTip(q->number, tr->mxtips)) {
-        // p -- q is not an internal branch
+        // errno = PLL_TBR_NOT_INNER_BRANCH;
         return PLL_FALSE;
     }
 
@@ -1429,61 +1475,60 @@ static int pllComputeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
 
     if (maxtrav < 1 || mintrav > maxtrav)
         return PLL_BADREAR;
-
-    if (!isTip(p1->number, tr->mxtips) || !isTip(p2->number, tr->mxtips)) {
-        /* split the tree in two components */
-        if (!pllTbrRemoveBranch(tr, pr, p))
-            return PLL_BADREAR;
-        /* p1 and p2 are now connected */
-        assert(p1->back == p2 && p2->back == p1);
-
-        /* recursively traverse and perform TBR */
-        pllTraverseUpdateTBR(tr, pr, p1, q1, &p, mintrav, maxtrav, mintrav,
-                             maxtrav, perSiteScores);
-        if (!isTip(q2->number, tr->mxtips)) {
-            pllTraverseUpdateTBR(tr, pr, q2->next->back, p1, &p, mintrav - 1,
-                                 maxtrav - 1, mintrav, maxtrav, perSiteScores);
-            pllTraverseUpdateTBR(tr, pr, q2->next->next->back, p1, &p,
-                                 mintrav - 1, maxtrav - 1, mintrav, maxtrav,
-                                 perSiteScores);
-        }
-
-        if (!isTip(p2->number, tr->mxtips)) {
-            pllTraverseUpdateTBR(tr, pr, p2->next->back, q1, &p, mintrav - 1,
-                                 maxtrav - 1, mintrav, maxtrav, perSiteScores);
-            pllTraverseUpdateTBR(tr, pr, p2->next->next->back, q1, &p,
-                                 mintrav - 1, maxtrav - 1, mintrav, maxtrav,
-                                 perSiteScores);
-            if (!isTip(q2->number, tr->mxtips)) {
-                pllTraverseUpdateTBR(tr, pr, p2->next->back, q2->next->back, &p,
-                                     mintrav - 1, maxtrav - 1, mintrav - 1,
-                                     maxtrav - 1, perSiteScores);
-                pllTraverseUpdateTBR(tr, pr, p2->next->back,
-                                     q2->next->next->back, &p, mintrav - 1,
-                                     maxtrav - 1, mintrav - 1, maxtrav - 1,
-                                     perSiteScores);
-                pllTraverseUpdateTBR(tr, pr, p2->next->next->back,
-                                     q2->next->back, &p, mintrav - 1,
-                                     maxtrav - 1, mintrav - 1, maxtrav - 1,
-                                     perSiteScores);
-                pllTraverseUpdateTBR(tr, pr, p2->next->next->back,
-                                     q2->next->next->back, &p, mintrav - 1,
-                                     maxtrav - 1, mintrav - 1, maxtrav - 1,
-                                     perSiteScores);
-            }
-        }
-        nodeptr pb, qb, freeBranch;
-        /* restore the topology as it was before the split */
-        freeBranch = (p->xPars ? p : q);
-        p1 = (p1->xPars ? p1 : p1->back);
-        q1 = (q1->xPars ? q1 : q1->back);
-        int restoreTopoOK =
-            pllTbrConnectSubtrees(tr, p1, q1, &freeBranch, &pb, &qb);
-        evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, perSiteScores);
-        tr->curRoot = freeBranch;
-        tr->curRootBack = freeBranch->back;
-        assert(restoreTopoOK);
+    if (globalParam->tbr_test_draw == true) {
+        updateLastTreeString(tr, pr);
     }
+    /* split the tree in two components */
+    if (!pllTbrRemoveBranch(tr, pr, p))
+        return PLL_BADREAR;
+    /* p1 and p2 are now connected */
+    assert(p1->back == p2 && p2->back == p1);
+
+    /* recursively traverse and perform TBR */
+    pllTraverseUpdateTBRVer1P(tr, pr, p1, q1, &p, mintrav, maxtrav, mintrav,
+                              maxtrav, perSiteScores);
+    if (!isTip(q2->number, tr->mxtips)) {
+        pllTraverseUpdateTBRVer1P(tr, pr, p1, q2->next->back, &p, mintrav,
+                                  maxtrav, mintrav - 1, maxtrav - 1,
+                                  perSiteScores);
+        pllTraverseUpdateTBRVer1P(tr, pr, p1, q2->next->next->back, &p, mintrav,
+                                  maxtrav, mintrav - 1, maxtrav - 1,
+                                  perSiteScores);
+    }
+
+    if (!isTip(p2->number, tr->mxtips)) {
+        pllTraverseUpdateTBRVer1P(tr, pr, p2->next->back, q1, &p, mintrav - 1,
+                                  maxtrav - 1, mintrav, maxtrav, perSiteScores);
+        pllTraverseUpdateTBRVer1P(tr, pr, p2->next->next->back, q1, &p,
+                                  mintrav - 1, maxtrav - 1, mintrav, maxtrav,
+                                  perSiteScores);
+        if (!isTip(q2->number, tr->mxtips)) {
+            pllTraverseUpdateTBRVer1P(tr, pr, p2->next->back, q2->next->back,
+                                      &p, mintrav - 1, maxtrav - 1, mintrav - 1,
+                                      maxtrav - 1, perSiteScores);
+            pllTraverseUpdateTBRVer1P(
+                tr, pr, p2->next->back, q2->next->next->back, &p, mintrav - 1,
+                maxtrav - 1, mintrav - 1, maxtrav - 1, perSiteScores);
+            pllTraverseUpdateTBRVer1P(
+                tr, pr, p2->next->next->back, q2->next->back, &p, mintrav - 1,
+                maxtrav - 1, mintrav - 1, maxtrav - 1, perSiteScores);
+            pllTraverseUpdateTBRVer1P(tr, pr, p2->next->next->back,
+                                      q2->next->next->back, &p, mintrav - 1,
+                                      maxtrav - 1, mintrav - 1, maxtrav - 1,
+                                      perSiteScores);
+        }
+    }
+    nodeptr pb, qb, freeBranch;
+    /* restore the topology as it was before the split */
+    freeBranch = (p->xPars ? p : q);
+    p1 = (p1->xPars ? p1 : p1->back);
+    q1 = (q1->xPars ? q1 : q1->back);
+    int restoreTopoOK =
+        pllTbrConnectSubtrees(tr, p1, q1, &freeBranch, &pb, &qb);
+    evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, perSiteScores);
+    tr->curRoot = freeBranch;
+    tr->curRootBack = freeBranch->back;
+    assert(restoreTopoOK);
 
     return PLL_TRUE;
 }
@@ -1515,7 +1560,7 @@ static int pllComputeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
  Calculate scores for each site (Bootstrapping)
 
  @note
- Version 2 called pllTraverseUpdateTBRVer2.
+ Version 2 called pllTraverseUpdateTBRVer2 (default use version 2).
  */
 static int pllComputeTBRVer2(pllInstance *tr, partitionList *pr, nodeptr p,
                              int mintrav, int maxtrav, int perSiteScores) {
@@ -1537,64 +1582,58 @@ static int pllComputeTBRVer2(pllInstance *tr, partitionList *pr, nodeptr p,
 
     if (maxtrav < 1 || mintrav > maxtrav)
         return PLL_BADREAR;
-    q = p->back;
-
-    if (!isTip(p1->number, tr->mxtips) || !isTip(p2->number, tr->mxtips)) {
-        if (globalParam->tbr_test_draw == true) {
-            updateLastTreeString(tr, pr);
-        }
-        /* split the tree in two components */
-        if (!pllTbrRemoveBranch(tr, pr, p))
-            return PLL_BADREAR;
-        /* p1 and p2 are now connected */
-        assert(p1->back == p2 && p2->back == p1);
-
-        /* recursively traverse and perform TBR */
-        pllTraverseUpdateTBRVer2(tr, pr, p1, q1, &p, mintrav, maxtrav, 0, 0,
-                                 perSiteScores);
-        if (!isTip(q2->number, tr->mxtips)) {
-            pllTraverseUpdateTBRVer2(tr, pr, q2->next->back, p1, &p,
-                                     mintrav - 1, maxtrav - 1, 1, 0,
-                                     perSiteScores);
-            pllTraverseUpdateTBRVer2(tr, pr, q2->next->next->back, p1, &p,
-                                     mintrav - 1, maxtrav - 1, 1, 0,
-                                     perSiteScores);
-        }
-
-        if (!isTip(p2->number, tr->mxtips)) {
-            pllTraverseUpdateTBRVer2(tr, pr, p2->next->back, q1, &p,
-                                     mintrav - 1, maxtrav - 1, 1, 0,
-                                     perSiteScores);
-            pllTraverseUpdateTBRVer2(tr, pr, p2->next->next->back, q1, &p,
-                                     mintrav - 1, maxtrav - 1, 1, 0,
-                                     perSiteScores);
-            if (!isTip(q2->number, tr->mxtips)) {
-                pllTraverseUpdateTBRVer2(tr, pr, p2->next->back, q2->next->back,
-                                         &p, mintrav - 2, maxtrav - 2, 1, 1,
-                                         perSiteScores);
-                pllTraverseUpdateTBRVer2(tr, pr, p2->next->back,
-                                         q2->next->next->back, &p, mintrav - 2,
-                                         maxtrav - 2, 1, 1, perSiteScores);
-                pllTraverseUpdateTBRVer2(tr, pr, p2->next->next->back,
-                                         q2->next->back, &p, mintrav - 2,
-                                         maxtrav - 2, 1, 1, perSiteScores);
-                pllTraverseUpdateTBRVer2(tr, pr, p2->next->next->back,
-                                         q2->next->next->back, &p, mintrav - 2,
-                                         maxtrav - 2, 1, 1, perSiteScores);
-            }
-        }
-        nodeptr pb, qb, freeBranch;
-        /* restore the topology as it was before the split */
-        freeBranch = (p->xPars ? p : q);
-        p1 = (p1->xPars ? p1 : p1->back);
-        q1 = (q1->xPars ? q1 : q1->back);
-        int restoreTopoOK =
-            pllTbrConnectSubtrees(tr, p1, q1, &freeBranch, &pb, &qb);
-        evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, perSiteScores);
-        tr->curRoot = freeBranch;
-        tr->curRootBack = freeBranch->back;
-        assert(restoreTopoOK);
+    if (globalParam->tbr_test_draw == true) {
+        updateLastTreeString(tr, pr);
     }
+    /* split the tree in two components */
+    if (!pllTbrRemoveBranch(tr, pr, p))
+        return PLL_BADREAR;
+    /* p1 and p2 are now connected */
+    assert(p1->back == p2 && p2->back == p1);
+
+    /* recursively traverse and perform TBR */
+    pllTraverseUpdateTBRVer2P(tr, pr, p1, q1, &p, mintrav, maxtrav, 0, 0,
+                              perSiteScores);
+    if (!isTip(q2->number, tr->mxtips)) {
+        pllTraverseUpdateTBRVer2P(tr, pr, p1, q2->next->back, &p, mintrav - 1,
+                                  maxtrav - 1, 0, 1, perSiteScores);
+        pllTraverseUpdateTBRVer2P(tr, pr, p1, q2->next->next->back, &p,
+                                  mintrav - 1, maxtrav - 1, 0, 1,
+                                  perSiteScores);
+    }
+
+    if (!isTip(p2->number, tr->mxtips)) {
+        pllTraverseUpdateTBRVer2P(tr, pr, p2->next->back, q1, &p, mintrav - 1,
+                                  maxtrav - 1, 1, 0, perSiteScores);
+        pllTraverseUpdateTBRVer2P(tr, pr, p2->next->next->back, q1, &p,
+                                  mintrav - 1, maxtrav - 1, 1, 0,
+                                  perSiteScores);
+        if (!isTip(q2->number, tr->mxtips)) {
+            pllTraverseUpdateTBRVer2P(tr, pr, p2->next->back, q2->next->back,
+                                      &p, mintrav - 2, maxtrav - 2, 1, 1,
+                                      perSiteScores);
+            pllTraverseUpdateTBRVer2P(tr, pr, p2->next->back,
+                                      q2->next->next->back, &p, mintrav - 2,
+                                      maxtrav - 2, 1, 1, perSiteScores);
+            pllTraverseUpdateTBRVer2P(tr, pr, p2->next->next->back,
+                                      q2->next->back, &p, mintrav - 2,
+                                      maxtrav - 2, 1, 1, perSiteScores);
+            pllTraverseUpdateTBRVer2P(tr, pr, p2->next->next->back,
+                                      q2->next->next->back, &p, mintrav - 2,
+                                      maxtrav - 2, 1, 1, perSiteScores);
+        }
+    }
+    nodeptr pb, qb, freeBranch;
+    /* restore the topology as it was before the split */
+    freeBranch = (p->xPars ? p : q);
+    p1 = (p1->xPars ? p1 : p1->back);
+    q1 = (q1->xPars ? q1 : q1->back);
+    int restoreTopoOK =
+        pllTbrConnectSubtrees(tr, p1, q1, &freeBranch, &pb, &qb);
+    evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, perSiteScores);
+    tr->curRoot = freeBranch;
+    tr->curRootBack = freeBranch->back;
+    assert(restoreTopoOK);
 
     return PLL_TRUE;
 }
@@ -1866,8 +1905,13 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
             tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
             tr->TBR_insertNNI = false;
             bestTreeScoreHits = 1;
-            pllComputeTBRVer2(tr, pr, tr->nodep[i], mintrav, maxtrav,
-                              perSiteScores);
+            if (globalParam->tbr_traverse_ver1 == true) {
+                pllComputeTBRVer1(tr, pr, tr->nodep[i], mintrav, maxtrav,
+                                  perSiteScores);
+            } else {
+                pllComputeTBRVer2(tr, pr, tr->nodep[i], mintrav, maxtrav,
+                                  perSiteScores);
+            }
             if (tr->bestParsimony == randomMP)
                 bestIterationScoreHits++;
             if (tr->bestParsimony < randomMP)
@@ -1988,7 +2032,6 @@ static void stepwiseAddition(pllInstance *tr, partitionList *pr, nodeptr p,
 static void pllMakeParsimonyTreeFastTBR(pllInstance *tr, partitionList *pr,
                                         int tbr_mintrav, int tbr_maxtrav) {
     nodeptr p, f;
-    cout << "pllMakeParsimonyTreeFastTBR\n";
     int i, nextsp,
         *perm = (int *)rax_malloc((size_t)(tr->mxtips + 1) * sizeof(int));
 
@@ -2073,8 +2116,13 @@ static void pllMakeParsimonyTreeFastTBR(pllInstance *tr, partitionList *pr,
             tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
             bestTreeScoreHits = 1;
             // assert(tr->nodep[i]->xPars);
-            pllComputeTBRVer2(tr, pr, tr->nodep[i], tbr_mintrav, tbr_maxtrav,
-                              PLL_FALSE);
+            if (globalParam->tbr_traverse_ver1 == true) {
+                pllComputeTBRVer1(tr, pr, tr->nodep[i], tbr_mintrav,
+                                  tbr_maxtrav, PLL_FALSE);
+            } else {
+                pllComputeTBRVer2(tr, pr, tr->nodep[i], tbr_mintrav,
+                                  tbr_maxtrav, PLL_FALSE);
+            }
             if (tr->bestParsimony == randomMP)
                 bestIterationScoreHits++;
             if (tr->bestParsimony < randomMP)
