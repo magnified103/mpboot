@@ -468,6 +468,12 @@ struct Params {
     int tbr_traverse_ver1;
 
     /**
+     * Update to better tree for each insertBranch1 and all insertBranch2 with that insertBranch1 (Version 2)
+     * Where as version 1 (Default) is update after evaluating every pair (insertBranch1, insertBranch2). 
+     */
+    int tbr_restore_ver2;
+
+    /**
      *  rearrangeParsimony only take the first better SPR and return
      */
     bool spr_better;
