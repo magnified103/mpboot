@@ -976,11 +976,14 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                              VECTOR_LOAD((CAST)(&right[1][i]))),
         v_N = VECTOR_BIT_OR(l_A, l_C);
 
-        v_N = VECTOR_AND_NOT(v_N, allOne);
+        if (perSiteScores) {
+          v_N = VECTOR_AND_NOT(v_N, allOne);
 
-        sum += vectorPopcount(v_N);
-        if (perSiteScores)
+          sum += vectorPopcount(v_N);
           storePerSiteNodeScores(pr, model, v_N, i, tr->start->number);
+        } else {
+          sum += LONG_INTS_PER_VECTOR * sizeof(unsigned long) * 8 - vectorPopcount(v_N);
+        }
 
         //                 if(sum >= bestScore)
         //                   return sum;
@@ -1008,11 +1011,16 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                              VECTOR_LOAD((CAST)(&right[3][i]))),
         v_N = VECTOR_BIT_OR(VECTOR_BIT_OR(l_A, l_C), VECTOR_BIT_OR(l_G, l_T));
 
-        v_N = VECTOR_AND_NOT(v_N, allOne);
+        // v_N = VECTOR_AND_NOT(v_N, allOne);
 
-        sum += vectorPopcount(v_N);
-        if (perSiteScores)
+        if (perSiteScores) {
+          v_N = VECTOR_AND_NOT(v_N, allOne);
+
+          sum += vectorPopcount(v_N);
           storePerSiteNodeScores(pr, model, v_N, i, tr->start->number);
+        } else {
+          sum += LONG_INTS_PER_VECTOR * sizeof(unsigned long) * 8 - vectorPopcount(v_N);
+        }
         //                 if(sum >= bestScore)
         //                   return sum;
       }
