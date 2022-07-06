@@ -55,6 +55,8 @@ void IQTree::init() {
   curScore = 0.0;       // Current score of the tree
   bestScore = -DBL_MAX; // Best score found so far
   curIt = 1;
+  cntItersNotImproved = 0;
+  globalScore = UINT_MAX; 
   cur_pars_score = -1;
   //    enable_parsimony = false;
   estimate_nni_cutoff = false;
@@ -2246,15 +2248,22 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
       pllNewickTree *sprStartTree = pllNewickParseString(treeString1.c_str());
       assert(sprStartTree != NULL);
       pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
-      if (params->tbr_pars == true) {
+      if (params->spr_tbr == true) {
+        if (cntItersNotImproved < 60) {
+            pllOptimizeSprParsimonyMix(pllInst, pllPartitions, params->spr_mintrav,
+                    max_spr_rad, this);
+        } else {
+            pllOptimizeTbrParsimonyMix(pllInst, pllPartitions, params->tbr_mintrav,
+                    params->tbr_maxtrav, this);
+        }
+        // cout << "cnt: " << cntItersNotImproved << '\n';
+      } else if (params->tbr_pars == true) {
         pllOptimizeTbrParsimony(pllInst, pllPartitions, params->tbr_mintrav,
                                 params->tbr_maxtrav, this);
-      } else if (params->spr_better == true)
-        pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav,
-                                max_spr_rad, this, true);
-      else
+      } else {
         pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav,
                                 max_spr_rad, this);
+      }
 
       pllNewickParseDestroy(&sprStartTree);
 

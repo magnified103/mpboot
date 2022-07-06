@@ -1124,6 +1124,37 @@ static void nodeRectifierPars(pllInstance *tr, bool reset = false) {
     rax_free(np);
 }
 
+static void reorderNodesVer2(pllInstance *tr, nodeptr p, int *count,
+                         bool resetParent = false) {
+    tr->nodep_dfs[*count] = p;
+    *count = *count + 1;
+    if ((p->number <= tr->mxtips))
+        return;
+    assert(p->xPars || resetParent);
+    if (resetParent)
+        p->next->back->par = p->next->next->back->par = p;
+
+    reorderNodesVer2(tr, p->next->back, count, resetParent);
+    reorderNodesVer2(tr, p->next->next->back, count, resetParent);
+}
+
+static void nodeRectifierParsVer2(pllInstance *tr, bool reset = false) {
+    int i;
+    int count = 1;
+    tr->start = tr->nodep[1];
+    tr->rooted = PLL_FALSE;
+    /* TODO why is tr->rooted set to PLL_FALSE here ?*/
+    if (reset) {
+        tr->curRoot = tr->nodep[1];
+        tr->curRootBack = tr->nodep[1]->back;
+        tr->curRoot->par = NULL;
+        tr->start->back->par = tr->start;
+    }
+    reorderNodesVer2(tr, tr->curRoot, &count, reset);
+    reorderNodesVer2(tr, tr->curRoot->back, &count, reset);
+    assert(count == tr->mxtips + tr->mxtips - 1);
+}
+
 static bool restoreTreeRearrangeParsimonyTBR(pllInstance *tr, partitionList *pr,
                                              int perSiteScores,
                                              bool removed = false) {
@@ -2011,6 +2042,7 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
     assert(!tr->constrained);
 
     nodeRectifierPars(tr, true);
+    // nodeRectifierParsVer2(tr, true);
     tr->bestParsimony = UINT_MAX;
     tr->bestParsimony =
         _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
@@ -2022,8 +2054,48 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
 
     do {
         nodeRectifierPars(tr, false);
+        // nodeRectifierParsVer2(tr, false);
         startMP = randomMP;
+        /*
+        for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
+            tr->TBR_removeBranch = NULL;
+            tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
+            tr->TBR_insertNNI = false;
+            bestTreeScoreHits = 1;
+            bool isLeaf = isTip(tr->nodep_dfs[i]->number, tr->mxtips) || isTip(tr->nodep_dfs[i]->back->number, tr->mxtips);
+            if (isLeaf) {
+                pllComputeTBRLeaf(tr, pr, tr->nodep_dfs[i], mintrav, maxtrav,
+                              perSiteScores);
+                if (tr->bestParsimony == randomMP)
+                    bestIterationScoreHits++;
+                if (tr->bestParsimony < randomMP)
+                    bestIterationScoreHits = 1;
+                if (((tr->bestParsimony < randomMP) ||
+                     ((tr->bestParsimony == randomMP) &&
+                      (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                    tr->TBR_removeBranch && tr->TBR_insertBranch1) {
+                    restoreTreeRearrangeParsimonyTBRLeaf(tr, pr, perSiteScores);
+                    randomMP = tr->bestParsimony;
+                }
+            } else {
+                pllComputeTBRVer2(tr, pr, tr->nodep_dfs[i], mintrav, maxtrav,
+                                  perSiteScores);
+                if (tr->bestParsimony == randomMP)
+                    bestIterationScoreHits++;
+                if (tr->bestParsimony < randomMP)
+                    bestIterationScoreHits = 1;
+                if (((tr->bestParsimony < randomMP) ||
+                     ((tr->bestParsimony == randomMP) &&
+                      (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                    tr->TBR_removeBranch && tr->TBR_insertBranch1 &&
+                    tr->TBR_insertBranch2) {
+                    restoreTreeRearrangeParsimonyTBR(tr, pr, perSiteScores);
+                    randomMP = tr->bestParsimony;
+                }
+            }
 
+        }
+        */
         for (i = 1; i <= tr->mxtips; i++) {
             tr->TBR_removeBranch = tr->TBR_insertBranch1 = NULL;
             tr->TBR_insertNNI = false;
@@ -2076,6 +2148,162 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
             }
         }
     } while (randomMP < startMP);
+    return startMP;
+}
+
+int pllOptimizeTbrParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
+                            int maxtrav, IQTree *_iqtree) {
+    // cout << "TBR\n";
+    int perSiteScores = globalParam->gbo_replicates > 0;
+
+    iqtree = _iqtree; // update pointer to IQTree
+
+    if (globalParam->ratchet_iter >= 0 &&
+        (iqtree->on_ratchet_hclimb1 || iqtree->on_ratchet_hclimb2)) {
+        // oct 23: in non-ratchet iteration, allocate is not triggered
+        _updateInternalPllOnRatchet(tr, pr);
+        _allocateParsimonyDataStructuresTBR(
+            tr, pr, perSiteScores); // called once if not running ratchet
+    } else if (first_call || (iqtree && iqtree->on_opt_btree))
+        _allocateParsimonyDataStructuresTBR(
+            tr, pr, perSiteScores); // called once if not running ratchet
+
+    if (first_call) {
+        first_call = false;
+    }
+
+    int i;
+    unsigned int startMP;
+
+    assert(!tr->constrained);
+
+    // nodeRectifierPars(tr, true);
+    nodeRectifierParsVer2(tr, true);
+    tr->bestParsimony = UINT_MAX;
+    tr->bestParsimony =
+        _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
+
+    assert(-iqtree->curScore == tr->bestParsimony);
+
+    iqtree->cntItersNotImproved++;
+    unsigned int bestIterationScoreHits = 1;
+    randomMP = tr->bestParsimony;
+
+    do {
+        // nodeRectifierPars(tr, false);
+        nodeRectifierParsVer2(tr, false);
+        startMP = randomMP;
+        // /*
+        for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
+            tr->TBR_removeBranch = NULL;
+            tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
+            tr->TBR_insertNNI = false;
+            bestTreeScoreHits = 1;
+            bool isLeaf = isTip(tr->nodep_dfs[i]->number, tr->mxtips) || isTip(tr->nodep_dfs[i]->back->number, tr->mxtips);
+            if (isLeaf) {
+                pllComputeTBRLeaf(tr, pr, tr->nodep_dfs[i], mintrav, maxtrav,
+                              perSiteScores);
+                if (tr->bestParsimony < iqtree->globalScore) {
+                    iqtree->cntItersNotImproved = 0;
+                }
+                if (tr->bestParsimony < randomMP) {
+                    bestIterationScoreHits = 1;
+                }
+                if (tr->bestParsimony == randomMP)
+                    bestIterationScoreHits++;
+                if (((tr->bestParsimony < randomMP) ||
+                     ((tr->bestParsimony == randomMP) &&
+                      (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                    tr->TBR_removeBranch && tr->TBR_insertBranch1) {
+                    restoreTreeRearrangeParsimonyTBRLeaf(tr, pr, perSiteScores);
+                    randomMP = tr->bestParsimony;
+                }
+            } else {
+                pllComputeTBRVer2(tr, pr, tr->nodep_dfs[i], mintrav, maxtrav,
+                                  perSiteScores);
+                if (tr->bestParsimony < iqtree->globalScore) {
+                    iqtree->cntItersNotImproved = 0;
+                }
+                if (tr->bestParsimony < randomMP) {
+                    bestIterationScoreHits = 1;
+                }
+                if (tr->bestParsimony == randomMP)
+                    bestIterationScoreHits++;
+                if (((tr->bestParsimony < randomMP) ||
+                     ((tr->bestParsimony == randomMP) &&
+                      (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                    tr->TBR_removeBranch && tr->TBR_insertBranch1 &&
+                    tr->TBR_insertBranch2) {
+                    restoreTreeRearrangeParsimonyTBR(tr, pr, perSiteScores);
+                    randomMP = tr->bestParsimony;
+                }
+            }
+
+        }
+        // */
+        /*
+        for (i = 1; i <= tr->mxtips; i++) {
+            tr->TBR_removeBranch = tr->TBR_insertBranch1 = NULL;
+            tr->TBR_insertNNI = false;
+            bestTreeScoreHits = 1;
+            pllComputeTBRLeaf(tr, pr, tr->nodep[i]->back, mintrav, maxtrav,
+                              perSiteScores);
+            if (tr->bestParsimony < iqtree->globalScore) {
+                iqtree->cntItersNotImproved = 0;
+            }
+            if (tr->bestParsimony < randomMP) {
+                bestIterationScoreHits = 1;
+            }
+            if (tr->bestParsimony == randomMP)
+                bestIterationScoreHits++;
+            if (((tr->bestParsimony < randomMP) ||
+                 ((tr->bestParsimony == randomMP) &&
+                  (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                tr->TBR_removeBranch && tr->TBR_insertBranch1) {
+                restoreTreeRearrangeParsimonyTBRLeaf(tr, pr, perSiteScores);
+                randomMP = tr->bestParsimony;
+            }
+        }
+
+        for (i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
+            if (globalParam->tbr_restore_ver2 == false) {
+                tr->TBR_removeBranch = NULL;
+                tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
+                tr->TBR_insertNNI = false;
+                bestTreeScoreHits = 1;
+            }
+            if (globalParam->tbr_restore_ver2 == true) {
+                pllComputeTBRVer3(tr, pr, tr->nodep[i], mintrav, maxtrav,
+                                  perSiteScores);
+            } else if (globalParam->tbr_traverse_ver1 == true) {
+                pllComputeTBRVer1(tr, pr, tr->nodep[i], mintrav, maxtrav,
+                                  perSiteScores);
+            } else {
+                pllComputeTBRVer2(tr, pr, tr->nodep[i], mintrav, maxtrav,
+                                  perSiteScores);
+            }
+            if (globalParam->tbr_restore_ver2 == false) {
+                if (tr->bestParsimony == randomMP)
+                    bestIterationScoreHits++;
+                if (tr->bestParsimony < iqtree->globalScore) {
+                    iqtree->cntItersNotImproved = 0;
+                }
+                if (tr->bestParsimony < randomMP) {
+                    bestIterationScoreHits = 1;
+                }
+                if (((tr->bestParsimony < randomMP) ||
+                     ((tr->bestParsimony == randomMP) &&
+                      (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                    tr->TBR_removeBranch && tr->TBR_insertBranch1 &&
+                    tr->TBR_insertBranch2) {
+                    restoreTreeRearrangeParsimonyTBR(tr, pr, perSiteScores);
+                    randomMP = tr->bestParsimony;
+                }
+            }
+        }
+        */
+    } while (randomMP < startMP);
+    iqtree->globalScore = min(iqtree->globalScore, startMP);
     return startMP;
 }
 

@@ -1987,6 +1987,7 @@ static void pllTreeInitDefaults (pllInstance * tr, int tips)
 
   tr->nameList         = (char **)   rax_malloc ((tips + 1) * sizeof (char *));
   tr->nodep            = (nodeptr *) rax_malloc ((2 * tips) * sizeof (nodeptr));
+  tr->nodep_dfs            = (nodeptr *) rax_malloc ((2 * tips) * sizeof (nodeptr));
 
   tr->autoProteinSelectionType = PLL_AUTO_ML;
 

@@ -431,6 +431,11 @@ struct Params {
     bool spr_test;
 
     /**
+     * Use TBR if SPR doesn't improve for a certain number of iterations
+     */
+    bool spr_tbr;
+
+    /**
      * Init candidate trees with TBR instead of SPR
      */
     bool tbr_init;
@@ -472,11 +477,6 @@ struct Params {
      * Where as version 1 (Default) is update after evaluating every pair (insertBranch1, insertBranch2). 
      */
     int tbr_restore_ver2;
-
-    /**
-     *  rearrangeParsimony only take the first better SPR and return
-     */
-    bool spr_better;
 
     /**
      *  Number of starting parsimony trees

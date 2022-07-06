@@ -440,6 +440,13 @@ public:
     void setBestTree(string tree, double logl);
 
     /**
+     * Number of iterations of doing SPR/TBR but MP Score didn't improve. 
+     * If > some threshold, do TBR instead
+     */
+    int cntItersNotImproved;
+    unsigned int globalScore;
+
+    /**
             current parsimony score of the tree
      */
     int cur_pars_score;

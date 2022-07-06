@@ -572,6 +572,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     verbose_mode = VB_MIN;
     params.dna5 = false;
     params.spr_test = false;
+    params.spr_tbr = false;
     params.tbr_init = false;
     params.tbr_test_draw = false;
     params.tbr_test = false;
@@ -581,7 +582,6 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.tbr_insert_nni = false;
     params.tbr_traverse_ver1 = false;
     params.tbr_restore_ver2 = false;
-    params.spr_better = false;
     params.tree_gen = NONE;
     params.user_file = NULL;
     params.out_prefix = NULL;
@@ -871,8 +871,8 @@ void parseArg(int argc, char *argv[], Params &params) {
 
     for (cnt = 1; cnt < argc; cnt++) {
         try {
-            if (strcmp(argv[cnt], "-spr_better") == 0) {
-                params.spr_better = true;
+            if (strcmp(argv[cnt], "-spr_tbr") == 0) {
+                params.spr_tbr = true;
                 continue;
             }
             if (strcmp(argv[cnt], "-spr_test") == 0) {
