@@ -573,6 +573,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.dna5 = false;
     params.spr_test = false;
     params.spr_tbr = false;
+    params.tbr_spr = false;
     params.tbr_init = false;
     params.tbr_test_draw = false;
     params.tbr_test = false;
@@ -873,6 +874,10 @@ void parseArg(int argc, char *argv[], Params &params) {
         try {
             if (strcmp(argv[cnt], "-spr_tbr") == 0) {
                 params.spr_tbr = true;
+                continue;
+            }
+            if (strcmp(argv[cnt], "-tbr_spr") == 0) {
+                params.tbr_spr = true;
                 continue;
             }
             if (strcmp(argv[cnt], "-spr_test") == 0) {

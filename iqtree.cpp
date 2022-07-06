@@ -2248,7 +2248,16 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
       pllNewickTree *sprStartTree = pllNewickParseString(treeString1.c_str());
       assert(sprStartTree != NULL);
       pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
-      if (params->spr_tbr == true) {
+
+      if (params->tbr_spr == true) {
+        if (cntItersNotImproved < 70) {
+            pllOptimizeTbrParsimonyMix(pllInst, pllPartitions, params->tbr_mintrav,
+                    params->tbr_maxtrav, this);
+        } else {
+            pllOptimizeSprParsimonyMix(pllInst, pllPartitions, params->spr_mintrav,
+                    max_spr_rad, this);
+        } 
+      } else if (params->spr_tbr == true) {
         if (cntItersNotImproved < 60) {
             pllOptimizeSprParsimonyMix(pllInst, pllPartitions, params->spr_mintrav,
                     max_spr_rad, this);

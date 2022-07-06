@@ -434,6 +434,11 @@ struct Params {
      * Use TBR if SPR doesn't improve for a certain number of iterations
      */
     bool spr_tbr;
+    
+    /**
+     * Use SPR if TBR doesn't improve for a certain number of iterations
+     */
+    bool tbr_spr;
 
     /**
      * Init candidate trees with TBR instead of SPR
