@@ -741,11 +741,9 @@ typedef struct noderec {
     double z[PLL_NUM_BRANCHES];
     struct noderec *next;
     struct noderec *back;
-    struct noderec *par;
     hashNumberType hash;
     int support;
     int number;
-    pllBoolean recalculate;
     char x;
     char xPars;
     char xBips;
