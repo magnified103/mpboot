@@ -2043,6 +2043,10 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
         }
 
         for (i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
+            if (isTip(tr->nodep[i]->number, tr->mxtips) ||
+                isTip(tr->nodep[i]->back->number, tr->mxtips)) {
+                continue;
+            }
             if (globalParam->tbr_restore_ver2 == false) {
                 tr->TBR_removeBranch = NULL;
                 tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
@@ -2057,7 +2061,7 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
                                   perSiteScores);
             } else {
                 assert(pllComputeTBRVer2(tr, pr, tr->nodep[i], mintrav, maxtrav,
-                                  perSiteScores));
+                                         perSiteScores));
             }
             if (globalParam->tbr_restore_ver2 == false) {
                 if (tr->bestParsimony == randomMP)
