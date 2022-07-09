@@ -101,7 +101,7 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 	message("Compiler      : GNU Compiler (gcc)")
 	set(GCC "TRUE")
 #	set(COMBINED_FLAGS "-Wall -Wno-unused-function -Wno-sign-compare -pedantic -D_GNU_SOURCE -fms-extensions -Wno-deprecated")
-#	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++98")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 	set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g0")
 	set(CMAKE_C_FLAGS_RELEASE "-O3 -g0")
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -109,8 +109,12 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	set(CLANG "TRUE")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 #	set(COMBINED_FLAGS "-Wall -Wno-unused-function -Wno-sign-compare -pedantic -D_GNU_SOURCE -Wno-nested-anon-types")
+	# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline -fprofile-instr-generate -fcoverage-mapping -O2 -g")
+	# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-inline -fprofile-instr-generate -fcoverage-mapping -O2 -g")	
+	# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g")
+	# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -g") 
 	set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-	set(CMAKE_C_FLAGS_RELEASE "-O3")	
+	set(CMAKE_C_FLAGS_RELEASE "-O3") 
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 	set(VCC "TRUE")
 	message("Compiler      : MS Visual C++ Compiler")
@@ -386,8 +390,10 @@ graph.cpp
 candidateset.cpp
 checkpoint.cpp
 parstree.cpp
-sprparsimony.cpp
-tbrparsimony.cpp
+# sprparsimony.cpp
+sprparsimony2.cpp
+# tbrparsimony.cpp
+tbrparsimony2.cpp
 test.cpp
 )
 

@@ -65,7 +65,7 @@
 #include "timeutil.h"
 //#include <unistd.h>
 #include <stdlib.h>
-#include "sprparsimony.h"
+#include "sprparsimony2.h"
 #include "tbrparsimony.h"
 #include "vectorclass/vectorclass.h"
 

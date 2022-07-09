@@ -50,7 +50,7 @@
 #include "model/ratemeyerhaeseler.h"
 #include "mtreeset.h"
 #include "parstree.h"
-#include "sprparsimony.h"
+#include "sprparsimony2.h"
 #include "timeutil.h"
 #include "tinatree.h"
 #include "whtest_wrapper.h"
@@ -2553,6 +2553,7 @@ void runPhyloAnalysis(Params &params) {
 
     //	if(params.maximum_parsimony && (params.gbo_replicates ||
     // params.sankoff_cost_file)){
+    tree->params = &params;                         // magnified: resolve bug with -keep_aln has been set
     if (params.maximum_parsimony &&
         (params.sort_alignment || params.sankoff_cost_file)) {
         optimizeAlignment(tree,

@@ -26,7 +26,7 @@
 #include "phylosupertree.h"
 #include "phylosupertreeplen.h"
 #include "pllrepo/src/pllInternal.h"
-#include "sprparsimony.h"
+#include "sprparsimony2.h"
 #include "tbrparsimony.h"
 #include "timeutil.h"
 #include "vectorclass/vectorclass.h"
