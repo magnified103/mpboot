@@ -2114,7 +2114,6 @@ int pllOptimizeTbrParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
         _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
     assert(-iqtree->curScore == tr->bestParsimony);
 
-    iqtree->cntItersNotImproved++;
     unsigned int bestIterationScoreHits = 1;
     randomMP = tr->bestParsimony;
 
@@ -2133,9 +2132,6 @@ int pllOptimizeTbrParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
             if (isLeaf) {
                 pllComputeTBRLeaf(tr, pr, tr->nodep_dfs[i], mintrav, maxtrav,
                                   perSiteScores);
-                if (tr->bestParsimony < iqtree->globalScore) {
-                    iqtree->cntItersNotImproved = 0;
-                }
                 if (tr->bestParsimony < randomMP) {
                     bestIterationScoreHits = 1;
                 }
@@ -2151,9 +2147,6 @@ int pllOptimizeTbrParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
             } else {
                 pllComputeTBRVer2(tr, pr, tr->nodep_dfs[i], mintrav, maxtrav,
                                   perSiteScores);
-                if (tr->bestParsimony < iqtree->globalScore) {
-                    iqtree->cntItersNotImproved = 0;
-                }
                 if (tr->bestParsimony < randomMP) {
                     bestIterationScoreHits = 1;
                 }
@@ -2177,9 +2170,6 @@ int pllOptimizeTbrParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
             bestTreeScoreHits = 1;
             pllComputeTBRLeaf(tr, pr, tr->nodep[i]->back, mintrav, maxtrav,
                               perSiteScores);
-            if (tr->bestParsimony < iqtree->globalScore) {
-                iqtree->cntItersNotImproved = 0;
-            }
             if (tr->bestParsimony < randomMP) {
                 bestIterationScoreHits = 1;
             }
@@ -2214,9 +2204,6 @@ int pllOptimizeTbrParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
             if (globalParam->tbr_restore_ver2 == false) {
                 if (tr->bestParsimony == randomMP)
                     bestIterationScoreHits++;
-                if (tr->bestParsimony < iqtree->globalScore) {
-                    iqtree->cntItersNotImproved = 0;
-                }
                 if (tr->bestParsimony < randomMP) {
                     bestIterationScoreHits = 1;
                 }
@@ -2232,7 +2219,11 @@ int pllOptimizeTbrParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
         }
         */
     } while (randomMP < startMP);
-    iqtree->globalScore = min(iqtree->globalScore, startMP);
+
+    if (startMP < iqtree->globalScore) {
+        iqtree->cntItersNotImproved = 0;
+        iqtree->globalScore = startMP;
+    }
     return startMP;
 }
 

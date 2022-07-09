@@ -127,8 +127,12 @@ if (params.gbo_replicates)
   if (params.maximum_parsimony) {
     if (params.max_iterations == 1) // if not specifying -nm
       params.max_iterations = max(params.max_iterations, 10 * aln->getNSeq());
-    if (params.unsuccess_iteration < 0) // if not specifying -stop_cond
-      params.unsuccess_iteration = ((aln->getNSeq() - 1) / 100 + 1) * 100;
+    if (params.unsuccess_iteration < 0) { // if not specifying -stop_cond 
+        params.unsuccess_iteration = ((aln->getNSeq() - 1) / 100 + 1) * 100;
+        if (params.spr_tbr || params.tbr_spr) {
+            params.unsuccess_iteration_hclimb = params.unsuccess_iteration / 4;
+        }
+    }
   }
 
   /*
@@ -1897,6 +1901,7 @@ double IQTree::doTreeSearch() {
     int nni_count = 0;
     int nni_steps = 0;
 
+    cntItersNotImproved++;
     imd_tree = doNNISearch(nni_count, nni_steps);
 
     if (iqp_assess_quartet == IQP_BOOTSTRAP) {
@@ -2250,7 +2255,7 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
       pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
 
       if (params->tbr_spr == true) {
-        if (cntItersNotImproved < 70) {
+        if (cntItersNotImproved < params->unsuccess_iteration_hclimb) {
             pllOptimizeTbrParsimonyMix(pllInst, pllPartitions, params->tbr_mintrav,
                     params->tbr_maxtrav, this);
         } else {
@@ -2258,7 +2263,7 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                     max_spr_rad, this);
         } 
       } else if (params->spr_tbr == true) {
-        if (cntItersNotImproved < 60) {
+        if (cntItersNotImproved < params->unsuccess_iteration_hclimb) {
             pllOptimizeSprParsimonyMix(pllInst, pllPartitions, params->spr_mintrav,
                     max_spr_rad, this);
         } else {

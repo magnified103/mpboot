@@ -620,6 +620,11 @@ struct Params {
      */
     int unsuccess_iteration;
 
+    /**
+     *  Number of unsuccessful RATCHET hill-climbing iterations to switch from SPR/TBR to TBR/SPR (spr_tbr or tbr_spr).
+     */
+    int unsuccess_iteration_hclimb;
+
     char *binary_aln_file;
 
     /**

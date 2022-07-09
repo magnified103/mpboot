@@ -1310,7 +1310,6 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
     if (pllCostMatrix)
         return _newviewSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
     int model, *ti = tr->ti, count = ti[0], index;
-    cout << "newhere\n";
     for (index = 4; index < count; index += 4) {
         unsigned int totalScore = 0;
 
@@ -3205,8 +3204,7 @@ int pllOptimizeSprParsimony(pllInstance *tr, partitionList *pr, int mintrav,
 }
 
 int pllOptimizeSprParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
-                            int maxtrav, IQTree *_iqtree) {
-    // cout << "SPR\n";
+                               int maxtrav, IQTree *_iqtree) {
     int perSiteScores = globalParam->gbo_replicates > 0;
     iqtree = _iqtree; // update pointer to IQTree
 
@@ -3259,7 +3257,6 @@ int pllOptimizeSprParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
     // *perm        = (int *)rax_malloc((size_t)(tr->mxtips + tr->mxtips - 1) *
     // sizeof(int));
     //	makePermutationFast(perm, tr->mxtips + tr->mxtips - 2, tr);
-    iqtree->cntItersNotImproved++;
     unsigned int bestIterationScoreHits = 1;
     randomMP = tr->bestParsimony;
     tr->ntips = tr->mxtips;
@@ -3275,9 +3272,7 @@ int pllOptimizeSprParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
                                PLL_FALSE, perSiteScores);
             if (tr->bestParsimony == randomMP)
                 bestIterationScoreHits++;
-            if (tr->bestParsimony < iqtree->globalScore) {
-                iqtree->cntItersNotImproved = 0;
-            }
+
             if (tr->bestParsimony < randomMP) {
                 bestIterationScoreHits = 1;
             }
@@ -3291,7 +3286,10 @@ int pllOptimizeSprParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
         }
     } while (randomMP < startMP);
 
-    iqtree->globalScore = min(iqtree->globalScore, startMP);
+    if (startMP < iqtree->globalScore) {
+        iqtree->cntItersNotImproved = 0;
+        iqtree->globalScore = startMP;
+    }
     return startMP;
 }
 
