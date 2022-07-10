@@ -417,27 +417,27 @@ int ParsTree::computeParsimonyBranch(PhyloNeighbor *dad_branch, PhyloNode *dad, 
 
     if (!central_partial_pars) {
         initializeAllPartialPars();
-        VECSIZE = VECTORCLASS::size();
-        sitesPerVec = (VECSIZE + aln->num_states - 1) / aln->num_states;
-        vecsPerSite = (VECSIZE + aln->num_states - 1) / VECSIZE;
-        assert(sitesPerVec == 1 || vecsPerSite == 1);
-        extendedSankoff = new UINT* [aln->num_states];
-        inversedSankoff = new UINT* [aln->num_states];
+    }
+    VECSIZE = VECTORCLASS::size();
+    sitesPerVec = (VECSIZE + aln->num_states - 1) / aln->num_states;
+    vecsPerSite = (VECSIZE + aln->num_states - 1) / VECSIZE;
+    assert(sitesPerVec == 1 || vecsPerSite == 1);
+    extendedSankoff = new UINT* [aln->num_states];
+    inversedSankoff = new UINT* [aln->num_states];
 
-        int sankoff_size = aln->num_states * sitesPerVec;
-        while(sankoff_size % VECSIZE != 0) sankoff_size++;
-        sLeft = new UINT[sankoff_size];
-        sRight = new UINT[sankoff_size];
+    int sankoff_size = aln->num_states * sitesPerVec;
+    while(sankoff_size % VECSIZE != 0) sankoff_size++;
+    sLeft = new UINT[sankoff_size];
+    sRight = new UINT[sankoff_size];
 
-        for(int i = 0; i < aln->num_states; ++i) {
-            extendedSankoff[i] = new UINT [sankoff_size]; 
-            inversedSankoff[i] = new UINT [aln->num_states];
-            for(int j = 0; j < sankoff_size; ++j) {
-                extendedSankoff[i][j] = cost_matrix[i * aln->num_states + j % aln->num_states];
-            }
-            for(int j = 0; j < aln->num_states; ++j) {
-                inversedSankoff[i][j] = cost_matrix[j * aln->num_states + i];
-            }
+    for(int i = 0; i < aln->num_states; ++i) {
+        extendedSankoff[i] = new UINT [sankoff_size]; 
+        inversedSankoff[i] = new UINT [aln->num_states];
+        for(int j = 0; j < sankoff_size; ++j) {
+            extendedSankoff[i][j] = cost_matrix[i * aln->num_states + j % aln->num_states];
+        }
+        for(int j = 0; j < aln->num_states; ++j) {
+            inversedSankoff[i][j] = cost_matrix[j * aln->num_states + i];
         }
     }
     // DTH: I don't really understand what this is for. ###########
