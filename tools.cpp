@@ -573,6 +573,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.dna5 = false;
     params.spr_test = false;
     params.spr_tbr = false;
+    params.tbr_spr_alternate = -1;
     params.tbr_spr = false;
     params.tbr_init = false;
     params.tbr_test_draw = false;
@@ -879,6 +880,14 @@ void parseArg(int argc, char *argv[], Params &params) {
             }
             if (strcmp(argv[cnt], "-tbr_spr") == 0) {
                 params.tbr_spr = true;
+                continue;
+            }
+            if (strcmp(argv[cnt], "-tbr_spr_alternate") == 0) {
+                cnt++;
+                if (cnt >= argc) {
+                    throw "Use -tbr_spr_alternate <num_iterations>";
+                }
+                params.tbr_spr_alternate = convert_int(argv[cnt]);
                 continue;
             }
             if (strcmp(argv[cnt], "-spr_test") == 0) {

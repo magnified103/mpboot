@@ -57,6 +57,7 @@ void IQTree::init() {
   curIt = 1;
   cntItersNotImproved = 0;
   globalScore = UINT_MAX; 
+  cnt_tbr_spr_alternate = 1;
   cur_pars_score = -1;
   //    enable_parsimony = false;
   estimate_nni_cutoff = false;
@@ -1901,7 +1902,22 @@ double IQTree::doTreeSearch() {
     int nni_count = 0;
     int nni_steps = 0;
 
-    cntItersNotImproved++;
+    if (params->spr_tbr || params->tbr_spr) {
+        cntItersNotImproved++;
+    }
+    if (params->tbr_spr_alternate != -1) {
+      if (cnt_tbr_spr_alternate > params->tbr_spr_alternate) { 
+        cnt_tbr_spr_alternate = -1;
+      } else if (cnt_tbr_spr_alternate < -params->tbr_spr_alternate) {
+        cnt_tbr_spr_alternate = 1;
+      }
+
+      if (cnt_tbr_spr_alternate > 0) {
+        cnt_tbr_spr_alternate++;
+      } else {
+        cnt_tbr_spr_alternate--;
+      }
+    }
     imd_tree = doNNISearch(nni_count, nni_steps);
 
     if (iqp_assess_quartet == IQP_BOOTSTRAP) {
@@ -2254,7 +2270,15 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
       assert(sprStartTree != NULL);
       pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
 
-      if (params->tbr_spr == true) {
+      if (params->tbr_spr_alternate != -1) {
+        if (cnt_tbr_spr_alternate > 0) {
+            pllOptimizeTbrParsimony(pllInst, pllPartitions, params->tbr_mintrav,
+                                params->tbr_maxtrav, this);
+        } else {
+            pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav,
+                                max_spr_rad, this);
+        }
+      } else if (params->tbr_spr == true) {
         if (cntItersNotImproved < params->unsuccess_iteration_hclimb) {
             pllOptimizeTbrParsimonyMix(pllInst, pllPartitions, params->tbr_mintrav,
                     params->tbr_maxtrav, this);

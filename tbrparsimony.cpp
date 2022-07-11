@@ -1968,8 +1968,8 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
 
     assert(!tr->constrained);
 
-    nodeRectifierPars(tr, true);
-    // nodeRectifierParsVer2(tr, true);
+    // nodeRectifierPars(tr, true);
+    nodeRectifierParsVer2(tr, true);
     tr->bestParsimony = UINT_MAX;
     tr->bestParsimony =
         _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
@@ -1980,10 +1980,9 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
     randomMP = tr->bestParsimony;
 
     do {
-        nodeRectifierPars(tr, false);
-        // nodeRectifierParsVer2(tr, false);
+        // nodeRectifierPars(tr, false);
+        nodeRectifierParsVer2(tr, false);
         startMP = randomMP;
-        /*
         for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
             tr->TBR_removeBranch = NULL;
             tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
@@ -2022,7 +2021,7 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
             }
 
         }
-        */
+        /*
         for (i = 1; i <= tr->mxtips; i++) {
             tr->TBR_removeBranch = tr->TBR_insertBranch1 = NULL;
             tr->TBR_insertNNI = false;
@@ -2078,6 +2077,7 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
                 }
             }
         }
+        */
     } while (randomMP < startMP);
     return startMP;
 }
