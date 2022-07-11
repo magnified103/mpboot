@@ -1905,10 +1905,10 @@ double IQTree::doTreeSearch() {
     if (params->spr_tbr || params->tbr_spr) {
         cntItersNotImproved++;
     }
-    if (params->tbr_spr_alternate != -1) {
-      if (cnt_tbr_spr_alternate > params->tbr_spr_alternate) { 
+    if (params->tbr_alternate != -1) {
+      if (cnt_tbr_spr_alternate > params->tbr_alternate) { 
         cnt_tbr_spr_alternate = -1;
-      } else if (cnt_tbr_spr_alternate < -params->tbr_spr_alternate) {
+      } else if (cnt_tbr_spr_alternate < -params->spr_alternate) {
         cnt_tbr_spr_alternate = 1;
       }
 
@@ -2270,7 +2270,7 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
       assert(sprStartTree != NULL);
       pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
 
-      if (params->tbr_spr_alternate != -1) {
+      if (params->tbr_alternate != -1) {
         if (cnt_tbr_spr_alternate > 0) {
             pllOptimizeTbrParsimony(pllInst, pllPartitions, params->tbr_mintrav,
                                 params->tbr_maxtrav, this);

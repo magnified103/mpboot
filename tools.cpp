@@ -191,7 +191,28 @@ bool fileExists(string strFilename) {
     }
     return (blnReturn);
 }
-
+void convert_int_pair(const char *str, int &x, int &y) throw(string) {
+    // Must be 2 numbers separated by a colon
+    // Save first number to x and second to y
+    int len = strlen(str), i;
+    for (i = 0; i < len; i++) {
+        if (str[i] != ':' && (str[i] < '0' || str[i] > '9')) {
+            string err = "Expecting 2 postive integers separated by 1 colon, but found \"";
+            err += str[i];
+            err += "\" instead";
+            throw err;
+        }
+    }
+    x = 0;
+    y = 0;
+    for (i = 0; i < len && str[i] != ':'; i++) {
+        x = x * 10 + (str[i] - '0');
+    }
+    i++;
+    for (; i < len; i++) {
+        y = y * 10 + (str[i] - '0');
+    }
+}
 int convert_int(const char *str) throw(string) {
     char *endptr;
     int i = strtol(str, &endptr, 10);
@@ -573,7 +594,8 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.dna5 = false;
     params.spr_test = false;
     params.spr_tbr = false;
-    params.tbr_spr_alternate = -1;
+    params.tbr_alternate = -1;
+    params.spr_alternate = -1;
     params.tbr_spr = false;
     params.tbr_init = false;
     params.tbr_test_draw = false;
@@ -885,9 +907,9 @@ void parseArg(int argc, char *argv[], Params &params) {
             if (strcmp(argv[cnt], "-tbr_spr_alternate") == 0) {
                 cnt++;
                 if (cnt >= argc) {
-                    throw "Use -tbr_spr_alternate <num_iterations>";
+                    throw "Use -tbr_spr_alternate <num_tbr_iterations:num_spr_iterations>";
                 }
-                params.tbr_spr_alternate = convert_int(argv[cnt]);
+                convert_int_pair(argv[cnt], params.tbr_alternate, params.spr_alternate);
                 continue;
             }
             if (strcmp(argv[cnt], "-spr_test") == 0) {

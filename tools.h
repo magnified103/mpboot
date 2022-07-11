@@ -441,9 +441,11 @@ struct Params {
     bool tbr_spr;
 
     /**
-     * Use SPR and TBR alternately every `tbr_spr_alternate` iterations
+     * Use SPR and TBR alternately, `tbr_alternate` iterations use TBR, 
+     * then `spr_alternate` iterations use SPR and so on
      */
-    int tbr_spr_alternate;
+    int tbr_alternate;
+    int spr_alternate;
 
     /**
      * Init candidate trees with TBR instead of SPR
