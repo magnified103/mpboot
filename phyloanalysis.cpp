@@ -580,74 +580,6 @@ void reportPhyloAnalysis(Params &params, string &original_model,
         //		out << "REFERENCES" << endl << "----------" << endl <<
         // endl; 		reportReferences(params, out, original_model);
 
-<<<<<<< HEAD
-        out << "SEQUENCE ALIGNMENT" << endl
-            << "------------------" << endl
-            << endl;
-        if (tree.isSuperTree()) {
-            out << "Input data: " << alignment.getNSeq() << " taxa with "
-                << alignment.getNSite() << " partitions and "
-                << tree.getAlnNSite() << " total sites ("
-                << ((SuperAlignment *)tree.aln)->computeMissingData() * 100
-                << "% missing data)" << endl
-                << endl;
-
-            PhyloSuperTree *stree = (PhyloSuperTree *)&tree;
-            int namelen = stree->getMaxPartNameLength();
-            int part;
-            out.width(max(namelen + 6, 10));
-            out << left << "  ID  Name"
-                << "  Type  #Seqs  #Sites  #Patterns  #Const_Sites" << endl;
-            // out << string(namelen+54, '-') << endl;
-            part = 0;
-            for (PhyloSuperTree::iterator it = stree->begin();
-                 it != stree->end(); it++, part++) {
-                // out << "FOR PARTITION " << stree->part_info[part].name << ":"
-                // << endl
-                // << endl; reportAlignment(out, *((*it)->aln));
-                out.width(4);
-                out << right << part + 1 << "  ";
-                out.width(max(namelen, 4));
-                out << left << stree->part_info[part].name << "  ";
-                out.width(6);
-                switch ((*it)->aln->seq_type) {
-                case SEQ_BINARY:
-                    out << "BIN";
-                    break;
-                case SEQ_CODON:
-                    out << "CODON";
-                    break;
-                case SEQ_DNA:
-                    out << "DNA";
-                    break;
-                case SEQ_MORPH:
-                    out << "MORPH";
-                    break;
-                case SEQ_MULTISTATE:
-                    out << "TINA";
-                    break;
-                case SEQ_PROTEIN:
-                    out << "AA";
-                    break;
-                case SEQ_DNA5:
-                    out << "DNA5!!!!!!!!!!!!!!!!!!!!!!!!!!!";
-                    break;
-                case SEQ_UNKNOWN:
-                    out << "???";
-                    break;
-                }
-                out.width(5);
-                out << right << (*it)->aln->getNSeq() << "  ";
-                out.width(6);
-                out << (*it)->aln->getNSite() << "  ";
-                out.width(6);
-                out << (*it)->aln->getNPattern() << "      ";
-                out << round((*it)->aln->frac_const_sites * 100) << "%" << endl;
-            }
-            out << endl;
-        } else
-            reportAlignment(out, alignment);
-=======
 		out << "SEQUENCE ALIGNMENT" << endl << "------------------" << endl
 				<< endl;
 		if (tree.isSuperTree()) {
@@ -691,8 +623,6 @@ void reportPhyloAnalysis(Params &params, string &original_model,
 			out << endl;
 		} else
 			reportAlignment(out, alignment, removed_seqs);
->>>>>>> mpboot
-
         out.precision(4);
         out << fixed;
 
@@ -2383,80 +2313,6 @@ void runStandardBootstrap(Params &params, string &original_model,
 
     double start_time = getCPUTime();
 
-<<<<<<< HEAD
-    // do bootstrap analysis
-    for (int sample = 0; sample < params.num_bootstrap_samples; sample++) {
-        cout << endl
-             << "===> START BOOTSTRAP REPLICATE NUMBER " << sample + 1 << endl
-             << endl;
-
-        Alignment *bootstrap_alignment;
-        cout << "Creating bootstrap alignment..." << endl;
-        if (alignment->isSuperAlignment())
-            bootstrap_alignment = new SuperAlignment;
-        else
-            bootstrap_alignment = new Alignment;
-        bootstrap_alignment->createBootstrapAlignment(alignment, NULL,
-                                                      params.bootstrap_spec);
-        if (params.print_tree_lh) {
-            double prob;
-            bootstrap_alignment->multinomialProb(*alignment, prob);
-            ofstream boot_lh;
-            if (sample == 0)
-                boot_lh.open(bootlh_name.c_str());
-            else
-                boot_lh.open(bootlh_name.c_str(),
-                             ios_base::out | ios_base::app);
-            boot_lh << "0\t" << prob << endl;
-            boot_lh.close();
-        }
-        IQTree *boot_tree;
-        if (alignment->isSuperAlignment()) {
-            if (params.partition_type) {
-                boot_tree = new PhyloSuperTreePlen(
-                    (SuperAlignment *)bootstrap_alignment,
-                    (PhyloSuperTree *)tree);
-            } else {
-                boot_tree =
-                    new PhyloSuperTree((SuperAlignment *)bootstrap_alignment,
-                                       (PhyloSuperTree *)tree);
-            }
-        } else
-            boot_tree = new IQTree(bootstrap_alignment);
-        if (params.print_bootaln)
-            bootstrap_alignment->printPhylip(bootaln_name.c_str(), true);
-        runTreeReconstruction(params, original_model, *boot_tree, model_info);
-        // read in the output tree file
-        string tree_str;
-        try {
-            ifstream tree_in;
-            tree_in.exceptions(ios::failbit | ios::badbit);
-            tree_in.open(treefile_name.c_str());
-            tree_in >> tree_str;
-            tree_in.close();
-        } catch (ios::failure) {
-            outError(ERR_READ_INPUT, treefile_name);
-        }
-        // write the tree into .boottrees file
-        try {
-            ofstream tree_out;
-            tree_out.exceptions(ios::failbit | ios::badbit);
-            tree_out.open(boottrees_name.c_str(),
-                          ios_base::out | ios_base::app);
-            tree_out << tree_str << endl;
-            tree_out.close();
-        } catch (ios::failure) {
-            outError(ERR_WRITE_OUTPUT, boottrees_name);
-        }
-        if (params.num_bootstrap_samples == 1)
-            reportPhyloAnalysis(params, original_model, *bootstrap_alignment,
-                                *boot_tree, model_info, removed_seqs,
-                                twin_seqs);
-        // WHY was the following line missing, which caused memory leak?
-        delete boot_tree;
-        delete bootstrap_alignment;
-    }
-=======
 	// do bootstrap analysis
 	for (int sample = 0; sample < params.num_bootstrap_samples; sample++) {
         resetGlobalParamOnNewAln();
@@ -2545,7 +2401,6 @@ void runStandardBootstrap(Params &params, string &original_model,
         delete boot_tree->aln;
 		delete boot_tree;
 	}
->>>>>>> mpboot
 
     if (params.consensus_type == CT_CONSENSUS_TREE) {
 
@@ -2558,40 +2413,6 @@ void runStandardBootstrap(Params &params, string &original_model,
                              NULL, &params);
     }
 
-<<<<<<< HEAD
-    if (params.compute_ml_tree) {
-        cout << endl
-             << "===> START ANALYSIS ON THE ORIGINAL ALIGNMENT" << endl
-             << endl;
-        params.aLRT_replicates = saved_aLRT_replicates;
-        runTreeReconstruction(params, original_model, *tree, model_info);
-
-        cout << endl
-             << "===> ASSIGN BOOTSTRAP SUPPORTS TO THE TREE FROM ORIGINAL "
-                "ALIGNMENT"
-             << endl
-             << endl;
-        MExtTree ext_tree;
-        assignBootstrapSupport(
-            boottrees_name.c_str(), 0, 1e6, treefile_name.c_str(), false,
-            treefile_name.c_str(), params.out_prefix, ext_tree, NULL, &params);
-        tree->copyTree(&ext_tree);
-        reportPhyloAnalysis(params, original_model, *alignment, *tree,
-                            model_info, removed_seqs, twin_seqs);
-    } else if (params.consensus_type == CT_CONSENSUS_TREE) {
-        int mi = params.min_iterations;
-        STOP_CONDITION sc = params.stop_condition;
-        params.min_iterations = 0;
-        params.stop_condition = SC_FIXED_ITERATION;
-        runTreeReconstruction(params, original_model, *tree, model_info);
-        params.min_iterations = mi;
-        params.stop_condition = sc;
-        tree->stop_rule.initialize(params);
-        reportPhyloAnalysis(params, original_model, *alignment, *tree,
-                            model_info, removed_seqs, twin_seqs);
-    } else
-        cout << endl;
-=======
 	if (params.compute_ml_tree) {
 		cout << endl << "===> START ANALYSIS ON THE ORIGINAL ALIGNMENT" << endl << endl;
 		params.aLRT_replicates = saved_aLRT_replicates;
@@ -2640,7 +2461,6 @@ void runStandardBootstrap(Params &params, string &original_model,
 		reportPhyloAnalysis(params, original_model, *(tree->aln), *tree, model_info, removed_seqs, twin_seqs);
 	} else
 		cout << endl;
->>>>>>> mpboot
 
     cout << "Total CPU time for bootstrap: " << (getCPUTime() - start_time)
          << " seconds." << endl
@@ -2766,47 +2586,6 @@ void runPhyloAnalysis(Params &params) {
         alignment->concatenateAlignment(&aln);
     }
 
-<<<<<<< HEAD
-    if (params.aln_output) {
-        /************ convert alignment to other format and write to output file
-         * *************/
-        convertAlignment(params, tree);
-    } else if (params.gbo_replicates > 0 && params.user_file &&
-               params.second_tree) {
-        // run one of the UFBoot analysis
-        runGuidedBootstrap(params, alignment, *tree);
-    } else if (params.avh_test) {
-        // run one of the wondering test for Arndt
-        runAvHTest(params, alignment, *tree);
-    } else if (params.bootlh_test) {
-        // run Arndt's plot of tree likelihoods against bootstrap alignments
-        runBootLhTest(params, alignment, *tree);
-    } else if (params.num_bootstrap_samples == 0) {
-        // the main Maximum likelihood tree reconstruction
-        vector<ModelInfo> model_info;
-        alignment->checkGappySeq();
-
-        StrVector removed_seqs;
-        StrVector twin_seqs;
-        // remove identical sequences
-        if (params.ignore_identical_seqs)
-            tree->removeIdenticalSeqs(params, removed_seqs, twin_seqs);
-
-        // call main tree reconstruction
-        runTreeReconstruction(params, original_model, *tree, model_info);
-        if (params.gbo_replicates && params.online_bootstrap) {
-            if (params.print_ufboot_trees)
-                tree->writeUFBootTrees(params, removed_seqs, twin_seqs);
-=======
-
-	string original_model = params.model_name;
-
-	if (params.concatenate_aln) {
-		Alignment aln(params.concatenate_aln, params.sequence_type, params.intype);
-		cout << "Concatenating " << params.aln_file << " with " << params.concatenate_aln << " ..." << endl;
-		alignment->concatenateAlignment(&aln);
-	}
-
 	if (params.aln_output) {
 		/************ convert alignment to other format and write to output file *************/
 		convertAlignment(params, tree);
@@ -2843,7 +2622,6 @@ void runPhyloAnalysis(Params &params) {
 		if (params.gbo_replicates && params.online_bootstrap) {
 			if (params.print_ufboot_trees)
 				tree->writeUFBootTrees(params, removed_seqs, twin_seqs);
->>>>>>> mpboot
 
             cout << endl << "Computing bootstrap consensus tree..." << endl;
             string splitsfile = params.out_prefix;
@@ -2887,59 +2665,6 @@ void runPhyloAnalysis(Params &params) {
             //	        	tree->fixNegativeBranch(true);
             //	    	}
 
-<<<<<<< HEAD
-            double conScore = tree->optimizeAllBranches();
-            if (params.maximum_parsimony)
-                cout << "Parsimony score of consensus tree: " << -conScore
-                     << endl;
-            else
-                cout << "Log-likelihood of consensus tree: " << conScore
-                     << endl;
-            tree->setRootNode(params.root);
-            tree->insertTaxa(removed_seqs, twin_seqs);
-            //			tree->printTree(splitsfile.c_str(), WT_BR_LEN |
-            // WT_BR_LEN_FIXED_WIDTH | WT_SORT_TAXA | WT_NEWLINE); // for ML
-            tree->printTree(splitsfile.c_str(),
-                            WT_SORT_TAXA | WT_NEWLINE); // Diep: for MP
-            // revert the best tree
-            tree->readTreeString(current_tree);
-            //			if (tree->isSuperTree()) {
-            //				tree->optimizeAllBranches();
-            //				((PhyloSuperTree*)tree)->computeBranchLengths();
-            //			}
-        }
-        // reinsert identical sequences
-        if (removed_seqs.size() > 0) {
-            delete tree->aln;
-            tree->reinsertIdenticalSeqs(alignment, removed_seqs, twin_seqs);
-            tree->printResultTree();
-        }
-        reportPhyloAnalysis(params, original_model, *alignment, *tree,
-                            model_info, removed_seqs, twin_seqs);
-    } else {
-        // the classical non-parameter bootstrap (SBS)
-        runStandardBootstrap(params, original_model, alignment, tree);
-    }
-
-    delete tree;
-    delete alignment;
-
-    // // Replace all '0' with '-' to return the old aln_file
-    // // IMPORTANT: '0' must not in aln_file before (as supposed to DNA type)
-    // if (params.dna5 == true) {
-    //     fstream fs(params.aln_file, fstream::in | fstream::out);
-    //     if (fs.is_open()) {
-    //         while (!fs.eof()) {
-    //             if (fs.get() == '0') {
-    //                 fs.seekp((fs.tellp() - static_cast<streampos> (1)));
-    //                 fs.put('-');
-    //                 fs.seekp(fs.tellp());
-    //             }
-    //         }
-    //         fs.close();
-    //     }
-    // }
-=======
 			double conScore = tree->optimizeAllBranches();
 			if(params.maximum_parsimony)
 				cout << "Parsimony score of consensus tree: " << -conScore << endl;
@@ -2970,7 +2695,6 @@ void runPhyloAnalysis(Params &params) {
 
     delete tree->aln;
 	delete tree;
->>>>>>> mpboot
 }
 
 void printSiteParsimonyUserTree(Params &params) {
@@ -3415,13 +3139,6 @@ bool checkDuplicatePattern(IQTree *&tree) {
     return found;
 }
 
-<<<<<<< HEAD
-void optimizeAlignment(IQTree *&tree, Params &params) {
-    //	if(checkDuplicatePattern(tree))
-    //		cout << "FIRST CHECK: Alignment patterns are not created
-    // properly!"
-    //<< endl;
-=======
 // Diep 2021-12-28: Changed the logic here
 // All parsimony tree search will have its aln optimized
 //      to initialize n_informative_patterns; n_informative_sites 
@@ -3429,47 +3146,23 @@ void optimizeAlignment(IQTree *&tree, Params &params) {
 void optimizeAlignment(IQTree * & tree, Params & params){
 //	if(checkDuplicatePattern(tree))
 //		cout << "FIRST CHECK: Alignment patterns are not created properly!" << endl;
->>>>>>> mpboot
 
     double start = getCPUTime();
     tree->params = &params; // Diep: 2020-08-17, there are two variables with
                             // identical name as 'params'
 
-<<<<<<< HEAD
-    if (params.user_file) {
-        cout << "\nReading user tree for sorting patterns" << endl;
-=======
     if(params.user_file){
         cout << "\nReading user tree for evaluating patterns" << endl;
->>>>>>> mpboot
         // Diep: 2021-10-31, to enable sorting columns based on user tree
         bool rooted = params.is_rooted;
         tree->readTree(params.user_file, rooted);
         tree->setAlignment(tree->aln);
-<<<<<<< HEAD
-        cout << "Time for reading: " << getCPUTime() - start << " seconds"
-             << endl;
-    } else {
-        cout << "\nComputing random stepwise addition parsimony tree for "
-                "sorting "
-                "patterns..."
-             << endl;
-        // tree->initTopologyByPLLRandomAdition(params); // this pll version
-        // needs further sync to work with the rest
-        tree->computeParsimonyTree(
-            params.out_prefix,
-            tree->aln); // this iqtree version plays nicely with the rest
-        cout
-            << "Time for random stepwise addition parsimony tree construction: "
-            << getCPUTime() - start << " seconds" << endl;
-=======
         cout << "Time for reading: " << getCPUTime() - start << " seconds" << endl;
     }else{
         cout << "\nComputing random stepwise addition parsimony tree for evaluating patterns..." << endl;
     	tree->initTopologyByPLLRandomAdition(params); // pll ras
         // tree->computeParsimonyTree(params.out_prefix, tree->aln); // iqtree ras
         cout << "Time for random stepwise addition parsimony tree construction: " << getCPUTime() - start << " seconds" << endl;
->>>>>>> mpboot
     }
     // extract the vector of pattern pars of the initialized tree
     tree->initializeAllPartialPars();
@@ -3484,41 +3177,22 @@ void optimizeAlignment(IQTree * & tree, Params & params){
         (tree->aln)->at(i).ras_pars_score = tmpPatternPars[i];
     }
 
-<<<<<<< HEAD
-    if (params.sort_alignment) {
-        cout << "Reordering patterns in alignment by decreasing order of "
-                "pattern "
-                "parsimony... ";
-=======
 	if(!params.sort_alignment){
         tree->aln->updateSitePatternAfterOptimized();
     }else{
 		cout << "Reordering patterns in alignment by decreasing order of pattern parsimony... ";
->>>>>>> mpboot
         start = getCPUTime();
         // reordering patterns
         PatternComp pcomp;
         sort(tree->aln->begin(), tree->aln->end(), pcomp);
         tree->aln->updateSitePatternAfterOptimized();
 
-<<<<<<< HEAD
-        tree->initializeAllPartialPars();
-        tree->clearAllPartialLH();
-        int pars_after = tree->computeParsimony();
-        if (pars_after != pars_before)
-            outError("Reordering alignment has bug.");
-        cout << getCPUTime() - start << " seconds" << endl;
-    } else {
-        tree->aln->updateSitePatternAfterOptimized();
-    }
-=======
 		tree->initializeAllPartialPars();
 		tree->clearAllPartialLH();
 		int pars_after = tree->computeParsimony();
 		if(pars_after != pars_before) outError("Reordering alignment has bug.");
 		cout << getCPUTime() - start << " seconds" << endl;
 	}
->>>>>>> mpboot
 
     tree->doSegmenting();
 
