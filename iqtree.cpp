@@ -375,29 +375,34 @@ void myPartitionsDestroy(partitionList *pl) {
 // To initialize current tree as a RAS tree computed by PLL
 // This is done independent of Tung's initializePLL function
 // to support reordering aln pattern by parsimony score
-void IQTree::initTopologyByPLLRandomAdition(Params &params) {
-  pllInstance *tmpInst;
-  pllInstanceAttr tmpAttr;
-  pllAlignmentData *tmpAlignmentData;
-  partitionList *tmpPartitions;
-  /* set PLL instance attributes */
-  tmpAttr.rateHetModel = PLL_GAMMA;
-  tmpAttr.fastScaling = PLL_FALSE;
-  tmpAttr.saveMemory = PLL_FALSE;
-  tmpAttr.useRecom = PLL_FALSE;
-  tmpAttr.randomNumberSeed = params.ran_seed;
+void IQTree::initTopologyByPLLRandomAdition(Params &params){
+	pllInstance * tmpInst = NULL;
+	pllInstanceAttr tmpAttr;
+	pllAlignmentData * tmpAlignmentData;
+	partitionList * tmpPartitions;
+	/* set PLL instance attributes */
+	tmpAttr.rateHetModel = PLL_GAMMA;
+	tmpAttr.fastScaling  = PLL_FALSE;
+	tmpAttr.saveMemory   = PLL_FALSE;
+	tmpAttr.useRecom     = PLL_FALSE;
+	tmpAttr.randomNumberSeed = params.ran_seed;
 
-  tmpInst = pllCreateInstance(&tmpAttr); /* Create the PLL instance */
-  /* Read in the aln file */
-  stringstream pllAln;
-  if (aln->isSuperAlignment()) {
-    ((SuperAlignment *)aln)->printCombinedAlignment(pllAln);
-  } else {
-    aln->printPhylip(pllAln);
-  }
-  string pllAlnStr = pllAln.str();
-  tmpAlignmentData =
-      pllParsePHYLIPString(pllAlnStr.c_str(), pllAlnStr.length());
+#ifdef _OPENMP
+    tmpAttr.numberOfThreads = params.num_threads; /* This only affects the pthreads version */
+#else
+    tmpAttr.numberOfThreads = 1;
+#endif
+
+	tmpInst = pllCreateInstance (&tmpAttr);      /* Create the PLL instance */
+    /* Read in the aln file */
+    stringstream pllAln;
+	if (aln->isSuperAlignment()) {
+		((SuperAlignment*) aln)->printCombinedAlignment(pllAln);
+	} else {
+		aln->printPhylip(pllAln);
+	}
+	string pllAlnStr = pllAln.str();
+	tmpAlignmentData = pllParsePHYLIPString(pllAlnStr.c_str(), pllAlnStr.length());
 
   /* Read in the partition information */
   // BQM: to avoid printing file
@@ -417,7 +422,10 @@ void IQTree::initTopologyByPLLRandomAdition(Params &params) {
   /* We don't need the the intermediate partition queue structure anymore */
   pllQueuePartitionsDestroy(&partitionInfo);
 
-  pllTreeInitTopologyForAlignment(tmpInst, tmpAlignmentData);
+    if(params.maximum_parsimony)
+    	pllSortedAlignmentRemoveDups(tmpAlignmentData, tmpPartitions); // to sync IQTree aln and PLL one
+    
+    pllTreeInitTopologyForAlignment(tmpInst, tmpAlignmentData);
 
   /* Connect the aln and partition structure with the tree structure */
   if (!pllLoadAlignment(tmpInst, tmpAlignmentData, tmpPartitions)) {
@@ -601,18 +609,16 @@ void IQTree::initializePLL(Params &params) {
   /* We don't need the the intermediate partition queue structure anymore */
   pllQueuePartitionsDestroy(&partitionInfo);
 
-  // Diep: 	Added this IF statement so that UFBoot-MP SPR code doesn't
-  // affect
-  // other IQTree mode 			alignment in  UFBoot-MP SPR branch will
-  // be sorted by pattern and site pars score PLL eliminates duplicate sites
-  // from the alignment and update weights vector
-  //    if(params.maximum_parsimony && params.gbo_replicates) // WRONG
-  if (params.maximum_parsimony &&
-      (params.sort_alignment || params.sankoff_cost_file))
-    pllSortedAlignmentRemoveDups(
-        pllAlignment, pllPartitions); // to sync sorted IQTree aln and PLL one
-  else
-    pllAlignmentRemoveDups(pllAlignment, pllPartitions);
+    // Diep: 	Added this IF statement so that UFBoot-MP SPR code doesn't affect other IQTree mode
+    // 			alignment in  UFBoot-MP SPR branch will be sorted by pattern and site pars score
+    // PLL eliminates duplicate sites from the alignment and update weights vector
+    // Diep 2021-12-29: 
+    //  For maximum parsimony, SYNCING between two cores (IQ-TREE and PLL) must always be guaranteed!!!!!!!!
+    //  Especially necessary if having ratchet on.
+    if(params.maximum_parsimony)
+    	pllSortedAlignmentRemoveDups(pllAlignment, pllPartitions); // to sync IQTree aln and PLL one
+    else
+        pllAlignmentRemoveDups(pllAlignment, pllPartitions);
 
   pllTreeInitTopologyForAlignment(pllInst, pllAlignment);
 
@@ -4847,27 +4853,23 @@ void IQTree::printIntermediateTree(int brtype) {
   save_all_trees = x;
 }
 
-void IQTree::removeIdenticalSeqs(Params &params, StrVector &removed_seqs,
-                                 StrVector &twin_seqs) {
-  // commented out because it also works for SuperAlignment now!
-  Alignment *new_aln;
-  if (params.root)
-    new_aln =
-        aln->removeIdenticalSeq((string)params.root, params.gbo_replicates > 0,
-                                removed_seqs, twin_seqs);
-  else
-    new_aln = aln->removeIdenticalSeq("", params.gbo_replicates > 0,
-                                      removed_seqs, twin_seqs);
-  if (removed_seqs.size() > 0) {
-    cout << "NOTE: " << removed_seqs.size()
-         << " identical sequences will be ignored during tree search" << endl;
-    if (verbose_mode >= VB_MED) {
-      for (int i = 0; i < removed_seqs.size(); i++) {
-        cout << removed_seqs[i] << " is identical to " << twin_seqs[i] << endl;
-      }
-    }
-    aln = new_aln;
-  }
+void IQTree::removeIdenticalSeqs(Params &params, StrVector &removed_seqs, StrVector &twin_seqs) {
+	// commented out because it also works for SuperAlignment now!
+	Alignment *new_aln;
+	if (params.root)
+		new_aln = aln->removeIdenticalSeq((string)params.root, params.gbo_replicates > 0, removed_seqs, twin_seqs);
+	else
+		new_aln = aln->removeIdenticalSeq("", params.gbo_replicates > 0, removed_seqs, twin_seqs);
+	if (removed_seqs.size() > 0) {
+		cout << "NOTE: " << removed_seqs.size() << " identical sequences will be ignored during tree search" << endl;
+		if (verbose_mode >= VB_MED) {
+			for (int i = 0; i < removed_seqs.size(); i++) {
+				cout << removed_seqs[i] << " is identical to " << twin_seqs[i] << endl;
+			}
+		}
+        delete aln; // REF: fix in iqtree1.6.12
+		aln = new_aln;
+	}
 }
 
 void IQTree::reinsertIdenticalSeqs(Alignment *orig_aln, StrVector &removed_seqs,

@@ -860,6 +860,7 @@ void parseArg(int argc, char *argv[], Params &params) {
         0; // Diep: if not specify -distinct_iter_top_boot <int>
     params.top_boot_concensus = false;
     params.do_first_rell = false;
+    params.remove_dup_seq = false;
     params.test_mode = false;
 
 #ifdef _OPENMP
@@ -2631,12 +2632,15 @@ void parseArg(int argc, char *argv[], Params &params) {
                 // 	throw "These options are to convert newick tree string
                 // of taxa to one of id.\nUse -s [alignment_file] -test_mode
                 // [tree_file]";
-
                 params.test_mode = true;
                 continue;
             }
-            if (strcmp(argv[cnt], "-opt_btree_spr") == 0) {
-                cnt++;
+            if(strcmp(argv[cnt], "-remove_dup_seq") == 0){
+            	params.remove_dup_seq = true;
+            	continue;
+            }
+            if(strcmp(argv[cnt], "-opt_btree_spr") == 0){
+            	cnt++;
                 if (cnt >= argc)
                     throw "Use -opt_btree_spr <spr_radius>";
                 params.opt_btree_spr = convert_int(argv[cnt]);

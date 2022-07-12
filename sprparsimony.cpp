@@ -149,6 +149,22 @@ parsimonyNumber
 bool first_call = true; // is this the first call to pllOptimizeSprParsimony
 bool doing_stepwise_addition = false; // is the stepwise addition on
 
+void resetGlobalParamOnNewAln(){
+    globalParam = NULL;
+    iqtree = NULL;
+    bestTreeScoreHits = 0;
+    pllCostMatrix = NULL;
+    pllCostNstates = 0;
+    vectorCostMatrix = NULL;
+    highest_cost = 0;
+
+    pllRepsSegments = -1;
+    pllSegmentUpper = NULL;
+    pllRemainderLowerBounds = NULL;
+    first_call = true; 
+    doing_stepwise_addition = false;
+}
+
 void initializeCostMatrix() {
     highest_cost =
         *max_element(pllCostMatrix,

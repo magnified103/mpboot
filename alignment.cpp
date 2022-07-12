@@ -85,8 +85,8 @@ Alignment::Alignment() : vector<Pattern>() {
     STATE_UNKNOWN = 126;
 
     // Diep added:
-    n_informative_patterns = 0;
-    n_informative_sites = 0;
+    n_informative_patterns = -1; // use -1 for denoting uninitialization
+    n_informative_sites = -1; // use -1 for denoting uninitialization
 }
 
 void Alignment::operator=(Alignment &aln) {
@@ -123,18 +123,19 @@ void Alignment::updateSitePatternAfterOptimized() {
     n_informative_patterns = 0;
     n_informative_sites = 0;
     int site = 0;
-    for (int i = 0; i < nptn; ++i) {
-        for (int j = 0; j < at(i).frequency; ++j) {
-            site_pattern[site] = i;
-            site++;
-        }
-        pattern_index[at(i)] = i;
-        if (at(i).ras_pars_score != 0) {
-            n_informative_patterns++;
-            n_informative_sites += at(i).frequency;
-        }
+    for(int i = 0; i < nptn; ++i) {
+    	for(int j = 0; j < at(i).frequency; ++j){
+    		site_pattern[site] = i;
+    		site++;
+    	}
+    	pattern_index[at(i)] = i;
+		// if(at(i).ras_pars_score != 0){
+		// 	n_informative_patterns++;
+		// 	n_informative_sites += at(i).frequency;
+		// }
     }
-    countConstSite();
+	countConstSite();
+    countInformative();
 }
 
 void Alignment::modifyPatternFreq(Alignment &aln,
@@ -808,6 +809,7 @@ void Alignment::condenseParsimonyEquivalentSites(Alignment *aln) {
         }
     }
     countConstSite();
+    countInformative();
     cout << "Alignment is condensed into " << size() << " patterns" << endl;
 }
 
@@ -1865,6 +1867,7 @@ void Alignment::extractSubAlignment(Alignment *aln, IntVector &seq_id,
     site_pattern.resize(site);
     verbose_mode = save_mode;
     countConstSite();
+    countInformative();
     buildSeqStates();
     assert(size() <= aln->size());
 }
@@ -1894,6 +1897,7 @@ void Alignment::extractPatterns(Alignment *aln, IntVector &ptn_id) {
     site_pattern.resize(site);
     verbose_mode = save_mode;
     countConstSite();
+    countInformative();
     buildSeqStates();
     assert(size() <= aln->size());
 }
@@ -1925,6 +1929,7 @@ void Alignment::extractPatternFreqs(Alignment *aln, IntVector &ptn_freq) {
     site_pattern.resize(site);
     verbose_mode = save_mode;
     countConstSite();
+    countInformative();
     buildSeqStates();
     assert(size() <= aln->size());
 }
@@ -1951,6 +1956,7 @@ void Alignment::extractSites(Alignment *aln, IntVector &site_id) {
     }
     verbose_mode = save_mode;
     countConstSite();
+    countInformative();
     buildSeqStates();
     // cout << getNSite() << " positions were extracted" << endl;
     // cout << __func__ << " " << num_states << endl;
@@ -2163,6 +2169,7 @@ void Alignment::createBootstrapAlignment(Alignment *aln,
     }
     verbose_mode = save_mode;
     countConstSite();
+    countInformative();
     buildSeqStates();
 }
 /*
@@ -2215,6 +2222,7 @@ in addPattern
 
     verbose_mode = save_mode;
     countConstSite();
+    countInformative();
     buildSeqStates();
     if(sort_aln) updateSitePatternAfterOptimized();
 }
@@ -2235,21 +2243,19 @@ void Alignment::createPerturbAlignment(Alignment *aln, int percentage,
     clear();
     pattern_index.clear();
     VerboseMode save_mode = verbose_mode;
-    verbose_mode = min(verbose_mode,
-                       VB_MIN); // to avoid printing gappy sites in addPattern
-
-    int nptn = aln->getNPattern();
-    site = 0;
-    for (int p = 0; p < nptn; p++) {
-        Pattern pat = aln->at(p);
-        // keep original frequency
-        for (int i = 0; i < aln->at(p).frequency; i++) {
-            addPattern(pat, site);
-            site++;
-        }
-        at(p).ras_pars_score = aln->at(p).ras_pars_score;
-    }
-
+    verbose_mode = min(verbose_mode, VB_MIN); // to avoid printing gappy sites in addPattern
+    
+	int nptn = aln->getNPattern();
+	site = 0;
+	for(int p = 0; p < nptn; p++){
+		Pattern pat = aln->at(p);
+		// keep original frequency
+		for(int i = 0; i < aln->at(p).frequency; i++){
+			addPattern(pat, site);
+			site++;
+		}
+		at(p).ras_pars_score = aln->at(p).ras_pars_score;
+	}
     int ratchet_nsite = aln->n_informative_sites * percentage /
                         100; // only resample from informative site
     int orig_nsite = aln->getNSite();
@@ -2279,6 +2285,7 @@ void Alignment::createPerturbAlignment(Alignment *aln, int percentage,
 
     verbose_mode = save_mode;
     countConstSite();
+    // countInformative();
     buildSeqStates();
     if (sort_aln)
         updateSitePatternAfterOptimized();
@@ -2405,6 +2412,7 @@ void Alignment::createGapMaskedAlignment(Alignment *masked_aln,
     }
     verbose_mode = save_mode;
     countConstSite();
+    countInformative();
     buildSeqStates();
 }
 
@@ -2444,6 +2452,7 @@ void Alignment::concatenateAlignment(Alignment *aln) {
     }
     verbose_mode = save_mode;
     countConstSite();
+    countInformative();
     buildSeqStates();
 }
 
@@ -2468,6 +2477,7 @@ void Alignment::copyAlignment(Alignment *aln) {
     }
     verbose_mode = save_mode;
     countConstSite();
+    countInformative();
     buildSeqStates();
 }
 
@@ -2477,6 +2487,19 @@ void Alignment::countConstSite() {
         if ((*it).is_const)
             num_const_sites += (*it).frequency;
     frac_const_sites = ((double)num_const_sites) / getNSite();
+}
+
+void Alignment::countInformative() {
+	int nptn = getNPattern();
+	n_informative_patterns = 0;
+	n_informative_sites = 0;
+
+    for(int i = 0; i < nptn; ++i) {
+		if(at(i).ras_pars_score != 0){
+			n_informative_patterns++;
+			n_informative_sites += at(i).frequency;
+		}
+    }
 }
 
 string Alignment::getUnobservedConstPatterns() {
