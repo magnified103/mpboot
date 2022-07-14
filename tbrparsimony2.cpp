@@ -10,6 +10,8 @@
 #include "nnisearch.h"
 #include "parstree.h"
 #include <string>
+#include <queue>
+#include <functional>
 /**
  * PLL (version 1.0.0) a software library for phylogenetic inference
  * Copyright (C) 2013 Tomas Flouri and Alexandros Stamatakis
@@ -1825,6 +1827,76 @@ string(ptree->pllInst->tree_string); ptree->readTreeString(treeString);
 }
 */
 
+vector<int> build_centroid_tree(int n, vector<vector<int>> adj) {
+    vector<int> vis(n + 1);
+    vector<int> sz(n + 1);
+    vector<int> par(n + 1);
+    function<int(int, int, int)> find_centroid = [&](int v, int p, int n) {
+        for (int x: adj[v]) {
+            if (x != p) {
+                if (!vis[x] && sz[x] > n / 2) {
+                    return find_centroid(x, v, n);
+                }
+            }
+        }
+
+        return v;
+    };
+    function<int(int, int)> find_size = [&](int v, int p) {
+        assert(v >= 1 && v <= n);
+        if (vis[v]) return 0;
+        sz[v] = 1;
+        // cout << v << "\n";
+
+        for (int x: adj[v]) {
+            if (x != p) {
+                sz[v] += find_size(x, v);
+            }
+        }
+        return sz[v];
+    };
+    function<void(int, int)> init_centroid = [&](int v, int p) {
+        // cout << "FIND SIZE\n";
+        find_size(v, -1);
+
+        int c = find_centroid(v, -1, sz[v]);
+        vis[c] = true;
+        par[c] = p;
+
+        for (int x: adj[c]) {
+            if (!vis[x]) {
+                init_centroid(x, c);
+            }
+        }
+    };
+    init_centroid(1, -1);
+    int root = -1;
+    for (int i = 1; i <= n; i++) {
+        if (par[i] == -1) {
+            root = i;
+        }
+    }
+    assert(root != -1);
+    adj = vector<vector<int>>(n + 1);
+    for (int i = 1; i <= n; i++) {
+        if (par[i] >= 1 && par[i] <= n) {
+            adj[par[i]].push_back(i);
+        }
+    }
+    queue<int> q;
+    q.push(root);
+    vector<int> order;
+    while (q.size()) {
+        int u = q.front();
+        q.pop();
+        order.push_back(u);
+        for (auto v: adj[u]) {
+            q.push(v);
+        }
+    }
+    return order;
+}
+
 int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
                             int maxtrav, IQTree *_iqtree) {
     int perSiteScores = globalParam->gbo_replicates > 0;
@@ -1859,6 +1931,43 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
     assert(!tr->constrained);
 
     nodeRectifierPars(tr, true);
+
+    vector<int> order;
+    {
+        int n = tr->mxtips * 2 - 2;
+        vector<vector<int>> adj(n + 1);
+        for (int i = 1; i <= n; i++) {
+            if (tr->nodep[i] && tr->nodep[i]->back) {
+                int u = tr->nodep[i]->number;
+                int v = tr->nodep[i]->back->number;
+                if (v >= 1 && v <= n) {
+                    adj[u].push_back(v);
+                    adj[v].push_back(u);
+                }
+            }
+        }
+        // for (int i = 1; i <= n; i++) {
+        //     sort(adj[i].begin(), adj[i].end());
+        //     adj[i].erase(unique(adj[i].begin(), adj[i].end()), adj[i].end());
+        // }
+        queue<int> q;
+        q.push(1);
+        vector<int> flag(n + 1);
+        flag[1] = 1;
+        while (q.size()) {
+            int u = q.front();
+            q.pop();
+            order.push_back(u);
+            for (auto v: adj[u]) {
+                if (!flag[v]) {
+                    flag[v] = 1;
+                    q.push(v);
+                }
+            }
+        }
+        // order = build_centroid_tree(n, adj);
+    }
+
     tr->bestParsimony = UINT_MAX;
     if (perSiteScores) {
         tr->bestParsimony =
@@ -1903,7 +2012,10 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
             }
         }
 
-        for (i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
+        for (auto i: order) {
+            if (isTip(i, tr->mxtips)) {
+                continue;
+            }
             tr->TBR_removeBranch = NULL;
             tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
             tr->TBR_insertNNI = false;
