@@ -111,8 +111,8 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 #	set(COMBINED_FLAGS "-Wall -Wno-unused-function -Wno-sign-compare -pedantic -D_GNU_SOURCE -Wno-nested-anon-types")
 	# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline -fprofile-instr-generate -fcoverage-mapping -O2 -g")
 	# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-inline -fprofile-instr-generate -fcoverage-mapping -O2 -g")	
-	# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g")
-	# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -g") 
+	# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-inline -O3 -g")
+	# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-inline -O3 -g") 
 	set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 	set(CMAKE_C_FLAGS_RELEASE "-O3") 
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
@@ -208,7 +208,7 @@ if (IQTREE_FLAGS MATCHES "fma") # AVX+FMA instruction set
 
 elseif (IQTREE_FLAGS MATCHES "avx2") # AVX instruction set
  	message("Vectorization : AVX2")
-	add_definitions(-D__SSE3 -D__AVX) # define both SSE3 and AVX directive
+	add_definitions(-D__SSE3 -D__AVX -D__AVX2) # define both SSE3 and AVX directive
 	if (VCC) 
 		set(COMBINED_FLAGS "${COMBINED_FLAGS} /arch:AVX2")
 	elseif (CLANG)
