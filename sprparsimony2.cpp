@@ -81,6 +81,10 @@
 #define VECTOR_BIT_OR _mm256_or_pd
 #define VECTOR_STORE _mm256_store_pd
 #define VECTOR_AND_NOT _mm256_andnot_pd
+#define VECTOR_SET1_INT32 _mm256_set1_epi32
+#define VECTOR_SET_INT32 _mm256_set_epi32
+#define VECTOR_ADD_INT32 _mm256_add_epi32
+#define VECTOR_MIN_UINT32 _mm256_min_epu32
 
 #elif (defined(__SSE3))
 
@@ -111,6 +115,10 @@
 #define VECTOR_BIT_OR _mm_or_si128
 #define VECTOR_STORE _mm_store_si128
 #define VECTOR_AND_NOT _mm_andnot_si128
+#define VECTOR_SET1_INT32 _mm_set1_epi32
+#define VECTOR_SET_INT32 _mm_set_epi32
+#define VECTOR_ADD_INT32 _mm_add_epi32
+#define VECTOR_MIN_UINT32 _mm_min_epu32
 
 #else
 // no vectorization
@@ -243,6 +251,9 @@ static inline void storePerSiteNodeScores(partitionList *pr, int model,
   int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
   int nodeStart = partialParsLength * nodeNumber;
   int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
+
+  static_assert(sizeof(parsimonyNumber) == 4, "sizeof(parsimonyNumber) = 4");
+
   for (i = 0; i < LONG_INTS_PER_VECTOR; ++i) {
     buf = &(pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
     nodeStartPlusOffset += ULINT_SIZE;
@@ -250,8 +261,15 @@ static inline void storePerSiteNodeScores(partitionList *pr, int model,
     // offset * PLL_PCF + i * ULINT_SIZE]); // Diep's 		buf =
     //&(pr->partitionData[model]->perSitePartialPars[nodeStart + offset *
     // PLL_PCF + i]); // Tomas's code
-    for (j = 0; j < ULINT_SIZE; ++j)
-      buf[j] += ((counts[i] >> j) & 1);
+    const int parsPerVector = LONG_INTS_PER_VECTOR * sizeof(unsigned long) / 4;
+    for (j = 0; j < ULINT_SIZE; j += parsPerVector) {
+      // buf[j] += ((counts[i] >> j) & 1);
+      INT_TYPE mask = VECTOR_SET1_INT32(counts[i] >> j);
+      mask = VECTOR_BIT_AND(mask, VECTOR_SET_INT32(8, 4, 2, 1));
+      mask = VECTOR_MIN_UINT32(mask, VECTOR_SET1_INT32(1));
+      mask = VECTOR_ADD_INT32(mask, VECTOR_LOAD((CAST)(&buf[j])));
+      VECTOR_STORE((CAST)(&buf[j]), mask);
+    }
   }
 }
 
