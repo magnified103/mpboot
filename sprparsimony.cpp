@@ -7,6 +7,11 @@
 #include "sprparsimony.h"
 #include "parstree.h"
 #include <string>
+#ifdef _OPENMP
+#include <thread>
+#include <vector>
+#include <functional>
+#endif
 /**
  * PLL (version 1.0.0) a software library for phylogenetic inference
  * Copyright (C) 2013 Tomas Flouri and Alexandros Stamatakis
@@ -491,8 +496,7 @@ void newviewSankoffParsimonyIterativeFastSIMD(pllInstance *tr, partitionList * p
 }
 
 
-static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, int perSiteScores)
-{
+static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, int perSiteScores) {
 	if(pllCostMatrix) {
 //        newviewSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
 //        return;
@@ -556,62 +560,56 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
         return;
     }
 
-  INT_TYPE
-    allOne = SET_ALL_BITS_ONE;
+    int *ti = tr->ti;
+    int count = ti[0];
 
-  int
-    model,
-    *ti = tr->ti,
-    count = ti[0],
-    index;
+    auto start_time = std::chrono::system_clock::now();
 
-  for(index = 4; index < count; index += 4)
-    {
-      unsigned int
-        totalScore = 0;
+    for (int index = 4; index < count; index += 4) {
+        unsigned int totalScore = 0;
 
-      size_t
-        pNumber = (size_t)ti[index],
-        qNumber = (size_t)ti[index + 1],
-        rNumber = (size_t)ti[index + 2];
+        size_t pNumber = (size_t)ti[index];
+        size_t qNumber = (size_t)ti[index + 1];
+        size_t rNumber = (size_t)ti[index + 2];
 
-      if(perSiteScores){
-		  if(qNumber <= tr->mxtips) resetPerSiteNodeScores(pr, qNumber);
-		  if(rNumber <= tr->mxtips) resetPerSiteNodeScores(pr, rNumber);
-      }
+        if (perSiteScores) {
+            if (qNumber <= tr->mxtips) resetPerSiteNodeScores(pr, qNumber);
+            if (rNumber <= tr->mxtips) resetPerSiteNodeScores(pr, rNumber);
+        }
 
-      for(model = 0; model < pr->numberOfPartitions; model++)
-        {
-          size_t
-            k,
-            states = pr->partitionData[model]->states,
-            width = pr->partitionData[model]->parsimonyLength;
+        for (int model = 0; model < pr->numberOfPartitions; model++) {
+            size_t states = pr->partitionData[model]->states;
+            size_t width = pr->partitionData[model]->parsimonyLength;
 
-          unsigned int
-            i;
+#ifdef _OPENMP
+            int number_of_threads = omp_get_max_threads();
 
-          switch(states)
-            {
-            case 2:
-              {
-                parsimonyNumber
-                  *left[2],
-                  *right[2],
-                  *cur[2];
+            int total_work = width / INTS_PER_VECTOR;
 
-                for(k = 0; k < 2; k++)
-                  {
+            int work_per_thread = (total_work + number_of_threads - 1) / number_of_threads; // ceil(total_work / number_of_threads)
+
+            int gap = work_per_thread * INTS_PER_VECTOR;
+#endif
+
+            switch (states) {
+            case 2: {
+                parsimonyNumber *left[2];
+                parsimonyNumber *right[2];
+                parsimonyNumber *cur[2];
+
+                for(size_t k = 0; k < 2; k++) {
                     left[k]  = &(pr->partitionData[model]->parsVect[(width * 2 * qNumber) + width * k]);
                     right[k] = &(pr->partitionData[model]->parsVect[(width * 2 * rNumber) + width * k]);
                     cur[k]  = &(pr->partitionData[model]->parsVect[(width * 2 * pNumber) + width * k]);
-                  }
+                }
 
-                for(i = 0; i < width; i += INTS_PER_VECTOR)
-                  {
+                for(unsigned int i = 0; i < width; i += INTS_PER_VECTOR) {
                     INT_TYPE
-                      s_r, s_l, v_N,
-                      l_A, l_C,
-                      v_A, v_C;
+                        s_r, s_l, v_N,
+                        l_A, l_C,
+                        v_A, v_C;
+                    
+                    const INT_TYPE allOne = SET_ALL_BITS_ONE;
 
                     s_l = VECTOR_LOAD((CAST)(&left[0][i]));
                     s_r = VECTOR_LOAD((CAST)(&right[0][i]));
@@ -632,30 +630,51 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
 
                     totalScore += vectorPopcount(v_N);
                     if (perSiteScores)
-                       storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                  }
-              }
-              break;
-            case 4:
-              {
-                parsimonyNumber
-                  *left[4],
-                  *right[4],
-                  *cur[4];
+                        storePerSiteNodeScores(pr, model, v_N, i, pNumber);
+                }
+                break;
+            }
+            case 4: {
+                parsimonyNumber *left[4];
+                parsimonyNumber *right[4];
+                parsimonyNumber *cur[4];
 
-                for(k = 0; k < 4; k++)
-                  {
+                for (size_t k = 0; k < 4; k++) {
                     left[k]  = &(pr->partitionData[model]->parsVect[(width * 4 * qNumber) + width * k]);
                     right[k] = &(pr->partitionData[model]->parsVect[(width * 4 * rNumber) + width * k]);
                     cur[k]  = &(pr->partitionData[model]->parsVect[(width * 4 * pNumber) + width * k]);
-                  }
+                }
 
-                for(i = 0; i < width; i += INTS_PER_VECTOR)
-                  {
+#ifdef _OPENMP
+                std::vector<std::thread> work;
+                std::vector<unsigned int*> score_per_work;
+                for (size_t i = 0; i < width; i += gap) {
+                    size_t low = i;
+                    size_t high = (i + gap < width ? i + gap : width);
+                    score_per_work.push_back(nullptr);
+                    
+                    // align to cache line to prevent false-sharing
+#define CACHE_LINE_SIZE 64
+                    rax_posix_memalign((void **)&(score_per_work.back()), CACHE_LINE_SIZE, sizeof(unsigned int));
+
+                    unsigned int *score_ptr = score_per_work.back();
+
+                    work.emplace_back([tr, pr, perSiteScores, model, pNumber, low, high, left, right, cur, score_ptr] {
+
+                //     });
+                // }
+
+                unsigned int totalScore = 0;
+                for (unsigned int i = low; i < high; i += INTS_PER_VECTOR) {
+#else
+                for (unsigned int i = 0; i < width; i += INTS_PER_VECTOR) {
+#endif
                     INT_TYPE
-                      s_r, s_l, v_N,
-                      l_A, l_C, l_G, l_T,
-                      v_A, v_C, v_G, v_T;
+                        s_r, s_l, v_N,
+                        l_A, l_C, l_G, l_T,
+                        v_A, v_C, v_G, v_T;
+                    
+                    const INT_TYPE allOne = SET_ALL_BITS_ONE;
 
                     s_l = VECTOR_LOAD((CAST)(&left[0][i]));
                     s_r = VECTOR_LOAD((CAST)(&right[0][i]));
@@ -688,109 +707,124 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
 
                     totalScore += vectorPopcount(v_N);
                     if (perSiteScores)
-                       storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                  }
-              }
-              break;
-            case 20:
-              {
-                parsimonyNumber
-                  *left[20],
-                  *right[20],
-                  *cur[20];
+                        storePerSiteNodeScores(pr, model, v_N, i, pNumber);
+#ifdef _OPENMP
+                }
+                *score_ptr = totalScore;
+                });
+                }
 
-                for(k = 0; k < 20; k++)
-                  {
+                for (auto &thread: work) {
+                    thread.join();
+                }
+
+                for (auto score_ptr: score_per_work) {
+                    totalScore += *score_ptr;
+                    rax_free(score_ptr);
+                }
+#else
+                }
+#endif
+                break;
+            }
+            case 20: {
+                parsimonyNumber *left[20];
+                parsimonyNumber *right[20];
+                parsimonyNumber *cur[20];
+
+                for (size_t k = 0; k < 20; k++) {
                     left[k]  = &(pr->partitionData[model]->parsVect[(width * 20 * qNumber) + width * k]);
                     right[k] = &(pr->partitionData[model]->parsVect[(width * 20 * rNumber) + width * k]);
                     cur[k]  = &(pr->partitionData[model]->parsVect[(width * 20 * pNumber) + width * k]);
-                  }
+                }
 
-                for(i = 0; i < width; i += INTS_PER_VECTOR)
-                  {
+                for (unsigned int i = 0; i < width; i += INTS_PER_VECTOR) {
                     size_t j;
 
                     INT_TYPE
-                      s_r, s_l,
-                      v_N = SET_ALL_BITS_ZERO,
-                      l_A[20],
-                      v_A[20];
+                        s_r, s_l,
+                        v_N = SET_ALL_BITS_ZERO,
+                        l_A[20],
+                        v_A[20];
+                    
+                    const INT_TYPE allOne = SET_ALL_BITS_ONE;
 
-                    for(j = 0; j < 20; j++)
-                      {
+                    for (j = 0; j < 20; j++)
+                        {
                         s_l = VECTOR_LOAD((CAST)(&left[j][i]));
                         s_r = VECTOR_LOAD((CAST)(&right[j][i]));
                         l_A[j] = VECTOR_BIT_AND(s_l, s_r);
                         v_A[j] = VECTOR_BIT_OR(s_l, s_r);
 
                         v_N = VECTOR_BIT_OR(v_N, l_A[j]);
-                      }
+                        }
 
-                    for(j = 0; j < 20; j++)
-                      VECTOR_STORE((CAST)(&cur[j][i]), VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
+                    for (j = 0; j < 20; j++)
+                        VECTOR_STORE((CAST)(&cur[j][i]), VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
 
                     v_N = VECTOR_AND_NOT(v_N, allOne);
 
                     totalScore += vectorPopcount(v_N);
                     if (perSiteScores)
-                       storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                  }
-              }
-              break;
-            default:
-
-              {
-                parsimonyNumber
-                  *left[32],
-                  *right[32],
-                  *cur[32];
+                        storePerSiteNodeScores(pr, model, v_N, i, pNumber);
+                }
+                break;
+            }
+            default: {
+                parsimonyNumber *left[32];
+                parsimonyNumber *right[32];
+                parsimonyNumber *cur[32];
 
                 assert(states <= 32);
 
-                for(k = 0; k < states; k++)
-                  {
+                for (size_t k = 0; k < states; k++) {
                     left[k]  = &(pr->partitionData[model]->parsVect[(width * states * qNumber) + width * k]);
                     right[k] = &(pr->partitionData[model]->parsVect[(width * states * rNumber) + width * k]);
                     cur[k]  = &(pr->partitionData[model]->parsVect[(width * states * pNumber) + width * k]);
-                  }
+                }
 
-                for(i = 0; i < width; i += INTS_PER_VECTOR)
-                  {
+                for (unsigned int i = 0; i < width; i += INTS_PER_VECTOR) {
                     size_t j;
 
                     INT_TYPE
-                      s_r, s_l,
-                      v_N = SET_ALL_BITS_ZERO,
-                      l_A[32],
-                      v_A[32];
+                        s_r, s_l,
+                        v_N = SET_ALL_BITS_ZERO,
+                        l_A[32],
+                        v_A[32];
+                    
+                    const INT_TYPE allOne = SET_ALL_BITS_ONE;
 
-                    for(j = 0; j < states; j++)
-                      {
+                    for (j = 0; j < states; j++)
+                        {
                         s_l = VECTOR_LOAD((CAST)(&left[j][i]));
                         s_r = VECTOR_LOAD((CAST)(&right[j][i]));
                         l_A[j] = VECTOR_BIT_AND(s_l, s_r);
                         v_A[j] = VECTOR_BIT_OR(s_l, s_r);
 
                         v_N = VECTOR_BIT_OR(v_N, l_A[j]);
-                      }
+                        }
 
-                    for(j = 0; j < states; j++)
-                      VECTOR_STORE((CAST)(&cur[j][i]), VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
+                    for (j = 0; j < states; j++)
+                        VECTOR_STORE((CAST)(&cur[j][i]), VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
 
                     v_N = VECTOR_AND_NOT(v_N, allOne);
 
                     totalScore += vectorPopcount(v_N);
                     if (perSiteScores)
-                       storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                  }
-              }
+                        storePerSiteNodeScores(pr, model, v_N, i, pNumber);
+                }
+                break;
+            }
             }
         }
 
-      tr->parsimonyScore[pNumber] = totalScore + tr->parsimonyScore[rNumber] + tr->parsimonyScore[qNumber];
-      if (perSiteScores)
-    	  addPerSiteSubtreeScores(pr, pNumber, qNumber, rNumber); // Diep: add rNumber and qNumber to pNumber
+        tr->parsimonyScore[pNumber] = totalScore + tr->parsimonyScore[rNumber] + tr->parsimonyScore[qNumber];
+        if (perSiteScores)
+            addPerSiteSubtreeScores(pr, pNumber, qNumber, rNumber); // Diep: add rNumber and qNumber to pNumber
     }
+
+    auto finish_time = std::chrono::system_clock::now();
+    // std::cout << "TIME: " << std::chrono::duration_cast<std::chrono::microseconds>(finish_time - start_time).count() << "\n";
 }
 
 template <class VectorClass, class Numeric, const size_t states, const bool BY_PATTERN>
