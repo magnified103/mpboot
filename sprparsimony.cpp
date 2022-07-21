@@ -556,62 +556,46 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
         return;
     }
 
-  INT_TYPE
-    allOne = SET_ALL_BITS_ONE;
+    INT_TYPE allOne = SET_ALL_BITS_ONE;
 
-  int
-    model,
-    *ti = tr->ti,
-    count = ti[0],
-    index;
+    int *ti = tr->ti;
+    int count = ti[0];
 
-  for(index = 4; index < count; index += 4)
-    {
-      unsigned int
-        totalScore = 0;
+    for (int index = 4; index < count; index += 4) {
+        unsigned int totalScore = 0;
 
-      size_t
-        pNumber = (size_t)ti[index],
-        qNumber = (size_t)ti[index + 1],
-        rNumber = (size_t)ti[index + 2];
+        size_t pNumber = (size_t)ti[index];
+        size_t qNumber = (size_t)ti[index + 1];
+        size_t rNumber = (size_t)ti[index + 2];
 
-      if(perSiteScores){
-		  if(qNumber <= tr->mxtips) resetPerSiteNodeScores(pr, qNumber);
-		  if(rNumber <= tr->mxtips) resetPerSiteNodeScores(pr, rNumber);
-      }
+        if(perSiteScores) {
+            if(qNumber <= tr->mxtips) resetPerSiteNodeScores(pr, qNumber);
+            if(rNumber <= tr->mxtips) resetPerSiteNodeScores(pr, rNumber);
+        }
 
-      for(model = 0; model < pr->numberOfPartitions; model++)
-        {
-          size_t
-            k,
-            states = pr->partitionData[model]->states,
-            width = pr->partitionData[model]->parsimonyLength;
+        for (int model = 0; model < pr->numberOfPartitions; model++) {
+            size_t states = pr->partitionData[model]->states;
+            size_t width = pr->partitionData[model]->parsimonyLength;
 
-          unsigned int
-            i;
+            switch(states) {
+            case 2: {
+                parsimonyNumber *left[2];
+                parsimonyNumber *right[2];
+                parsimonyNumber *cur[2];
 
-          switch(states)
-            {
-            case 2:
-              {
-                parsimonyNumber
-                  *left[2],
-                  *right[2],
-                  *cur[2];
-
-                for(k = 0; k < 2; k++)
-                  {
+                for (size_t k = 0; k < 2; k++) {
                     left[k]  = &(pr->partitionData[model]->parsVect[(width * 2 * qNumber) + width * k]);
                     right[k] = &(pr->partitionData[model]->parsVect[(width * 2 * rNumber) + width * k]);
                     cur[k]  = &(pr->partitionData[model]->parsVect[(width * 2 * pNumber) + width * k]);
-                  }
-
-                for(i = 0; i < width; i += INTS_PER_VECTOR)
-                  {
+                }
+#ifdef _OPENMP
+#pragma omp parallel for schedule(runtime) reduction(+: totalScore) if ((count / 4) * (width / INTS_PER_VECTOR) > 10000)
+#endif
+                for (size_t i = 0; i < width; i += INTS_PER_VECTOR) {
                     INT_TYPE
-                      s_r, s_l, v_N,
-                      l_A, l_C,
-                      v_A, v_C;
+                        s_r, s_l, v_N,
+                        l_A, l_C,
+                        v_A, v_C;
 
                     s_l = VECTOR_LOAD((CAST)(&left[0][i]));
                     s_r = VECTOR_LOAD((CAST)(&right[0][i]));
@@ -631,31 +615,31 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
                     v_N = VECTOR_AND_NOT(v_N, allOne);
 
                     totalScore += vectorPopcount(v_N);
-                    if (perSiteScores)
-                       storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                  }
-              }
-              break;
-            case 4:
-              {
-                parsimonyNumber
-                  *left[4],
-                  *right[4],
-                  *cur[4];
+                    if (perSiteScores) {
+                        storePerSiteNodeScores(pr, model, v_N, i, pNumber);
+                    }
+                }
+                break;
+            }
+            case 4: {
+                parsimonyNumber *left[4];
+                parsimonyNumber *right[4];
+                parsimonyNumber *cur[4];
 
-                for(k = 0; k < 4; k++)
-                  {
+                for (size_t k = 0; k < 4; k++) {
                     left[k]  = &(pr->partitionData[model]->parsVect[(width * 4 * qNumber) + width * k]);
                     right[k] = &(pr->partitionData[model]->parsVect[(width * 4 * rNumber) + width * k]);
                     cur[k]  = &(pr->partitionData[model]->parsVect[(width * 4 * pNumber) + width * k]);
-                  }
+                }
 
-                for(i = 0; i < width; i += INTS_PER_VECTOR)
-                  {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(runtime) reduction(+: totalScore) if ((count / 4) * (width / INTS_PER_VECTOR) > 10000)
+#endif
+                for (size_t i = 0; i < width; i += INTS_PER_VECTOR) {
                     INT_TYPE
-                      s_r, s_l, v_N,
-                      l_A, l_C, l_G, l_T,
-                      v_A, v_C, v_G, v_T;
+                        s_r, s_l, v_N,
+                        l_A, l_C, l_G, l_T,
+                        v_A, v_C, v_G, v_T;
 
                     s_l = VECTOR_LOAD((CAST)(&left[0][i]));
                     s_r = VECTOR_LOAD((CAST)(&right[0][i]));
@@ -687,109 +671,108 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
                     v_N = VECTOR_AND_NOT(v_N, allOne);
 
                     totalScore += vectorPopcount(v_N);
-                    if (perSiteScores)
-                       storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                  }
-              }
-              break;
-            case 20:
-              {
-                parsimonyNumber
-                  *left[20],
-                  *right[20],
-                  *cur[20];
+                    if (perSiteScores) {
+                        storePerSiteNodeScores(pr, model, v_N, i, pNumber);
+                    }
+                }
+                break;
+            }
+            case 20: {
+                parsimonyNumber *left[20];
+                parsimonyNumber *right[20];
+                parsimonyNumber *cur[20];
 
-                for(k = 0; k < 20; k++)
-                  {
+                for (size_t k = 0; k < 20; k++) {
                     left[k]  = &(pr->partitionData[model]->parsVect[(width * 20 * qNumber) + width * k]);
                     right[k] = &(pr->partitionData[model]->parsVect[(width * 20 * rNumber) + width * k]);
                     cur[k]  = &(pr->partitionData[model]->parsVect[(width * 20 * pNumber) + width * k]);
-                  }
+                }
 
-                for(i = 0; i < width; i += INTS_PER_VECTOR)
-                  {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(runtime) reduction(+: totalScore) if ((count / 4) * (width / INTS_PER_VECTOR) > 10000)
+#endif
+                for (size_t i = 0; i < width; i += INTS_PER_VECTOR) {
                     size_t j;
 
                     INT_TYPE
-                      s_r, s_l,
-                      v_N = SET_ALL_BITS_ZERO,
-                      l_A[20],
-                      v_A[20];
+                        s_r, s_l,
+                        v_N = SET_ALL_BITS_ZERO,
+                        l_A[20],
+                        v_A[20];
 
-                    for(j = 0; j < 20; j++)
-                      {
+                    for (j = 0; j < 20; j++) {
                         s_l = VECTOR_LOAD((CAST)(&left[j][i]));
                         s_r = VECTOR_LOAD((CAST)(&right[j][i]));
                         l_A[j] = VECTOR_BIT_AND(s_l, s_r);
                         v_A[j] = VECTOR_BIT_OR(s_l, s_r);
 
                         v_N = VECTOR_BIT_OR(v_N, l_A[j]);
-                      }
+                    }
 
-                    for(j = 0; j < 20; j++)
-                      VECTOR_STORE((CAST)(&cur[j][i]), VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
+                    for (j = 0; j < 20; j++)
+                        VECTOR_STORE((CAST)(&cur[j][i]), VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
 
                     v_N = VECTOR_AND_NOT(v_N, allOne);
 
                     totalScore += vectorPopcount(v_N);
-                    if (perSiteScores)
-                       storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                  }
-              }
-              break;
-            default:
-
-              {
-                parsimonyNumber
-                  *left[32],
-                  *right[32],
-                  *cur[32];
+                    if (perSiteScores) {
+                        storePerSiteNodeScores(pr, model, v_N, i, pNumber);
+                    }
+                }
+                break;
+            }
+            default: {
+                parsimonyNumber *left[32];
+                parsimonyNumber *right[32];
+                parsimonyNumber *cur[32];
 
                 assert(states <= 32);
 
-                for(k = 0; k < states; k++)
-                  {
+                for (size_t k = 0; k < states; k++) {
                     left[k]  = &(pr->partitionData[model]->parsVect[(width * states * qNumber) + width * k]);
                     right[k] = &(pr->partitionData[model]->parsVect[(width * states * rNumber) + width * k]);
                     cur[k]  = &(pr->partitionData[model]->parsVect[(width * states * pNumber) + width * k]);
-                  }
+                }
 
-                for(i = 0; i < width; i += INTS_PER_VECTOR)
-                  {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(runtime) reduction(+: totalScore) if ((count / 4) * (width / INTS_PER_VECTOR) > 10000)
+#endif
+                for (size_t i = 0; i < width; i += INTS_PER_VECTOR) {
                     size_t j;
 
                     INT_TYPE
-                      s_r, s_l,
-                      v_N = SET_ALL_BITS_ZERO,
-                      l_A[32],
-                      v_A[32];
+                        s_r, s_l,
+                        v_N = SET_ALL_BITS_ZERO,
+                        l_A[32],
+                        v_A[32];
 
-                    for(j = 0; j < states; j++)
-                      {
+                    for (j = 0; j < states; j++) {
                         s_l = VECTOR_LOAD((CAST)(&left[j][i]));
                         s_r = VECTOR_LOAD((CAST)(&right[j][i]));
                         l_A[j] = VECTOR_BIT_AND(s_l, s_r);
                         v_A[j] = VECTOR_BIT_OR(s_l, s_r);
 
                         v_N = VECTOR_BIT_OR(v_N, l_A[j]);
-                      }
+                    }
 
-                    for(j = 0; j < states; j++)
-                      VECTOR_STORE((CAST)(&cur[j][i]), VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
+                    for (j = 0; j < states; j++)
+                        VECTOR_STORE((CAST)(&cur[j][i]), VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
 
                     v_N = VECTOR_AND_NOT(v_N, allOne);
 
                     totalScore += vectorPopcount(v_N);
-                    if (perSiteScores)
-                       storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                  }
-              }
+                    if (perSiteScores) {
+                        storePerSiteNodeScores(pr, model, v_N, i, pNumber);
+                    }
+                }
+            }
             }
         }
 
-      tr->parsimonyScore[pNumber] = totalScore + tr->parsimonyScore[rNumber] + tr->parsimonyScore[qNumber];
-      if (perSiteScores)
-    	  addPerSiteSubtreeScores(pr, pNumber, qNumber, rNumber); // Diep: add rNumber and qNumber to pNumber
+        tr->parsimonyScore[pNumber] = totalScore + tr->parsimonyScore[rNumber] + tr->parsimonyScore[qNumber];
+        if (perSiteScores) {
+            addPerSiteSubtreeScores(pr, pNumber, qNumber, rNumber); // Diep: add rNumber and qNumber to pNumber
+        }
     }
 }
 
