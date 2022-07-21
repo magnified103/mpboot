@@ -2136,6 +2136,13 @@ params->startCPUTime) << "s" << endl << endl; if (curScore > bestScore) {
          << " bootstrap candidate trees evaluated." << endl;
   }
 
+  std::cout << "\n";
+  std::cout << "Sum of microseconds = " << pllInst->sum_row << "\n";
+  std::cout << "Sum of rows = " << pllInst->cnt_row << "\n";
+  std::cout << "Number of calls = " << pllInst->cnt_call << "\n";
+  std::cout << "Microseconds per row = " << (long double)pllInst->sum_row / pllInst->cnt_row << "\n";
+  std::cout << "Microseconds per call = " << (long double)pllInst->sum_row / pllInst->cnt_call << "\n\n";
+
   readTreeString(bestTreeString);
 
   if (testNNI)

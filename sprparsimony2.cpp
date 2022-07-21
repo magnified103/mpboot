@@ -431,6 +431,10 @@ static void getxnodeLocal(nodeptr p) {
   assert(p->next->xPars || p->next->next->xPars || p->xPars);
 }
 
+static long long cnt_call = 0;
+static long long sum_row = 0;
+static long long cnt_row = 0;
+
 template <int perSiteScores>
 static void computeTraversalInfoParsimony(nodeptr p, int *ti, int *counter,
                                           int maxTips, pllBoolean full) {
@@ -637,7 +641,11 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr) {
 
   int model, *ti = tr->ti, count = ti[0], index;
 
+  auto start = std::chrono::system_clock::now();
+  cnt_call++;
+
   for (index = 4; index < count; index += 4) {
+    cnt_row++;
     unsigned int totalScore = 0;
 
     size_t pNumber = (size_t)ti[index], qNumber = (size_t)ti[index + 1],
@@ -847,6 +855,12 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr) {
           pr, pNumber, qNumber,
           rNumber); // Diep: add rNumber and qNumber to pNumber
   }
+
+  auto finish = std::chrono::system_clock::now();
+  sum_row += std::chrono::duration_cast<std::chrono::microseconds>(finish - start).count();
+  tr->sum_row = sum_row;
+  tr->cnt_row = cnt_row;
+  tr->cnt_call = cnt_call;
 }
 
 template <class VectorClass, class Numeric, const size_t states,
@@ -1007,6 +1021,10 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr)
 
   size_t pNumber = (size_t)tr->ti[1], qNumber = (size_t)tr->ti[2];
 
+  auto start = std::chrono::system_clock::now();
+  cnt_row++;
+  cnt_call++;
+
   int model;
 
   unsigned int bestScore = tr->bestParsimony, sum;
@@ -1159,6 +1177,11 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr)
     }
     }
   }
+  auto finish = std::chrono::system_clock::now();
+  sum_row += std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count();
+  tr->sum_row = sum_row;
+  tr->cnt_row = cnt_row;
+  tr->cnt_call = cnt_call;
 
   return sum;
 }

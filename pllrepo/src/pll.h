@@ -1315,6 +1315,10 @@ typedef struct {
     nodeptr TBR_insertBranch2;
     pllBoolean TBR_insertNNI;
 
+    long long cnt_call;
+    long long sum_row;
+    long long cnt_row;
+
     double zqr[PLL_NUM_BRANCHES];
     double currentZQR[PLL_NUM_BRANCHES];
 
