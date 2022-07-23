@@ -644,9 +644,9 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr) {
            rNumber = (size_t)ti[index + 2];
 
     if (perSiteScores) {
-      if (qNumber <= tr->mxtips)
+      if (qNumber == tr->start->number)
         resetPerSiteNodeScores(pr, qNumber);
-      if (rNumber <= tr->mxtips)
+      if (rNumber == tr->start->number && qNumber != rNumber)
         resetPerSiteNodeScores(pr, rNumber);
     }
 
