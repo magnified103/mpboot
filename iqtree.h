@@ -302,6 +302,8 @@ public:
      */
     double pllOptimizeNNI(int &nniCount, int &nniSteps, SearchInfo &searchinfo);
 
+    string doAntColonySearch(int &nniCount, int &nniSteps);
+
     /**
      * 		@brief Perform NNI search on the current tree topology
      * 		This function will automatically use the selected kernel (either PLL or IQ-TREE)

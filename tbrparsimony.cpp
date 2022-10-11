@@ -7,6 +7,7 @@
 #include <sprparsimony.h>
 #include <tbrparsimony.h>
 
+#include "helper.h"
 #include "nnisearch.h"
 #include "parstree.h"
 #include <string>
@@ -129,6 +130,7 @@ extern const unsigned int mask32[32];
 extern double masterTime;
 
 // /* program options */
+// static DuplicatedTreeEval *dupTreeEval;
 extern Params *globalParam;
 static IQTree *iqtree = NULL;
 static unsigned long bestTreeScoreHits; // to count hits to bestParsimony
@@ -1235,10 +1237,13 @@ static int pllTestTBRMove(pllInstance *tr, partitionList *pr, nodeptr branch1,
     } else {
         TBR_removeBranch = branch1->back->next;
     }
-    unsigned int mp = evaluateParsimonyTBR(tr, pr, branch1, branch2,
-                                           TBR_removeBranch, perSiteScores);
-    tr->curRoot = TBR_removeBranch;
-    tr->curRootBack = TBR_removeBranch->back;
+    unsigned int mp = INT_MAX;
+    // if (dupTreeEval->keepOptimizeTree(tr->nodep[1]->back)) {
+        mp = evaluateParsimonyTBR(tr, pr, branch1, branch2, TBR_removeBranch,
+                                  perSiteScores);
+        tr->curRoot = TBR_removeBranch;
+        tr->curRootBack = TBR_removeBranch->back;
+    // }
 
     if (perSiteScores) {
         // If UFBoot is enabled ...
@@ -1961,8 +1966,8 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
 
     if (first_call) {
         first_call = false;
+        // dupTreeEval = new DuplicatedTreeEval(tr->mxtips);
     }
-
     int i;
     unsigned int startMP;
 
@@ -1978,11 +1983,16 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
 
     unsigned int bestIterationScoreHits = 1;
     randomMP = tr->bestParsimony;
-
+    // bool firstDo = true;
     do {
+        startMP = randomMP;
+        // if (!dupTreeEval->keepOptimizeTree(tr->nodep[1]->back) && !firstDo) {
+        //     break;
+        // }
+        // firstDo = false;
+
         // nodeRectifierPars(tr, false);
         nodeRectifierParsVer2(tr, false);
-        startMP = randomMP;
         for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
             bool isLeaf = isTip(tr->nodep_dfs[i]->number, tr->mxtips) ||
                           isTip(tr->nodep_dfs[i]->back->number, tr->mxtips);
