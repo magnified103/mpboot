@@ -421,6 +421,11 @@ extern int NNI_MAX_NR_STEP;
 struct Params {
 
     /**
+     * Use Ant Colony Optimization Algorithm or not?
+     */
+    bool do_ant_colony;
+
+    /**
      *  Whether to consider '-' in DNA data as the 5-th distinct character
      */
     bool dna5;

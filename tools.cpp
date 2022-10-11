@@ -197,7 +197,8 @@ void convert_int_pair(const char *str, int &x, int &y) throw(string) {
     int len = strlen(str), i;
     for (i = 0; i < len; i++) {
         if (str[i] != ':' && (str[i] < '0' || str[i] > '9')) {
-            string err = "Expecting 2 postive integers separated by 1 colon, but found \"";
+            string err = "Expecting 2 postive integers separated by 1 colon, "
+                         "but found \"";
             err += str[i];
             err += "\" instead";
             throw err;
@@ -591,6 +592,7 @@ void get2RandNumb(const int size, int &first, int &second) {
 void parseArg(int argc, char *argv[], Params &params) {
     int cnt;
     verbose_mode = VB_MIN;
+    params.do_ant_colony = false;
     params.dna5 = false;
     params.spr_test = false;
     params.spr_tbr = false;
@@ -897,6 +899,10 @@ void parseArg(int argc, char *argv[], Params &params) {
 
     for (cnt = 1; cnt < argc; cnt++) {
         try {
+            if (strcmp(argv[cnt], "-do_ant_colony") == 0) {
+                params.do_ant_colony = true;
+                continue;
+            }
             if (strcmp(argv[cnt], "-spr_tbr") == 0) {
                 params.spr_tbr = true;
                 continue;
@@ -908,9 +914,11 @@ void parseArg(int argc, char *argv[], Params &params) {
             if (strcmp(argv[cnt], "-tbr_spr_alternate") == 0) {
                 cnt++;
                 if (cnt >= argc) {
-                    throw "Use -tbr_spr_alternate <num_tbr_iterations:num_spr_iterations>";
+                    throw "Use -tbr_spr_alternate "
+                          "<num_tbr_iterations:num_spr_iterations>";
                 }
-                convert_int_pair(argv[cnt], params.tbr_alternate, params.spr_alternate);
+                convert_int_pair(argv[cnt], params.tbr_alternate,
+                                 params.spr_alternate);
                 continue;
             }
             if (strcmp(argv[cnt], "-spr_test") == 0) {
@@ -960,7 +968,7 @@ void parseArg(int argc, char *argv[], Params &params) {
                 params.tbr_insert_nni = true;
                 continue;
             }
-            
+
             if (strcmp(argv[cnt], "-tbr_traverse_ver1") == 0) {
                 params.tbr_traverse_ver1 = true;
                 continue;
@@ -2635,12 +2643,12 @@ void parseArg(int argc, char *argv[], Params &params) {
                 params.test_mode = true;
                 continue;
             }
-            if(strcmp(argv[cnt], "-remove_dup_seq") == 0){
-            	params.remove_dup_seq = true;
-            	continue;
+            if (strcmp(argv[cnt], "-remove_dup_seq") == 0) {
+                params.remove_dup_seq = true;
+                continue;
             }
-            if(strcmp(argv[cnt], "-opt_btree_spr") == 0){
-            	cnt++;
+            if (strcmp(argv[cnt], "-opt_btree_spr") == 0) {
+                cnt++;
                 if (cnt >= argc)
                     throw "Use -opt_btree_spr <spr_radius>";
                 params.opt_btree_spr = convert_int(argv[cnt]);
@@ -3235,7 +3243,7 @@ void usage_iqtree(char *argv[], bool full_command) {
         << "                       Meyer & von Haeseler (2003) method"
         << endl
         //<< "  -c <#categories>     Number of Gamma rate categories (default:
-        //4)"
+        // 4)"
         //<< endl
         << endl
         << "TEST OF MODEL HOMOGENEITY:" << endl
