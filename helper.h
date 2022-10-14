@@ -112,69 +112,78 @@ class DuplicatedTreeEval {
     }
 };
 
-
 class AntColonyAlgo {
-public:
-    int numNNI, numSPR, numTBR;
-    int totNNI, totSPR, totTBR;
+  public:
     const int MAX_ITER = 100;
-    AntColonyAlgo() {
-        numNNI = numSPR = numTBR = 0;
-        totNNI = totSPR = totTBR = 0;
-    }
+    const int UPDATE_ITER = 30;
+    const double EVAPORATION_RATE = 0.6;
     /**
      * 0: NNI
      * 1: SPR
      * 2: TBR
      */
-    int getMoveType(int curIt) {
-        if (curIt <= MAX_ITER) {
-            int tem1 = random_int(3);
-            if (tem1 == 0) {
-                totNNI++;
-            } else if (tem1 == 1) {
-                totSPR++;
-            } else {
-                totTBR++;
-            }
-            return tem1;
-        } 
-        int tem = random_int(numNNI + numSPR + numTBR);
-        if (tem < numNNI) {
-            totNNI++;
+    double pheromone[3], prior[3] = {0.3, 0.35, 0.35}, prob[3];
+    double addedPheromone[3];
+    int curIter = 0;
+    int cnt[3];
+    AntColonyAlgo() {
+        for (int i = 0; i < 3; ++i) {
+            pheromone[i] = 1;
+            cnt[i] = addedPheromone[i] = 0;
+        }
+    }
+
+    int getMoveType() {
+        double sum = 0;
+        for (int i = 0; i < 3; ++i) {
+            prob[i] = pheromone[i] * prior[i];
+            sum += prob[i];
+        }
+        // for (int i = 0; i < 3; ++i) {
+        //     cout << "Prob[" << i << "] = " << setprecision(10) << fixed <<
+        //     prob[i] / sum << '\n';
+        //     cout << "Num[" << i << "] = " << cnt[i] << '\n';
+        // }
+        double random = random_double() * sum;
+        if (random < prob[0]) {
             return 0;
-        } else if (tem < numNNI + numSPR) {
-            totSPR++;
+        } else if (random < prob[0] + prob[1]) {
             return 1;
         }
-        totTBR++;
         return 2;
     }
 
-    void update(int moveType, bool better) {
-        if (better) {
-            if (moveType == 0) {
-                numNNI++;
-            } else if (moveType == 1) {
-                numSPR += 3;
-            } else {
-                numTBR += 3;
-            }
+    void updatePheromone() {
+        curIter = 0;
+        for (int i = 0; i < 3; ++i) {
+            pheromone[i] = (1 - EVAPORATION_RATE) * pheromone[i] +
+                           (double)addedPheromone[i];
+            addedPheromone[i] = 0;
+        }
+    }
+
+    void update(int moveType, int diffPar) {
+        cnt[moveType]++;
+        // if (moveType == 0) {
+        //     cout << "NNI ";
+        // } else if (moveType == 1) {
+        //     cout << "SPR ";
+        // } else {
+        //     cout << "TBR ";
+        // }
+        // cout << diffPar << '\n';
+        if (diffPar > 0) {
+            addedPheromone[moveType]++;
         } else {
-            if (moveType == 0) {
-                numSPR += 3;
-                numTBR += 3;
-            } else if (moveType == 1) {
-                numNNI += 1;
-                numTBR += 3;
-            } else {
-                numNNI += 1;
-                numSPR += 3;
+            for (int i = 0; i < 3; ++i) {
+                if (i != moveType) {
+                    addedPheromone[i] += 0.5;
+                }
             }
         }
-        // cout << "totNNI: " << totNNI << '\n';
-        // cout << "totSPR: " << totSPR << '\n';
-        // cout << "totTBR: " << totTBR << '\n';
+        if (++curIter == UPDATE_ITER) {
+            updatePheromone();
+        }
     }
 };
 #endif /* HELPER_H_ */
