@@ -2318,7 +2318,7 @@ string IQTree::doAntColonySearch(int &nniCount, int &nniSteps) {
             treeString = getTreeString();
         } else {
 
-            int moveType = antColonyAlgo->getMoveType(curIt);
+            int moveType = antColonyAlgo->getMoveType();
             int newScore = 0;
             if (0 && on_ratchet_hclimb1 && moveType == 0) {
                 cout << "NNI\n";
@@ -2351,15 +2351,12 @@ string IQTree::doAntColonySearch(int &nniCount, int &nniSteps) {
                 pllTreeInitTopologyNewick(pllInst, startTree, PLL_FALSE);
 
                 if (moveType == 0) {
-                    // cout << "NNI\n";
                     pllOptimizeSprParsimony(pllInst, pllPartitions, 1, 1, this);
                 } else if (moveType == 1) {
-                    // cout << "SPR\n";
                     pllOptimizeSprParsimony(pllInst, pllPartitions,
                                             params->spr_mintrav, max_spr_rad,
                                             this);
                 } else {
-                    // cout << "TBR\n";
                     pllOptimizeTbrParsimony(pllInst, pllPartitions,
                                             params->tbr_mintrav,
                                             params->tbr_maxtrav, this);
@@ -2389,7 +2386,9 @@ string IQTree::doAntColonySearch(int &nniCount, int &nniSteps) {
                     _pllFreeParsimonyDataStructures(pllInst, pllPartitions);
                 }
             }
-            antColonyAlgo->update(moveType, (newScore > curScore));
+            // cout << "Cur score: " << curScore << '\n';
+            // cout << "New score: " << newScore << '\n';
+            antColonyAlgo->update(moveType, (newScore - curScore));
             curScore = newScore;
         }
     } else if (params->pll) {
