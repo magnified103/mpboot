@@ -11,6 +11,7 @@
 #include "helper.h"
 #include "nnisearch.h"
 #include "parstree.h"
+#include "tools.h"
 #include <string>
 /**
  * PLL (version 1.0.0) a software library for phylogenetic inference
@@ -1174,32 +1175,34 @@ int findCentroid(pllInstance *tr, int u, int p, int treeSize) {
     }
     return u;
 }
-static void findRemoveBranchSet(pllInstance *tr) {
-    queue<int> q;
-    q.push(tr->nodep[1]->back->number);
-    for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
-        inCen[i] = false;
-    }
+static void findRemoveBranchSet(pllInstance *tr, int turn) {
+    queue<pair<int, bool>> q;
+    q.push({tr->nodep[1]->back->number, (turn == 0)});
     numRemoveBranch = 0;
-    while (!q.empty() && numRemoveBranch < tr->mxtips) {
-        int u = q.front();
+    // cout << "START\n";
+    while (!q.empty()) {
+        int uNum = q.front().first;
+        // cout << "uNum: " << uNum << '\n';
+        bool chosen = q.front().second;
         q.pop();
-        u = findCentroid(tr, u, u, getSubtreeSize(tr, u, u));
-        tr->nodep_dfs[numRemoveBranch++] = numberToNodeptr[u];
-        inCen[u] = true;
-        nodeptr v = numberToNodeptr[u];
-        int numNeighbors = (u <= tr->mxtips ? 1 : 3);
-        for (int i = 0; i < numNeighbors; ++i, v = v->next) {
-            int vNumber = v->back->number;
-            if (inCen[vNumber]) {
-                continue;
+        if (turn == -1 || chosen) {
+            tr->nodep_dfs[numRemoveBranch++] = numberToNodeptr[uNum];
+        }
+        if (uNum > tr->mxtips) {
+            nodeptr u = numberToNodeptr[uNum];
+            if (chosen) {
+                q.push({u->next->back->number, false});
+                q.push({u->next->next->back->number, false});
+            } else {
+                q.push({u->next->back->number, true});
+                q.push({u->next->next->back->number, false});
             }
-            q.push(vNumber);
         }
     }
 }
 
-static void nodeRectifierParsVerCen(pllInstance *tr, bool reset = false) {
+static void nodeRectifierParsVerCen(pllInstance *tr, bool reset = false,
+                                    int turn = 0) {
     tr->start = tr->nodep[1];
     tr->rooted = PLL_FALSE;
     /* TODO why is tr->rooted set to PLL_FALSE here ?*/
@@ -1207,11 +1210,11 @@ static void nodeRectifierParsVerCen(pllInstance *tr, bool reset = false) {
         tr->curRoot = tr->nodep[1];
         tr->curRootBack = tr->nodep[1]->back;
     }
-    reorderNodesVerCen(tr, tr->curRoot, reset);
-    reorderNodesVerCen(tr, tr->curRoot->back, reset);
+    reorderNodesVerCen(tr, tr->nodep[1], reset);
+    reorderNodesVerCen(tr, tr->nodep[1]->back, reset);
 
     if (!reset) {
-        findRemoveBranchSet(tr);
+        findRemoveBranchSet(tr, turn);
     }
 }
 
@@ -2331,58 +2334,62 @@ int pllOptimizeTbrParsimonyCen(pllInstance *tr, partitionList *pr, int mintrav,
         _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
 
     assert(-iqtree->curScore == tr->bestParsimony);
-
+    /**
+     * -1 means iterate through all branches as removed branches
+     *
+     * 0 means taking the chosen ones
+     *
+     * 1 means taking except the chosen ones
+     */
+    int turn = -1;
     unsigned int bestIterationScoreHits = 1;
     randomMP = tr->bestParsimony;
     do {
         startMP = randomMP;
-        nodeRectifierParsVerCen(tr, false);
-        for (int i = 1; i <= tr->mxtips; ++i) {
+        nodeRectifierParsVerCen(tr, false, turn);
+        if (turn == -1) {
+            turn = 0;
+        } else {
+            turn ^= 1;
+        }
+        // cout << "numRemoveBranch: " << numRemoveBranch << '\n';
+        for (int i = 0; i < numRemoveBranch; ++i) {
             tr->TBR_removeBranch = NULL;
             tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
             bestTreeScoreHits = 1;
-            pllComputeTBRLeaf(tr, pr, tr->nodep[i], mintrav, maxtrav,
-                              perSiteScores);
-            if (tr->bestParsimony == randomMP)
-                bestIterationScoreHits++;
-            if (tr->bestParsimony < randomMP)
-                bestIterationScoreHits = 1;
-            if (((tr->bestParsimony < randomMP) ||
-                 ((tr->bestParsimony == randomMP) &&
-                  (random_double() <= 1.0 / bestIterationScoreHits))) &&
-                tr->TBR_removeBranch && tr->TBR_insertBranch1) {
-                restoreTreeRearrangeParsimonyTBRLeaf(tr, pr, perSiteScores);
-                randomMP = tr->bestParsimony;
-            }
-        }
-        int num = 0;
-        for (int i = 0; i < numRemoveBranch; ++i) {
             bool isLeaf = isTip(tr->nodep_dfs[i]->number, tr->mxtips) ||
                           isTip(tr->nodep_dfs[i]->back->number, tr->mxtips);
             if (isLeaf) {
-                continue;
-            }
-            ++num;
-            tr->TBR_removeBranch = NULL;
-            tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
-            bestTreeScoreHits = 1;
-            pllComputeTBRVer2(tr, pr, tr->nodep_dfs[i], mintrav, maxtrav,
-                              perSiteScores);
-            if (tr->bestParsimony == randomMP)
-                bestIterationScoreHits++;
-            if (tr->bestParsimony < randomMP)
-                bestIterationScoreHits = 1;
-            if (((tr->bestParsimony < randomMP) ||
-                 ((tr->bestParsimony == randomMP) &&
-                  (random_double() <= 1.0 / bestIterationScoreHits))) &&
-                tr->TBR_removeBranch && tr->TBR_insertBranch1 &&
-                tr->TBR_insertBranch2) {
-                restoreTreeRearrangeParsimonyTBR(tr, pr, perSiteScores);
-                randomMP = tr->bestParsimony;
+                pllComputeTBRLeaf(tr, pr, tr->nodep_dfs[i], mintrav, maxtrav,
+                                  perSiteScores);
+                if (tr->bestParsimony == randomMP)
+                    bestIterationScoreHits++;
+                if (tr->bestParsimony < randomMP)
+                    bestIterationScoreHits = 1;
+                if (((tr->bestParsimony < randomMP) ||
+                     ((tr->bestParsimony == randomMP) &&
+                      (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                    tr->TBR_removeBranch && tr->TBR_insertBranch1) {
+                    restoreTreeRearrangeParsimonyTBRLeaf(tr, pr, perSiteScores);
+                    randomMP = tr->bestParsimony;
+                }
+            } else {
+                pllComputeTBRVer2(tr, pr, tr->nodep_dfs[i], mintrav, maxtrav,
+                                  perSiteScores);
+                if (tr->bestParsimony == randomMP)
+                    bestIterationScoreHits++;
+                if (tr->bestParsimony < randomMP)
+                    bestIterationScoreHits = 1;
+                if (((tr->bestParsimony < randomMP) ||
+                     ((tr->bestParsimony == randomMP) &&
+                      (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                    tr->TBR_removeBranch && tr->TBR_insertBranch1 &&
+                    tr->TBR_insertBranch2) {
+                    restoreTreeRearrangeParsimonyTBR(tr, pr, perSiteScores);
+                    randomMP = tr->bestParsimony;
+                }
             }
         }
-        // cout << "numRemoveBranch: " << numRemoveBranch << '\n';
-        // cout << "num: " << num << '\n';
     } while (randomMP < startMP);
     return startMP;
 }
@@ -2413,6 +2420,7 @@ int pllOptimizeTbrParsimonyFull(pllInstance *tr, partitionList *pr,
     assert(!tr->constrained);
 
     nodeRectifierParsVerFull(tr, true);
+    nodeRectifierPars(tr, true);
     tr->bestParsimony = UINT_MAX;
     tr->bestParsimony =
         _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
@@ -2424,19 +2432,26 @@ int pllOptimizeTbrParsimonyFull(pllInstance *tr, partitionList *pr,
     do {
         // cout << "Loop\n";
         startMP = randomMP;
+        nodeRectifierPars(tr, false);
+        for (int i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
+            bool isLeaf = isTip(tr->nodep[i]->number, tr->mxtips) ||
+                          isTip(tr->nodep[i]->back->number, tr->mxtips);
+            if (isLeaf) {
+                continue;
+            }
+            centralBranch = tr->nodep[i];
+            tr->TBR_removeBranch = NULL;
+            tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
 
-        tr->TBR_removeBranch = NULL;
-        tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
-        nodeRectifierParsVerFull(tr, false);
+            pllComputeTBRVerFull(tr, pr, perSiteScores);
 
-        pllComputeTBRVerFull(tr, pr, perSiteScores);
-
-        // cout << "Score before: " << randomMP << '\n';
-        if (tr->bestParsimony < randomMP && tr->TBR_removeBranch &&
-            tr->TBR_insertBranch1 && tr->TBR_insertBranch2) {
-            restoreTreeRearrangeParsimonyTBR(tr, pr, perSiteScores);
-            randomMP = tr->bestParsimony;
-            // cout << "Score: " << randomMP << '\n';
+            // cout << "Score before: " << randomMP << '\n';
+            if (tr->bestParsimony < randomMP && tr->TBR_removeBranch &&
+                tr->TBR_insertBranch1 && tr->TBR_insertBranch2) {
+                restoreTreeRearrangeParsimonyTBR(tr, pr, perSiteScores);
+                randomMP = tr->bestParsimony;
+                // cout << "Score: " << randomMP << '\n';
+            }
         }
     } while (randomMP < startMP);
     return startMP;

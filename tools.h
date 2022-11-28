@@ -474,16 +474,16 @@ struct Params {
 
     /**
      * Optimize the parsimony tree using TBR implemented in PLL, takes the
-     * centered branch to be the removed branch and do a FULL TBR (regardless of
+     * centered branch to be the only removed branch and do a FULL TBR (regardless of
      * mintrav or maxtrav) on it.
      */
     bool tbr_full;
 
     /**
      * Optimize the parsimony tree using TBR implemented in PLL, takes removed
-     * branch in a centroid approach (just centroid decomposition until enough
+     * branches in a centroid decomposition approach (just centroid decomposition until enough
      * branches taken). This makes the removed branches kinda spaced out
-     * equally.
+     * equally (not really, gonna fix this later).
      */
     bool tbr_jump;
 
