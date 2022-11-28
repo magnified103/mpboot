@@ -439,14 +439,14 @@ struct Params {
      * Use TBR if SPR doesn't improve for a certain number of iterations
      */
     bool spr_tbr;
-    
+
     /**
      * Use SPR if TBR doesn't improve for a certain number of iterations
      */
     bool tbr_spr;
 
     /**
-     * Use SPR and TBR alternately, `tbr_alternate` iterations use TBR, 
+     * Use SPR and TBR alternately, `tbr_alternate` iterations use TBR,
      * then `spr_alternate` iterations use SPR and so on
      */
     int tbr_alternate;
@@ -463,14 +463,29 @@ struct Params {
     bool tbr_test_draw;
 
     /**
-     *  Test TBR once on a user tree
+     * Test TBR once on a user tree
      */
     bool tbr_test;
 
     /**
-     *  Optimize the parsimony tree using TBR implemented in PLL
+     * Optimize the parsimony tree using TBR implemented in PLL
      */
     bool tbr_pars;
+
+    /**
+     * Optimize the parsimony tree using TBR implemented in PLL, takes the
+     * centered branch to be the removed branch and do a FULL TBR (regardless of
+     * mintrav or maxtrav) on it.
+     */
+    bool tbr_full;
+
+    /**
+     * Optimize the parsimony tree using TBR implemented in PLL, takes removed
+     * branch in a centroid approach (just centroid decomposition until enough
+     * branches taken). This makes the removed branches kinda spaced out
+     * equally.
+     */
+    bool tbr_jump;
 
     /**
      *  TBR's radius as required by PLL
@@ -484,14 +499,16 @@ struct Params {
     int tbr_insert_nni;
 
     /**
-     * Each insert branches has its own [mintrav, maxtrav] condition (Default is sum of the 2 is in [mintrav, maxtrav])
-     * Use pllComputeTBRVer1() and pllTraverseUpdateTBRVer1() instead.
+     * Each insert branches has its own [mintrav, maxtrav] condition (Default is
+     * sum of the 2 is in [mintrav, maxtrav]) Use pllComputeTBRVer1() and
+     * pllTraverseUpdateTBRVer1() instead.
      */
     int tbr_traverse_ver1;
 
     /**
-     * Update to better tree for each insertBranch1 and all insertBranch2 with that insertBranch1 (Version 2)
-     * Where as version 1 (Default) is update after evaluating every pair (insertBranch1, insertBranch2). 
+     * Update to better tree for each insertBranch1 and all insertBranch2 with
+     * that insertBranch1 (Version 2) Where as version 1 (Default) is update
+     * after evaluating every pair (insertBranch1, insertBranch2).
      */
     int tbr_restore_ver2;
 
@@ -633,7 +650,8 @@ struct Params {
     int unsuccess_iteration;
 
     /**
-     *  Number of unsuccessful RATCHET hill-climbing iterations to switch from SPR/TBR to TBR/SPR (spr_tbr or tbr_spr).
+     *  Number of unsuccessful RATCHET hill-climbing iterations to switch from
+     * SPR/TBR to TBR/SPR (spr_tbr or tbr_spr).
      */
     int unsuccess_iteration_hclimb;
 
@@ -1605,7 +1623,7 @@ struct Params {
     int ratchet_iter;         // # of iterations between two ratchet iterations
     int ratchet_wgt;          // weight to add to selected site during ratchet
     int ratchet_percent;      // 0-100; percent of informative sites to upweight
-                         // during ratchet
+                              // during ratchet
 
     bool compute_parsimony; // to compute parsimony of a user tree
     bool newick_to_tnt;   // to convert a tree in Newick format into TNT syntax
@@ -1741,14 +1759,14 @@ struct Params {
      */
     bool test_mode;
 
-	/*
-	 * Diep:
-	 * Use with -test_mode
+    /*
+     * Diep:
+     * Use with -test_mode
      * Remove duplicate sequence from the input alignment
      * (this is to create input aln to compare with mpboot1 because
      * mpboot1 does not properly support -keep_ident)
-	 */
-	bool remove_dup_seq;
+     */
+    bool remove_dup_seq;
 
 #ifdef _OPENMP
     int num_threads;

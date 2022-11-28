@@ -16,6 +16,9 @@
  * @param mintrav, maxtrav are PLL limitations for TBR radius
  * @return best parsimony score found
  */
+int pllOptimizeTbrParsimonyCen(pllInstance *tr, partitionList *pr, int mintrav,
+                            int maxtrav, IQTree *iqtree);
+int pllOptimizeTbrParsimonyFull(pllInstance *tr, partitionList *pr, IQTree *iqtree);
 int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
                             int maxtrav, IQTree *iqtree);
 int pllOptimizeTbrParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,

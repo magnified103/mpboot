@@ -156,7 +156,7 @@ class AntColonyAlgo {
     void updatePheromone() {
         curIter = 0;
         for (int i = 0; i < 3; ++i) {
-            pheromone[i] = (1 - EVAPORATION_RATE) * pheromone[i] +
+            pheromone[i] = (1.0 - EVAPORATION_RATE) * pheromone[i] +
                            (double)addedPheromone[i];
             addedPheromone[i] = 0;
         }

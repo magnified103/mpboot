@@ -603,6 +603,8 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.tbr_test_draw = false;
     params.tbr_test = false;
     params.tbr_pars = false;
+    params.tbr_full = false;
+    params.tbr_jump = false;
     params.tbr_mintrav = 1;
     params.tbr_maxtrav = 5;
     params.tbr_insert_nni = false;
@@ -947,6 +949,14 @@ void parseArg(int argc, char *argv[], Params &params) {
             }
             if (strcmp(argv[cnt], "-tbr_pars") == 0) {
                 params.tbr_pars = true;
+                continue;
+            }
+            if (strcmp(argv[cnt], "-tbr_full") == 0) {
+                params.tbr_full = true;
+                continue;
+            }
+            if (strcmp(argv[cnt], "-tbr_jump") == 0) {
+                params.tbr_jump = true;
                 continue;
             }
             if (strcmp(argv[cnt], "-tbr_mintrav") == 0) {
