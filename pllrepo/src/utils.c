@@ -2509,7 +2509,6 @@ pllTreeInitTopologyForAlignment (pllInstance * tr, pllAlignmentData * alignmentD
 */
 void pllComputeRandomizedStepwiseAdditionParsimonyTree(pllInstance * tr, partitionList * partitions, int sprDist)
 {
-  printf("ok\n");
   allocateParsimonyDataStructures(tr, partitions);
   pllMakeParsimonyTreeFast(tr, partitions, sprDist);
   pllFreeParsimonyDataStructures(tr, partitions);

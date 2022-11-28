@@ -2515,9 +2515,17 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                 }
                 // cout << "cnt: " << cntItersNotImproved << '\n';
             } else if (params->tbr_pars == true) {
-                pllOptimizeTbrParsimony(pllInst, pllPartitions,
-                                        params->tbr_mintrav,
-                                        params->tbr_maxtrav, this);
+                if (params->tbr_full == true) {
+                    pllOptimizeTbrParsimonyFull(pllInst, pllPartitions, this);
+                } else if (params->tbr_jump == true) {
+                    pllOptimizeTbrParsimonyCen(pllInst, pllPartitions,
+                                               params->tbr_mintrav,
+                                               params->tbr_maxtrav, this);
+                } else {
+                    pllOptimizeTbrParsimony(pllInst, pllPartitions,
+                                            params->tbr_mintrav,
+                                            params->tbr_maxtrav, this);
+                }
             } else {
                 pllOptimizeSprParsimony(pllInst, pllPartitions,
                                         params->spr_mintrav, max_spr_rad, this);
