@@ -2420,7 +2420,6 @@ int pllOptimizeTbrParsimonyFull(pllInstance *tr, partitionList *pr,
     assert(!tr->constrained);
 
     nodeRectifierParsVerFull(tr, true);
-    nodeRectifierPars(tr, true);
     tr->bestParsimony = UINT_MAX;
     tr->bestParsimony =
         _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
@@ -2432,27 +2431,10 @@ int pllOptimizeTbrParsimonyFull(pllInstance *tr, partitionList *pr,
     do {
         // cout << "Loop\n";
         startMP = randomMP;
-        nodeRectifierPars(tr, false);
-        for (int i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
-            bool isLeaf = isTip(tr->nodep[i]->number, tr->mxtips) ||
-                          isTip(tr->nodep[i]->back->number, tr->mxtips);
-            if (isLeaf) {
-                continue;
-            }
-            centralBranch = tr->nodep[i];
-            tr->TBR_removeBranch = NULL;
-            tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
+        nodeRectifierParsVerFull(tr, false);
+        // cout << "Num: " << centralBranch->number << '\n';
+        pllComputeTBRVer3(tr, pr, centralBranch, 1, tr->mxtips + tr->mxtips, perSiteScores);
 
-            pllComputeTBRVerFull(tr, pr, perSiteScores);
-
-            // cout << "Score before: " << randomMP << '\n';
-            if (tr->bestParsimony < randomMP && tr->TBR_removeBranch &&
-                tr->TBR_insertBranch1 && tr->TBR_insertBranch2) {
-                restoreTreeRearrangeParsimonyTBR(tr, pr, perSiteScores);
-                randomMP = tr->bestParsimony;
-                // cout << "Score: " << randomMP << '\n';
-            }
-        }
     } while (randomMP < startMP);
     return startMP;
 }
