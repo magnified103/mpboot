@@ -1054,6 +1054,7 @@ typedef struct {
     /* Parsimony vectors at each node */
     size_t parsimonyLength;
     parsimonyNumber *parsVect;
+    parsimonyNumber *parsVectUppass;
     parsimonyNumber *perSiteParsScores;
 
     parsimonyNumber *perSitePartialPars; /* Diep added - for UFBoot */

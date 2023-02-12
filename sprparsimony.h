@@ -105,4 +105,6 @@ unsigned int _evaluateParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
 
 void _newviewParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
                        int perSiteScores);
+
+void testUppassSPR(pllInstance *tr, partitionList *pr);
 #endif /* SPRPARSIMONY_H_ */

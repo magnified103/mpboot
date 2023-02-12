@@ -610,6 +610,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.tbr_insert_nni = false;
     params.tbr_traverse_ver1 = false;
     params.tbr_restore_ver2 = false;
+    params.test_uppass = false;
     params.tree_gen = NONE;
     params.user_file = NULL;
     params.out_prefix = NULL;
@@ -986,6 +987,15 @@ void parseArg(int argc, char *argv[], Params &params) {
 
             if (strcmp(argv[cnt], "-tbr_restore_ver2") == 0) {
                 params.tbr_restore_ver2 = true;
+                continue;
+            }
+
+            if (strcmp(argv[cnt], "-test_uppass") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use -test_uppass <file.treefile>";
+                params.test_uppass = true;
+                params.user_file = argv[cnt];
                 continue;
             }
 

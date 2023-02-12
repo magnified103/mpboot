@@ -513,6 +513,11 @@ struct Params {
     int tbr_restore_ver2;
 
     /**
+     * Testing Uppass Indirect Calculation of MP Score (Goloboff 1996)
+     */
+    bool test_uppass;
+
+    /**
      *  Number of starting parsimony trees
      */
     int numParsTrees;
