@@ -4266,9 +4266,8 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr,
         assert(0);
     }
     int model, *ti = tr->ti, count = ti[0], index;
-    int low = (skipFirst ? 4 : 0);
     assert(count % 4 == 0);
-    for (index = count - 4; index > low; index -= 4) {
+    for (index = count - (skipFirst ? 8 : 4); index > 0; index -= 4) {
         unsigned int totalScore = 0;
 
         size_t uNumber = (size_t)ti[index], v1Number = (size_t)ti[index + 1],
@@ -4965,7 +4964,8 @@ void testInsertSPR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr u) {
     // Try to insert
     p->next->back = u;
     p->next->next->back = v;
-    u->back = v->back = p;
+    u->back = p->next;
+    v->back = p->next->next;
 
     unsigned int mp = _evaluateParsimonyNormalNotAvx(tr, pr, p, PLL_TRUE, PLL_FALSE);
     // Rollback
@@ -5012,7 +5012,7 @@ void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p) {
 void testUppassSPR(pllInstance *tr, partitionList *pr) {
     _allocateParsimonyDataStructuresUppass(tr, pr, false);
     nodeRectifierPars(tr);
-    for (int i = 19; i <= 19; ++i) {
+    for (int i = 19; i <= 30; ++i) {
         cout << "i: " << i << '\n';
         rearrangeSPR(tr, pr, tr->nodep[i]);
     }
