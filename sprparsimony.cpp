@@ -6,8 +6,8 @@
  */
 #include "sprparsimony.h"
 #include "parstree.h"
-#include <string>
 #include <bitset>
+#include <string>
 /**
  * PLL (version 1.0.0) a software library for phylogenetic inference
  * Copyright (C) 2013 Tomas Flouri and Alexandros Stamatakis
@@ -4137,7 +4137,8 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
             }
         }
         // Copy leaves' downpass to uppass
-        for (i = 0; i < compressedEntriesPadded * states * ((size_t)tr->mxtips + 1);
+        for (i = 0;
+             i < compressedEntriesPadded * states * ((size_t)tr->mxtips + 1);
              i++) {
             pr->partitionData[model]->parsVectUppass[i] =
                 pr->partitionData[model]->parsVect[i];
@@ -4348,8 +4349,9 @@ void assignDownpassToUppass(partitionList *pr, size_t uNumber) {
         }
     }
 }
-void _newviewParsimonyIterativeFastNormalNotAvx(pllInstance *tr, partitionList *pr,
-                                    int perSiteScores) {
+void _newviewParsimonyIterativeFastNormalNotAvx(pllInstance *tr,
+                                                partitionList *pr,
+                                                int perSiteScores) {
     int model, *ti = tr->ti, count = ti[0], index;
     for (index = 4; index < count; index += 4) {
         unsigned int totalScore = 0;
@@ -4522,8 +4524,9 @@ void _newviewParsimonyIterativeFastNormalNotAvx(pllInstance *tr, partitionList *
                                       tr->parsimonyScore[qNumber];
     }
 }
-unsigned int _evaluateParsimonyIterativeFastNormalNotAvx(pllInstance *tr, partitionList *pr,
-                                             int perSiteScores) {
+unsigned int _evaluateParsimonyIterativeFastNormalNotAvx(pllInstance *tr,
+                                                         partitionList *pr,
+                                                         int perSiteScores) {
     // cout << "evaluateParsimonyIterativeFast\n";
     // cout << "Don't go to CostMatrix\n";
     size_t pNumber = (size_t)tr->ti[1], qNumber = (size_t)tr->ti[2];
@@ -4651,8 +4654,9 @@ unsigned int _evaluateParsimonyIterativeFastNormalNotAvx(pllInstance *tr, partit
     return sum;
 }
 
-unsigned int _evaluateParsimonyNormalNotAvx(pllInstance *tr, partitionList *pr, nodeptr p,
-                                pllBoolean full, int perSiteScores) {
+unsigned int _evaluateParsimonyNormalNotAvx(pllInstance *tr, partitionList *pr,
+                                            nodeptr p, pllBoolean full,
+                                            int perSiteScores) {
     volatile unsigned int result;
     nodeptr q = p->back;
     int *ti = tr->ti, counter = 4;
@@ -4864,9 +4868,63 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
     uppassStatesIterativeCalculate(tr, pr, false);
     return sum;
 }
+void getLeavesInSubtree(nodeptr p, int *ti, int *counter, int mxtips) {
+    if (p->number <= mxtips) {
+        ti[*counter] = p->number; 
+        *counter = *counter + 1;
+        return;
+    }
+    getLeavesInSubtree(p->next->back, ti, counter, mxtips);
+    getLeavesInSubtree(p->next->next->back, ti, counter, mxtips);
+
+}
+void fixLeavesUppass(pllInstance *tr, partitionList *pr, int *counter) {
+    int model;
+    for (int id = 0; id < *counter; ++id) {
+        int uNumber = tr->ti[id];
+        for (model = 0; model < pr->numberOfPartitions; model++) {
+            size_t k, states = pr->partitionData[model]->states,
+                      width = pr->partitionData[model]->parsimonyLength;
+
+            unsigned int i;
+
+            switch (states) {
+            default: {
+                /**
+                 * u:    uppass state of current node
+                 * p:    uppass state of parent node
+                 */
+                assert(states <= 32);
+                parsimonyNumber *u[32], *p[32];
+
+                for (k = 0; k < states; ++k) {
+                    u[k] = &(pr->partitionData[model]
+                                 ->parsVectUppass[(width * states * uNumber) +
+                                                  width * k]);
+                    p[k] = &(pr->partitionData[model]->parsVectUppass
+                                 [(width * states *
+                                   tr->nodep[uNumber]->back->number) +
+                                  width * k]);
+                }
+
+                for (i = 0; i < width; ++i) {
+                    parsimonyNumber x = 0;
+                    for (k = 0; k < states; ++k) {
+                        x |= (~(u[k][i] & p[k][i]) & p[k][i]);
+                    }
+                    x = ~x;
+                    for (k = 0; k < states; ++k) {
+                        u[k][i] ^= ((u[k][i] ^ p[k][i]) & x);
+                    }
+                }
+            }
+            }
+        }
+    }
+}
 unsigned int _evaluateParsimonyUppass(pllInstance *tr, partitionList *pr,
                                       nodeptr p, int perSiteScores,
-                                      bool isRootBranch) {
+                                      bool isRootBranch, bool fixLeaves) {
     /**
      * isRootBranch == true: (Branch p - p->back is the root) Calculate
      * parsimony score of subtree p and subtree p->back combined isRootBranch ==
@@ -4898,6 +4956,16 @@ unsigned int _evaluateParsimonyUppass(pllInstance *tr, partitionList *pr,
     ti[0] = counter;
     result = _evaluateParsimonyIterativeFastUppass(tr, pr, perSiteScores,
                                                    isRootBranch);
+    if (fixLeaves) {
+        counter = 0;
+        if (isRootBranch) {
+            getLeavesInSubtree(p, ti, &counter, tr->mxtips);
+            getLeavesInSubtree(q, ti, &counter, tr->mxtips);
+        } else {
+            getLeavesInSubtree(p, ti, &counter, tr->mxtips);
+        }
+        fixLeavesUppass(tr, pr, &counter);
+    }
 
     return result;
 }
@@ -4911,9 +4979,9 @@ void printAllUppass(pllInstance *tr, partitionList *pr) {
                 parsimonyNumber *uStates[32];
                 assert(states <= 32);
                 for (int k = 0; k < states; ++k) {
-                    uStates[k] =
-                        &(pr->partitionData[model]
-                              ->parsVectUppass[(width * states * u) + width * k]);
+                    uStates[k] = &(
+                        pr->partitionData[model]
+                            ->parsVectUppass[(width * states * u) + width * k]);
                 }
 
                 cout << "width: " << width << '\n';
@@ -4929,7 +4997,8 @@ void printAllUppass(pllInstance *tr, partitionList *pr) {
                         } else if (k == 3) {
                             cout << "T: \n";
                         }
-                        cout << "State " << u << " : " << bitset<1> (uStates[k][i]) << '\n';
+                        cout << "State " << u << " : "
+                             << bitset<1>(uStates[k][i]) << '\n';
                     }
                 }
             }
@@ -4938,7 +5007,7 @@ void printAllUppass(pllInstance *tr, partitionList *pr) {
     }
 }
 unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
-                                   nodeptr p, nodeptr u) {
+                                           nodeptr p, nodeptr u) {
     unsigned int score = scoreTwoSubtrees;
     size_t pNumber = p->number, uNumber = u->number, vNumber = u->back->number;
 
@@ -4952,15 +5021,15 @@ unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
             assert(states <= 32);
 
             for (int k = 0; k < states; ++k) {
-                pStates[k] =
-                    &(pr->partitionData[model]
-                          ->parsVectUppass[(width * states * pNumber) + width * k]);
-                uStates[k] =
-                    &(pr->partitionData[model]
-                          ->parsVectUppass[(width * states * uNumber) + width * k]);
-                vStates[k] =
-                    &(pr->partitionData[model]
-                          ->parsVectUppass[(width * states * vNumber) + width * k]);
+                pStates[k] = &(pr->partitionData[model]
+                                   ->parsVectUppass[(width * states * pNumber) +
+                                                    width * k]);
+                uStates[k] = &(pr->partitionData[model]
+                                   ->parsVectUppass[(width * states * uNumber) +
+                                                    width * k]);
+                vStates[k] = &(pr->partitionData[model]
+                                   ->parsVectUppass[(width * states * vNumber) +
+                                                    width * k]);
             }
 
             // cout << "width: " << width << '\n';
@@ -4968,18 +5037,6 @@ unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
                 t_N = 0;
 
                 for (int k = 0; k < states; ++k) {
-                    // if (k == 0) {
-                    //     cout << "A: \n";
-                    // } else if (k == 1) {
-                    //     cout << "C: \n";
-                    // } else if (k == 2) {
-                    //     cout << "G: \n";
-                    // } else if (k == 3) {
-                    //     cout << "T: \n";
-                    // }
-                    // cout << "State " << pNumber << " : " << bitset<1> (pStates[k][i]) << '\n';
-                    // cout << "State " << uNumber << " : " << bitset<1> (uStates[k][i]) << '\n';
-                    // cout << "State " << vNumber << " : " << bitset<1> (vStates[k][i]) << '\n';
                     t_A = pStates[k][i] & (uStates[k][i] | vStates[k][i]);
                     t_N = t_N | t_A;
                 }
@@ -4997,11 +5054,8 @@ unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
     return score;
 }
 void testInsertSPR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr u) {
-    if (p->number <= tr->mxtips || p->back->number <= tr->mxtips || u->number <= tr->mxtips || u->back->number <= tr->mxtips) {
-        return;
-    }
-    // cout << "insert branch: " << u->number << " - " << u->back->number << '\n';
-    // Uppass Score
+    // cout << "insert branch: " << u->number << " - " << u->back->number <<
+    // '\n'; Uppass Score
     unsigned int uppassMP = evaluateInsertParsimonyUppass(tr, pr, p->back, u);
 
     // Downpass Score
@@ -5013,7 +5067,8 @@ void testInsertSPR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr u) {
     u->back = p->next;
     v->back = p->next->next;
 
-    unsigned int mp = _evaluateParsimonyNormalNotAvx(tr, pr, p, PLL_TRUE, PLL_FALSE);
+    unsigned int mp =
+        _evaluateParsimonyNormalNotAvx(tr, pr, p, PLL_TRUE, PLL_FALSE);
     // Rollback
     p->next->back = p->next->next->back = NULL;
     u->back = v;
@@ -5036,13 +5091,12 @@ void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p) {
     if (q->number > tr->mxtips) {
         nodeptr q1 = q->next->back;
         nodeptr q2 = q->next->next->back;
-        cout << "OK\n";
         q->next->back = q->next->next->back = NULL;
         q1->back = q2;
         q2->back = q1;
         scoreTwoSubtrees =
-            _evaluateParsimonyUppass(tr, pr, p, PLL_FALSE, false) +
-            _evaluateParsimonyUppass(tr, pr, q1, PLL_FALSE, true);
+            _evaluateParsimonyUppass(tr, pr, p, PLL_FALSE, false, false) +
+            _evaluateParsimonyUppass(tr, pr, q1, PLL_FALSE, true, true);
         cout << "scoreTwoSubtrees : " << scoreTwoSubtrees << '\n';
         traverseInsertBranches(tr, pr, q, q1);
         if (q2->number > tr->mxtips) {
@@ -5053,14 +5107,14 @@ void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p) {
         q->next->next->back = q2;
         q1->back = q->next;
         q2->back = q->next->next;
-        cout << "Done connect\n";
     }
 }
 void testUppassSPR(pllInstance *tr, partitionList *pr) {
     _allocateParsimonyDataStructuresUppass(tr, pr, false);
     nodeRectifierPars(tr);
     for (int i = 1; i <= 2 * tr->mxtips - 2; ++i) {
-        cout << "branch " << tr->nodep[i]->number << " - " << tr->nodep[i]->back->number << '\n';
+        cout << "branch " << tr->nodep[i]->number << " - "
+             << tr->nodep[i]->back->number << '\n';
         rearrangeSPR(tr, pr, tr->nodep[i]);
     }
     _pllFreeParsimonyDataStructuresUppass(tr, pr);
