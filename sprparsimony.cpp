@@ -55,6 +55,7 @@
 #define VECTOR_BIT_AND _mm512_and_epi32
 #define VECTOR_BIT_OR _mm512_or_epi32
 #define VECTOR_AND_NOT _mm512_andnot_epi32
+#define VECTOR_BIT_XOR _mm512_xor_epi32
 
 #elif defined(__AVX)
 
@@ -82,6 +83,7 @@
 #define VECTOR_BIT_OR _mm256_or_pd
 #define VECTOR_STORE _mm256_store_pd
 #define VECTOR_AND_NOT _mm256_andnot_pd
+#define VECTOR_BIT_XOR _mm256_xor_pd
 
 #elif (defined(__SSE3))
 
@@ -110,6 +112,7 @@
 #define VECTOR_LOAD _mm_load_si128
 #define VECTOR_BIT_AND _mm_and_si128
 #define VECTOR_BIT_OR _mm_or_si128
+#define VECTOR_BIT_XOR _mm_xor_si128
 #define VECTOR_STORE _mm_store_si128
 #define VECTOR_AND_NOT _mm_andnot_si128
 
