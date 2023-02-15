@@ -133,6 +133,11 @@ class AntColonyAlgo {
         }
     }
 
+    void printNumTypes() {
+        cout << "Num NNIs: " << cnt[0] << '\n';
+        cout << "Num SPRs: " << cnt[1] << '\n';
+        cout << "Num TBRs: " << cnt[2] << '\n';
+    }
     int getMoveType() {
         double sum = 0;
         for (int i = 0; i < 3; ++i) {

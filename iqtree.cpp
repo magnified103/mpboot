@@ -2234,7 +2234,9 @@ double IQTree::doTreeSearch() {
 
     readTreeString(bestTreeString);
 
-    if (testNNI)
+    if (params->do_ant_colony) {
+        antColonyAlgo->printNumTypes();
+    } else if (testNNI)
         outNNI.close();
     if (params->write_intermediate_trees)
         out_treels.close();
