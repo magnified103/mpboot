@@ -518,6 +518,11 @@ struct Params {
     bool test_uppass;
 
     /**
+     * Do full SPR and full TBR with uppass algorithm
+     */
+    bool uppass;
+
+    /**
      *  Number of starting parsimony trees
      */
     int numParsTrees;

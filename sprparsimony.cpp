@@ -6,6 +6,7 @@
  */
 #include "sprparsimony.h"
 #include "parstree.h"
+#include "tools.h"
 #include <bitset>
 // #include <chrono>
 #include <string>
@@ -4056,7 +4057,6 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
             compressedEntries++;
 
 #if (defined(__SSE3) || defined(__AVX))
-        cout << "Yeah compressDNA AVX\n";
         if (compressedEntries % INTS_PER_VECTOR != 0)
             compressedEntriesPadded =
                 compressedEntries +
@@ -4066,8 +4066,6 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
 #else
         compressedEntriesPadded = compressedEntries;
 #endif
-        cout << "compressedEntriesPadded: " << compressedEntriesPadded << '\n';
-        cout << "compressedEntries: " << compressedEntries << '\n';
 
         rax_posix_memalign((void **)&(pr->partitionData[model]->parsVect),
                            PLL_BYTE_ALIGNMENT,
@@ -4251,8 +4249,16 @@ void _pllFreeParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr) {
 static void computeTraversalInfoParsimonyUppass(nodeptr p, int *ti,
                                                 int *counter, int maxTips,
                                                 int perSiteScores, bool first) {
+    // cout << "pNumber = " << p->number << '\n';
     assert(p->number > maxTips);
+#if (defined(__SSE3) || defined(__AVX))
+    if (perSiteScores && pllCostMatrix == NULL) {
+        resetPerSiteNodeScores(iqtree->pllPartitions, p->number);
+    }
+#endif
     nodeptr q = p->next->back, r = p->next->next->back;
+    // cout << "qNumber = " << q->number << '\n';
+    // cout << "rNumber = " << r->number << '\n';
 
     if (!p->xPars)
         getxnodeLocal(p);
@@ -4408,10 +4414,12 @@ void fixLeavesUppass(pllInstance *tr, partitionList *pr, int *counter) {
 /*
  * AVX version
  */
-unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr, partitionList *pr,
-                                           nodeptr p, nodeptr q) {
+unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr,
+                                              partitionList *pr, nodeptr p,
+                                              nodeptr q) {
     unsigned int score = scoreTwoSubtrees;
-    size_t pNumber = p->number, p1Number = p->back->number, qNumber = q->number, q1Number = q->back->number;
+    size_t pNumber = p->number, p1Number = p->back->number, qNumber = q->number,
+           q1Number = q->back->number;
 
     INT_TYPE allOne = SET_ALL_BITS_ONE;
     for (int model = 0; model < pr->numberOfPartitions; model++) {
@@ -4419,7 +4427,8 @@ unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr, partitionList *pr
                   width = pr->partitionData[model]->parsimonyLength, i;
         switch (states) {
         default: {
-            parsimonyNumber *pStates[32], *p1States[32], *qStates[32], *q1States[32];
+            parsimonyNumber *pStates[32], *p1States[32], *qStates[32],
+                *q1States[32];
 
             assert(states <= 32);
 
@@ -4427,15 +4436,17 @@ unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr, partitionList *pr
                 pStates[k] = &(pr->partitionData[model]
                                    ->parsVectUppass[(width * states * pNumber) +
                                                     width * k]);
-                p1States[k] = &(pr->partitionData[model]
-                                   ->parsVectUppass[(width * states * p1Number) +
-                                                    width * k]);
+                p1States[k] =
+                    &(pr->partitionData[model]
+                          ->parsVectUppass[(width * states * p1Number) +
+                                           width * k]);
                 qStates[k] = &(pr->partitionData[model]
                                    ->parsVectUppass[(width * states * qNumber) +
                                                     width * k]);
-                q1States[k] = &(pr->partitionData[model]
-                                   ->parsVectUppass[(width * states * q1Number) +
-                                                    width * k]);
+                q1States[k] =
+                    &(pr->partitionData[model]
+                          ->parsVectUppass[(width * states * q1Number) +
+                                           width * k]);
             }
 
             // cout << "width: " << width << '\n';
@@ -4454,6 +4465,9 @@ unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr, partitionList *pr
                 t_N = VECTOR_AND_NOT(t_N, allOne);
 
                 score += vectorPopcount(t_N);
+                if (score > tr->bestParsimony) {
+                    return score;
+                }
 
                 //                 if(sum >= bestScore)
                 //                   return sum;
@@ -4466,8 +4480,9 @@ unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr, partitionList *pr
 /*
  * AVX version
  */
-unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr, partitionList *pr,
-                                           nodeptr p, nodeptr u) {
+unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr,
+                                              partitionList *pr, nodeptr p,
+                                              nodeptr u) {
     unsigned int score = scoreTwoSubtrees;
     size_t pNumber = p->number, uNumber = u->number, vNumber = u->back->number;
 
@@ -4509,6 +4524,9 @@ unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr, partitionList *pr
 
                 score += vectorPopcount(t_N);
 
+                if (score > tr->bestParsimony) {
+                    return score;
+                }
                 //                 if(sum >= bestScore)
                 //                   return sum;
             }
@@ -4642,6 +4660,7 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr,
     // double elapsed_time_ms =
     //     std::chrono::duration<double, std::milli>(t_end - t_start).count();
     // total_time_uppass += elapsed_time_ms;
+    // cout << "Done uppassStatesIterativeCalculate\n";
 }
 
 /*
@@ -4651,8 +4670,6 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
                                                    partitionList *pr,
                                                    int perSiteScores,
                                                    bool isRootBranch) {
-    cout << "Please evaluate here!\n";
-
     if (pllCostMatrix) {
         assert(0);
     }
@@ -4666,6 +4683,8 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
             _newviewParsimonyIterativeFast(tr, pr, perSiteScores);
             assignDownpassToUppass(pr, pNumber);
             uppassStatesIterativeCalculate(tr, pr, true);
+        } else {
+            assignDownpassToUppass(pr, pNumber);
         }
         return tr->parsimonyScore[pNumber];
     }
@@ -4917,8 +4936,9 @@ void fixLeavesUppass(pllInstance *tr, partitionList *pr, int *counter) {
         }
     }
 }
-unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr, partitionList *pr,
-                                           nodeptr p, nodeptr u) {
+unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr,
+                                              partitionList *pr, nodeptr p,
+                                              nodeptr u) {
     unsigned int score = scoreTwoSubtrees;
     size_t pNumber = p->number, uNumber = u->number, vNumber = u->back->number;
 
@@ -4956,6 +4976,9 @@ unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr, partitionList *pr
 
                 score += ((unsigned int)__builtin_popcount(t_N));
 
+                if (score > tr->bestParsimony) {
+                    return score;
+                }
                 //                 if(sum >= bestScore)
                 //                   return sum;
             }
@@ -5253,6 +5276,8 @@ unsigned int _evaluateParsimonyUppass(pllInstance *tr, partitionList *pr,
 
     ti[1] = p->number;
     ti[2] = q->number;
+    // cout << "pNumber = " << p->number << '\n';
+    // cout << "qNumber = " << q->number << '\n';
     if (isRootBranch) {
         if (p->number > tr->mxtips) {
             computeTraversalInfoParsimonyUppass(p, ti, &counter, tr->mxtips,
@@ -5285,7 +5310,58 @@ unsigned int _evaluateParsimonyUppass(pllInstance *tr, partitionList *pr,
 
     return result;
 }
-void testInsertTBR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q, nodeptr r, int perSiteScores) {
+void testInsertSPR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr u,
+                   int perSiteScores) {
+    // cout << "insert branch: " << u->number << " - " << u->back->number << '\n';
+
+    // Uppass Score
+    unsigned int mp = evaluateInsertParsimonyUppassSPR(tr, pr, p->back, u);
+
+    if (perSiteScores) {
+        // If UFBoot is enabled ...
+        pllSaveCurrentTreeSprParsimony(tr, pr, mp); // run UFBoot
+    }
+    if (mp < tr->bestParsimony) {
+        bestTreeScoreHits = 1;
+    } else if (mp == tr->bestParsimony) {
+        bestTreeScoreHits++;
+    }
+    if ((mp < tr->bestParsimony) ||
+        ((mp == tr->bestParsimony) &&
+         (random_double() <= 1.0 / bestTreeScoreHits))) {
+        tr->bestParsimony = mp;
+        tr->TBR_insertBranch1 = u;
+        tr->TBR_removeBranch = p;
+    }
+}
+void testInsertTBR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q,
+                   nodeptr r, int perSiteScores) {
+    // cout << "insert branch: " << p->number << " - " << p->back->number << '\n';
+    // cout << "insert branch: " << q->number << " - " << q->back->number << '\n';
+
+    // Uppass Score
+    unsigned int mp = evaluateInsertParsimonyUppassTBR(tr, pr, p, q);
+
+    if (perSiteScores) {
+        // If UFBoot is enabled ...
+        pllSaveCurrentTreeSprParsimony(tr, pr, mp); // run UFBoot
+    }
+    if (mp < tr->bestParsimony) {
+        bestTreeScoreHits = 1;
+    } else if (mp == tr->bestParsimony) {
+        bestTreeScoreHits++;
+    }
+    if ((mp < tr->bestParsimony) ||
+        ((mp == tr->bestParsimony) &&
+         (random_double() <= 1.0 / bestTreeScoreHits))) {
+        tr->bestParsimony = mp;
+        tr->TBR_insertBranch1 = p;
+        tr->TBR_insertBranch2 = q;
+        tr->TBR_removeBranch = r;
+    }
+}
+void testInsertTBRCorrectness(pllInstance *tr, partitionList *pr, nodeptr p,
+                              nodeptr q, nodeptr r, int perSiteScores) {
     cout << "insert branch: " << p->number << " - " << p->back->number << '\n';
     cout << "insert branch: " << q->number << " - " << q->back->number << '\n';
 
@@ -5321,11 +5397,12 @@ void testInsertTBR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q, nod
     cout << "Real Score: " << mp << '\n';
     assert(uppassMP == mp);
 }
-void testInsertSPR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr u) {
+void testInsertSPRCorrectness(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr u) {
     cout << "insert branch: " << u->number << " - " << u->back->number << '\n';
 
     // Uppass Score
-    unsigned int uppassMP = evaluateInsertParsimonyUppassSPR(tr, pr, p->back, u);
+    unsigned int uppassMP =
+        evaluateInsertParsimonyUppassSPR(tr, pr, p->back, u);
 
     // Downpass Score
     nodeptr v = u->back;
@@ -5355,7 +5432,7 @@ void traverseInsertBranchesTBRQ(pllInstance *tr, partitionList *pr, nodeptr p,
     if (!isTip(q->number, tr->mxtips)) {
         traverseInsertBranchesTBRQ(tr, pr, p, q->next->back, r, perSiteScores);
         traverseInsertBranchesTBRQ(tr, pr, p, q->next->next->back, r,
-                                  perSiteScores);
+                                   perSiteScores);
     }
 }
 void traverseInsertBranchesTBRP(pllInstance *tr, partitionList *pr, nodeptr p,
@@ -5369,14 +5446,14 @@ void traverseInsertBranchesTBRP(pllInstance *tr, partitionList *pr, nodeptr p,
     }
 }
 void traverseInsertBranchesSPR(pllInstance *tr, partitionList *pr, nodeptr p,
-                               nodeptr u) {
-    testInsertSPR(tr, pr, p, u);
+                               nodeptr u, int perSiteScores) {
+    testInsertSPR(tr, pr, p, u, perSiteScores);
     if (u->number > tr->mxtips) {
-        traverseInsertBranchesSPR(tr, pr, p, u->next->back);
-        traverseInsertBranchesSPR(tr, pr, p, u->next->next->back);
+        traverseInsertBranchesSPR(tr, pr, p, u->next->back, perSiteScores);
+        traverseInsertBranchesSPR(tr, pr, p, u->next->next->back, perSiteScores);
     }
 }
-void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p) {
+void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p, int perSiteScores) {
     nodeptr q = p->back;
     if (q->number > tr->mxtips) {
         nodeptr q1 = q->next->back;
@@ -5386,13 +5463,15 @@ void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p) {
         q2->back = q1;
         assignAllLeavesDownpassToUppass(tr, pr);
         scoreTwoSubtrees =
-            _evaluateParsimonyUppass(tr, pr, p, PLL_FALSE, false, false) +
-            _evaluateParsimonyUppass(tr, pr, q1, PLL_FALSE, true, true);
-        // cout << "scoreTwoSubtrees : " << scoreTwoSubtrees << '\n';
-        traverseInsertBranchesSPR(tr, pr, q, q1);
-        if (q2->number > tr->mxtips) {
-            traverseInsertBranchesSPR(tr, pr, q, q2->next->back);
-            traverseInsertBranchesSPR(tr, pr, q, q2->next->next->back);
+            _evaluateParsimonyUppass(tr, pr, p, perSiteScores, false, false) +
+            _evaluateParsimonyUppass(tr, pr, q1, perSiteScores, true, true);
+        if (scoreTwoSubtrees <= tr->bestParsimony) {
+            // cout << "scoreTwoSubtrees : " << scoreTwoSubtrees << '\n';
+            traverseInsertBranchesSPR(tr, pr, q, q1, perSiteScores);
+            if (q2->number > tr->mxtips) {
+                traverseInsertBranchesSPR(tr, pr, q, q2->next->back, perSiteScores);
+                traverseInsertBranchesSPR(tr, pr, q, q2->next->next->back, perSiteScores);
+            }
         }
         q->next->back = q1;
         q->next->next->back = q2;
@@ -5408,13 +5487,13 @@ void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p) {
         p2->back = p1;
         assignAllLeavesDownpassToUppass(tr, pr);
         scoreTwoSubtrees =
-            _evaluateParsimonyUppass(tr, pr, q, PLL_FALSE, false, false) +
-            _evaluateParsimonyUppass(tr, pr, p1, PLL_FALSE, true, true);
+            _evaluateParsimonyUppass(tr, pr, q, perSiteScores, false, false) +
+            _evaluateParsimonyUppass(tr, pr, p1, perSiteScores, true, true);
         // cout << "scoreTwoSubtrees : " << scoreTwoSubtrees << '\n';
-        traverseInsertBranchesSPR(tr, pr, p, p1);
+        traverseInsertBranchesSPR(tr, pr, p, p1, perSiteScores);
         if (p2->number > tr->mxtips) {
-            traverseInsertBranchesSPR(tr, pr, p, p2->next->back);
-            traverseInsertBranchesSPR(tr, pr, p, p2->next->next->back);
+            traverseInsertBranchesSPR(tr, pr, p, p2->next->back, perSiteScores);
+            traverseInsertBranchesSPR(tr, pr, p, p2->next->next->back, perSiteScores);
         }
         p->next->back = p1;
         p->next->next->back = p2;
@@ -5422,7 +5501,7 @@ void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p) {
         p2->back = p->next->next;
     }
 }
-void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p) {
+void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p, int perSiteScores) {
     nodeptr q = p->back;
     assert(p->number > tr->mxtips && q->number > tr->mxtips);
     nodeptr q1 = q->next->back;
@@ -5437,25 +5516,28 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p) {
     p2->back = p1;
     assignAllLeavesDownpassToUppass(tr, pr);
     scoreTwoSubtrees =
-        _evaluateParsimonyUppass(tr, pr, p1, PLL_FALSE, true, true) +
-        _evaluateParsimonyUppass(tr, pr, q1, PLL_FALSE, true, true);
+        _evaluateParsimonyUppass(tr, pr, p1, perSiteScores, true, true) +
+        _evaluateParsimonyUppass(tr, pr, q1, perSiteScores, true, true);
     // cout << "scoreTwoSubtrees : " << scoreTwoSubtrees << '\n';
-    traverseInsertBranchesTBRP(tr, pr, p1, q1, p, false);
-    if (q2->number > tr->mxtips) {
-        traverseInsertBranchesTBRP(tr, pr, p1, q2->next->back, p, false);
-        traverseInsertBranchesTBRP(tr, pr, p1, q2->next->next->back, p, false);
-    }
-    if (p2->number > tr->mxtips) {
-        traverseInsertBranchesTBRP(tr, pr, p2->next->back, q1, p, false);
-        traverseInsertBranchesTBRP(tr, pr, p2->next->next->back, q1, p, false);
+    if (scoreTwoSubtrees <= tr->bestParsimony) {
+        traverseInsertBranchesTBRP(tr, pr, p1, q1, p, perSiteScores);
         if (q2->number > tr->mxtips) {
-            traverseInsertBranchesTBRP(tr, pr, p2->next->back, q2->next->back, p, false);
-            traverseInsertBranchesTBRP(tr, pr, p2->next->back,
-                                      q2->next->next->back, p, false);
-            traverseInsertBranchesTBRP(tr, pr, p2->next->next->back,
-                                      q2->next->back, p, false);
-            traverseInsertBranchesTBRP(tr, pr, p2->next->next->back,
-                                      q2->next->next->back, p, false);
+            traverseInsertBranchesTBRP(tr, pr, p1, q2->next->back, p, perSiteScores);
+            traverseInsertBranchesTBRP(tr, pr, p1, q2->next->next->back, p, perSiteScores);
+        }
+        if (p2->number > tr->mxtips) {
+            traverseInsertBranchesTBRP(tr, pr, p2->next->back, q1, p, perSiteScores);
+            traverseInsertBranchesTBRP(tr, pr, p2->next->next->back, q1, p, perSiteScores);
+            if (q2->number > tr->mxtips) {
+                traverseInsertBranchesTBRP(tr, pr, p2->next->back, q2->next->back,
+                                           p, perSiteScores);
+                traverseInsertBranchesTBRP(tr, pr, p2->next->back,
+                                           q2->next->next->back, p, perSiteScores);
+                traverseInsertBranchesTBRP(tr, pr, p2->next->next->back,
+                                           q2->next->back, p, perSiteScores);
+                traverseInsertBranchesTBRP(tr, pr, p2->next->next->back,
+                                           q2->next->next->back, p, perSiteScores);
+            }
         }
     }
     q->next->back = q1;
@@ -5474,12 +5556,117 @@ void testUppassSPR(pllInstance *tr, partitionList *pr) {
     for (int i = 2; i <= 2 * ((size_t)tr->mxtips) - 2; ++i) {
         // cout << "remove branch " << tr->nodep[i]->number << " - "
         //      << tr->nodep[i]->back->number << '\n';
-        rearrangeSPR(tr, pr, tr->nodep[i]);
+        rearrangeSPR(tr, pr, tr->nodep[i], false);
     }
     // cout << fixed << setprecision(10) << total_time_uppass << '\n';
     _pllFreeParsimonyDataStructuresUppass(tr, pr);
 }
+void applySPR(nodeptr p, nodeptr r1) {
+    // cout << "===> applySPR\n";
+    /*
+     * p is the remove branch
+     * r1 is the insert branch
+     */
+    nodeptr p1 = p->next->back;
+    nodeptr p2 = p->next->next->back;
+    p1->back = p2;
+    p2->back = p1;
 
+    nodeptr r2 = r1->back;
+    p->next->back = r1;
+    p->next->next->back = r2;
+    r1->back = p->next;
+    r2->back = p->next->next;
+}
+void applyTBR(nodeptr u, nodeptr p1, nodeptr q1) {
+    // cout << "===> applyTBR\n";
+    /*
+     * u is remove branch
+     * p1, q1 are 2 insert branches
+     */
+    nodeptr v = u->back;
+    nodeptr u1 = u->next->back;
+    nodeptr u2 = u->next->next->back;
+    nodeptr v1 = v->next->back;
+    nodeptr v2 = v->next->next->back;
+    u1->back = u2;
+    u2->back = u1;
+    v1->back = v2;
+    v2->back = v1;
+
+    nodeptr p2 = p1->back;
+    nodeptr q2 = q1->back;
+    p1->back = u->next;
+    p2->back = u->next->next;
+    q1->back = v->next;
+    q2->back = v->next->next;
+    u->next->back = p1;
+    u->next->next->back = p2;
+    v->next->back = q1;
+    v->next->next->back = q2;
+}
+int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree) {
+    int perSiteScores = globalParam->gbo_replicates > 0;
+
+    iqtree = _iqtree; // update pointer to IQTree
+
+    if (globalParam->ratchet_iter >= 0 &&
+        (iqtree->on_ratchet_hclimb1 || iqtree->on_ratchet_hclimb2)) {
+        // oct 23: in non-ratchet iteration, allocate is not triggered
+        _updateInternalPllOnRatchet(tr, pr);
+        _allocateParsimonyDataStructuresUppass(
+            tr, pr, perSiteScores); // called once if not running ratchet
+    } else if (first_call || (iqtree && iqtree->on_opt_btree))
+        _allocateParsimonyDataStructuresUppass(
+            tr, pr, perSiteScores); // called once if not running ratchet
+
+    if (first_call) {
+        first_call = false;
+    }
+    unsigned int randomMP, startMP;
+    assert(!tr->constrained);
+
+    nodeRectifierPars(tr);
+    tr->bestParsimony = UINT_MAX;
+    tr->bestParsimony =
+        _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
+
+    assert(-iqtree->curScore == tr->bestParsimony);
+    // cout << "Start MP = " << tr->bestParsimony << '\n';
+    unsigned int bestIterationScoreHits = 1;
+    randomMP = tr->bestParsimony;
+    do {
+        startMP = randomMP;
+        nodeRectifierPars(tr);
+        for (int i = 2; i <= tr->mxtips + tr->mxtips - 2; ++i) {
+            tr->TBR_removeBranch = NULL;
+            tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
+            bestTreeScoreHits = 1;
+            if (i > tr->mxtips && tr->nodep[i]->back->number > tr->mxtips) {
+                rearrangeTBR(tr, pr, tr->nodep[i], perSiteScores);
+            } else {
+                rearrangeSPR(tr, pr, tr->nodep[i], perSiteScores);
+            }
+            if (tr->bestParsimony == randomMP)
+                bestIterationScoreHits++;
+            if (tr->bestParsimony < randomMP)
+                bestIterationScoreHits = 1;
+            if (((tr->bestParsimony < randomMP) ||
+                 ((tr->bestParsimony == randomMP) &&
+                  (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                tr->TBR_removeBranch && tr->TBR_insertBranch1) {
+                if (tr->TBR_insertBranch2) {
+                    applyTBR(tr->TBR_removeBranch, tr->TBR_insertBranch1,
+                             tr->TBR_insertBranch2);
+                } else {
+                    applySPR(tr->TBR_removeBranch, tr->TBR_insertBranch1);
+                }
+                randomMP = tr->bestParsimony;
+            }
+        }
+    } while (randomMP < startMP);
+    return startMP;
+}
 void testUppassTBR(pllInstance *tr, partitionList *pr) {
     _allocateParsimonyDataStructuresUppass(tr, pr, false);
     nodeRectifierPars(tr);
@@ -5488,9 +5675,9 @@ void testUppassTBR(pllInstance *tr, partitionList *pr) {
         // cout << "remove branch " << tr->nodep[i]->number << " - "
         //      << tr->nodep[i]->back->number << '\n';
         if (i > tr->mxtips && tr->nodep[i]->back->number > tr->mxtips) {
-            rearrangeTBR(tr, pr, tr->nodep[i]);
+            rearrangeTBR(tr, pr, tr->nodep[i], false);
         } else {
-            rearrangeSPR(tr, pr, tr->nodep[i]);
+            rearrangeSPR(tr, pr, tr->nodep[i], false);
         }
     }
     // cout << fixed << setprecision(10) << total_time_uppass << '\n';

@@ -1531,6 +1531,7 @@ void PDTaxaSet::printTaxa(char *filename) {
 }
 
 void PDTaxaSet::printTree(ostream &out) {
+    cout << "xxxxxxx Wait why here\n";
     if (!tree_str.empty())
         out << tree_str << endl;
 }
