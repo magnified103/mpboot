@@ -2459,6 +2459,7 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
             treeString = getTreeString();
         } else {
             string treeString1 = getTreeString();
+            // cout << "treeString1 = " << treeString1 << '\n';
             size_t index = 0;
             while (true) {
                 /* Locate the substring to replace. */
@@ -2471,13 +2472,13 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
 
                 /* Advance index forward so the next iteration doesn't pick it
                  * up as well. */
-                index += 4;
+                index += 2;
             }
 
             int max_spr_rad = params->spr_maxtrav;
             if (on_opt_btree && params->opt_btree_nni)
                 params->spr_maxtrav = 1;
-
+            // cout << "treeString1 = " << treeString1 << '\n';
             pllNewickTree *sprStartTree =
                 pllNewickParseString(treeString1.c_str());
             assert(sprStartTree != NULL);
@@ -2526,6 +2527,8 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                                             params->tbr_mintrav,
                                             params->tbr_maxtrav, this);
                 }
+            } else if (params->uppass == true) {
+                pllOptimizeTbrUppass(pllInst, pllPartitions, this);
             } else {
                 pllOptimizeSprParsimony(pllInst, pllPartitions,
                                         params->spr_mintrav, max_spr_rad, this);
@@ -2537,6 +2540,7 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                             pllInst->start->back, PLL_TRUE, PLL_TRUE, 0, 0, 0,
                             PLL_SUMMARIZE_LH, 0, 0);
             treeString = string(pllInst->tree_string);
+            // cout << "treeString = " << treeString << '\n';
             if (treeString == treeString1)
                 outError("Tree string stays the same after SPR.");
             readTreeString(treeString);
@@ -2552,7 +2556,11 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                  (!params->hclimb1_nni))) {
                 //			if(((params->ratchet_iter >= 0) &&
                 // (!params->hclimb1_nni))) {
-                _pllFreeParsimonyDataStructures(pllInst, pllPartitions);
+                if (params->uppass) {
+                    _pllFreeParsimonyDataStructuresUppass(pllInst, pllPartitions);
+                } else {
+                    _pllFreeParsimonyDataStructures(pllInst, pllPartitions);
+                }
             }
         }
     } else if (params->pll) {

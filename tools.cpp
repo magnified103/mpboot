@@ -611,6 +611,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.tbr_traverse_ver1 = false;
     params.tbr_restore_ver2 = false;
     params.test_uppass = false;
+    params.uppass = false;
     params.tree_gen = NONE;
     params.user_file = NULL;
     params.out_prefix = NULL;
@@ -996,6 +997,11 @@ void parseArg(int argc, char *argv[], Params &params) {
                     throw "Use -test_uppass <file.treefile>";
                 params.test_uppass = true;
                 params.user_file = argv[cnt];
+                continue;
+            }
+
+            if (strcmp(argv[cnt], "-uppass") == 0) {
+                params.uppass = true;
                 continue;
             }
 
