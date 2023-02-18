@@ -112,7 +112,7 @@ void testUppassSPRCorrectness(Params &params) {
     _pllFreeParsimonyDataStructures(ptree->pllInst, ptree->pllPartitions);
     
 
-    testUppassSPR(ptree->pllInst, ptree->pllPartitions);
+    testUppassTBR(ptree->pllInst, ptree->pllPartitions);
 
     delete ptree;
 }
