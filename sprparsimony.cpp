@@ -5312,7 +5312,8 @@ unsigned int _evaluateParsimonyUppass(pllInstance *tr, partitionList *pr,
 }
 void testInsertSPR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr u,
                    int perSiteScores) {
-    // cout << "insert branch: " << u->number << " - " << u->back->number << '\n';
+    // cout << "insert branch: " << u->number << " - " << u->back->number <<
+    // '\n';
 
     // Uppass Score
     unsigned int mp = evaluateInsertParsimonyUppassSPR(tr, pr, p->back, u);
@@ -5336,8 +5337,9 @@ void testInsertSPR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr u,
 }
 void testInsertTBR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q,
                    nodeptr r, int perSiteScores) {
-    // cout << "insert branch: " << p->number << " - " << p->back->number << '\n';
-    // cout << "insert branch: " << q->number << " - " << q->back->number << '\n';
+    // cout << "insert branch: " << p->number << " - " << p->back->number <<
+    // '\n'; cout << "insert branch: " << q->number << " - " << q->back->number
+    // << '\n';
 
     // Uppass Score
     unsigned int mp = evaluateInsertParsimonyUppassTBR(tr, pr, p, q);
@@ -5397,7 +5399,8 @@ void testInsertTBRCorrectness(pllInstance *tr, partitionList *pr, nodeptr p,
     cout << "Real Score: " << mp << '\n';
     assert(uppassMP == mp);
 }
-void testInsertSPRCorrectness(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr u) {
+void testInsertSPRCorrectness(pllInstance *tr, partitionList *pr, nodeptr p,
+                              nodeptr u) {
     cout << "insert branch: " << u->number << " - " << u->back->number << '\n';
 
     // Uppass Score
@@ -5425,8 +5428,38 @@ void testInsertSPRCorrectness(pllInstance *tr, partitionList *pr, nodeptr p, nod
 }
 
 void traverseInsertBranchesTBRQ(pllInstance *tr, partitionList *pr, nodeptr p,
-                                nodeptr q, nodeptr r, int perSiteScores) {
+                                nodeptr q, nodeptr r, int mintrav, int maxtrav,
+                                int perSiteScores) {
 
+    if (mintrav <= 0) {
+        testInsertTBR(tr, pr, p, q, r, perSiteScores);
+    }
+    /* traverse the q subtree */
+    if (!isTip(q->number, tr->mxtips) && maxtrav >= 1) {
+        traverseInsertBranchesTBRQ(tr, pr, p, q->next->back, r, mintrav - 1,
+                                   maxtrav - 1, perSiteScores);
+        traverseInsertBranchesTBRQ(tr, pr, p, q->next->next->back, r,
+                                   mintrav - 1, maxtrav - 1, perSiteScores);
+    }
+}
+void traverseInsertBranchesTBRP(pllInstance *tr, partitionList *pr, nodeptr p,
+                                nodeptr q, nodeptr r, int mintrav, int maxtrav,
+                                int perSiteScores) {
+    if (maxtrav < 0) {
+        return;
+    }
+    traverseInsertBranchesTBRQ(tr, pr, p, q, r, mintrav, maxtrav,
+                               perSiteScores);
+    /* traverse the p subtree */
+    if (!isTip(p->number, tr->mxtips) && maxtrav >= 1) {
+        traverseInsertBranchesTBRP(tr, pr, p->next->back, q, r, mintrav - 1,
+                                   maxtrav - 1, perSiteScores);
+        traverseInsertBranchesTBRP(tr, pr, p->next->next->back, q, r,
+                                   mintrav - 1, maxtrav - 1, perSiteScores);
+    }
+}
+void traverseInsertBranchesTBRQ(pllInstance *tr, partitionList *pr, nodeptr p,
+                                nodeptr q, nodeptr r, int perSiteScores) {
     testInsertTBR(tr, pr, p, q, r, perSiteScores);
     /* traverse the q subtree */
     if (!isTip(q->number, tr->mxtips)) {
@@ -5446,14 +5479,32 @@ void traverseInsertBranchesTBRP(pllInstance *tr, partitionList *pr, nodeptr p,
     }
 }
 void traverseInsertBranchesSPR(pllInstance *tr, partitionList *pr, nodeptr p,
+                               nodeptr u, int mintrav, int maxtrav,
+                               int perSiteScores) {
+    if (maxtrav < 0) {
+        return;
+    }
+    if (mintrav <= 0) {
+        testInsertSPR(tr, pr, p, u, perSiteScores);
+    }
+    if (u->number > tr->mxtips && maxtrav >= 1) {
+        traverseInsertBranchesSPR(tr, pr, p, u->next->back, mintrav - 1,
+                                  maxtrav - 1, perSiteScores);
+        traverseInsertBranchesSPR(tr, pr, p, u->next->next->back, mintrav - 1,
+                                  maxtrav - 1, perSiteScores);
+    }
+}
+void traverseInsertBranchesSPR(pllInstance *tr, partitionList *pr, nodeptr p,
                                nodeptr u, int perSiteScores) {
     testInsertSPR(tr, pr, p, u, perSiteScores);
     if (u->number > tr->mxtips) {
         traverseInsertBranchesSPR(tr, pr, p, u->next->back, perSiteScores);
-        traverseInsertBranchesSPR(tr, pr, p, u->next->next->back, perSiteScores);
+        traverseInsertBranchesSPR(tr, pr, p, u->next->next->back,
+                                  perSiteScores);
     }
 }
-void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p, int perSiteScores) {
+void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p, int mintrav,
+                  int maxtrav, int perSiteScores) {
     nodeptr q = p->back;
     if (q->number > tr->mxtips) {
         nodeptr q1 = q->next->back;
@@ -5469,8 +5520,64 @@ void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p, int perSiteScor
             // cout << "scoreTwoSubtrees : " << scoreTwoSubtrees << '\n';
             traverseInsertBranchesSPR(tr, pr, q, q1, perSiteScores);
             if (q2->number > tr->mxtips) {
-                traverseInsertBranchesSPR(tr, pr, q, q2->next->back, perSiteScores);
-                traverseInsertBranchesSPR(tr, pr, q, q2->next->next->back, perSiteScores);
+                traverseInsertBranchesSPR(tr, pr, q, q2->next->back,
+                                          perSiteScores);
+                traverseInsertBranchesSPR(tr, pr, q, q2->next->next->back,
+                                          perSiteScores);
+            }
+        }
+        q->next->back = q1;
+        q->next->next->back = q2;
+        q1->back = q->next;
+        q2->back = q->next->next;
+    }
+
+    if (p->number > tr->mxtips) {
+        nodeptr p1 = p->next->back;
+        nodeptr p2 = p->next->next->back;
+        p->next->back = p->next->next->back = NULL;
+        p1->back = p2;
+        p2->back = p1;
+        assignAllLeavesDownpassToUppass(tr, pr);
+        scoreTwoSubtrees =
+            _evaluateParsimonyUppass(tr, pr, q, perSiteScores, false, false) +
+            _evaluateParsimonyUppass(tr, pr, p1, perSiteScores, true, true);
+        // cout << "scoreTwoSubtrees : " << scoreTwoSubtrees << '\n';
+        traverseInsertBranchesSPR(tr, pr, p, p1, mintrav, maxtrav,
+                                  perSiteScores);
+        if (p2->number > tr->mxtips) {
+            traverseInsertBranchesSPR(tr, pr, p, p2->next->back, mintrav - 1,
+                                      maxtrav - 1, perSiteScores);
+            traverseInsertBranchesSPR(tr, pr, p, p2->next->next->back,
+                                      mintrav - 1, maxtrav - 1, perSiteScores);
+        }
+        p->next->back = p1;
+        p->next->next->back = p2;
+        p1->back = p->next;
+        p2->back = p->next->next;
+    }
+}
+void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p,
+                  int perSiteScores) {
+    nodeptr q = p->back;
+    if (q->number > tr->mxtips) {
+        nodeptr q1 = q->next->back;
+        nodeptr q2 = q->next->next->back;
+        q->next->back = q->next->next->back = NULL;
+        q1->back = q2;
+        q2->back = q1;
+        assignAllLeavesDownpassToUppass(tr, pr);
+        scoreTwoSubtrees =
+            _evaluateParsimonyUppass(tr, pr, p, perSiteScores, false, false) +
+            _evaluateParsimonyUppass(tr, pr, q1, perSiteScores, true, true);
+        if (scoreTwoSubtrees <= tr->bestParsimony) {
+            // cout << "scoreTwoSubtrees : " << scoreTwoSubtrees << '\n';
+            traverseInsertBranchesSPR(tr, pr, q, q1, perSiteScores);
+            if (q2->number > tr->mxtips) {
+                traverseInsertBranchesSPR(tr, pr, q, q2->next->back,
+                                          perSiteScores);
+                traverseInsertBranchesSPR(tr, pr, q, q2->next->next->back,
+                                          perSiteScores);
             }
         }
         q->next->back = q1;
@@ -5493,7 +5600,8 @@ void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p, int perSiteScor
         traverseInsertBranchesSPR(tr, pr, p, p1, perSiteScores);
         if (p2->number > tr->mxtips) {
             traverseInsertBranchesSPR(tr, pr, p, p2->next->back, perSiteScores);
-            traverseInsertBranchesSPR(tr, pr, p, p2->next->next->back, perSiteScores);
+            traverseInsertBranchesSPR(tr, pr, p, p2->next->next->back,
+                                      perSiteScores);
         }
         p->next->back = p1;
         p->next->next->back = p2;
@@ -5501,7 +5609,66 @@ void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p, int perSiteScor
         p2->back = p->next->next;
     }
 }
-void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p, int perSiteScores) {
+void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p, int mintrav,
+                  int maxtrav, int perSiteScores) {
+    nodeptr q = p->back;
+    assert(p->number > tr->mxtips && q->number > tr->mxtips);
+    nodeptr q1 = q->next->back;
+    nodeptr q2 = q->next->next->back;
+    nodeptr p1 = p->next->back;
+    nodeptr p2 = p->next->next->back;
+    q->next->back = q->next->next->back = NULL;
+    q1->back = q2;
+    q2->back = q1;
+    p->next->back = p->next->next->back = NULL;
+    p1->back = p2;
+    p2->back = p1;
+    assignAllLeavesDownpassToUppass(tr, pr);
+    scoreTwoSubtrees =
+        _evaluateParsimonyUppass(tr, pr, p1, perSiteScores, true, true) +
+        _evaluateParsimonyUppass(tr, pr, q1, perSiteScores, true, true);
+    // cout << "scoreTwoSubtrees : " << scoreTwoSubtrees << '\n';
+    if (scoreTwoSubtrees <= tr->bestParsimony) {
+        traverseInsertBranchesTBRP(tr, pr, p1, q1, p, mintrav, maxtrav,
+                                   perSiteScores);
+        if (q2->number > tr->mxtips) {
+            traverseInsertBranchesTBRP(tr, pr, p1, q2->next->back, p,
+                                       mintrav - 1, maxtrav - 1, perSiteScores);
+            traverseInsertBranchesTBRP(tr, pr, p1, q2->next->next->back, p,
+                                       mintrav - 1, maxtrav - 1, perSiteScores);
+        }
+        if (p2->number > tr->mxtips) {
+            traverseInsertBranchesTBRP(tr, pr, p2->next->back, q1, p,
+                                       mintrav - 1, maxtrav - 1, perSiteScores);
+            traverseInsertBranchesTBRP(tr, pr, p2->next->next->back, q1, p,
+                                       mintrav - 1, maxtrav - 1, perSiteScores);
+            if (q2->number > tr->mxtips) {
+                traverseInsertBranchesTBRP(tr, pr, p2->next->back,
+                                           q2->next->back, p, mintrav - 2,
+                                           maxtrav - 2, perSiteScores);
+                traverseInsertBranchesTBRP(tr, pr, p2->next->back,
+                                           q2->next->next->back, p, mintrav - 2,
+                                           maxtrav - 2, perSiteScores);
+                traverseInsertBranchesTBRP(tr, pr, p2->next->next->back,
+                                           q2->next->back, p, mintrav - 2,
+                                           maxtrav - 2, perSiteScores);
+                traverseInsertBranchesTBRP(tr, pr, p2->next->next->back,
+                                           q2->next->next->back, p, mintrav - 2,
+                                           maxtrav - 2, perSiteScores);
+            }
+        }
+    }
+    q->next->back = q1;
+    q->next->next->back = q2;
+    q1->back = q->next;
+    q2->back = q->next->next;
+    p->next->back = p1;
+    p->next->next->back = p2;
+    p1->back = p->next;
+    p2->back = p->next->next;
+}
+void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
+                  int perSiteScores) {
     nodeptr q = p->back;
     assert(p->number > tr->mxtips && q->number > tr->mxtips);
     nodeptr q1 = q->next->back;
@@ -5522,21 +5689,27 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p, int perSiteScor
     if (scoreTwoSubtrees <= tr->bestParsimony) {
         traverseInsertBranchesTBRP(tr, pr, p1, q1, p, perSiteScores);
         if (q2->number > tr->mxtips) {
-            traverseInsertBranchesTBRP(tr, pr, p1, q2->next->back, p, perSiteScores);
-            traverseInsertBranchesTBRP(tr, pr, p1, q2->next->next->back, p, perSiteScores);
+            traverseInsertBranchesTBRP(tr, pr, p1, q2->next->back, p,
+                                       perSiteScores);
+            traverseInsertBranchesTBRP(tr, pr, p1, q2->next->next->back, p,
+                                       perSiteScores);
         }
         if (p2->number > tr->mxtips) {
-            traverseInsertBranchesTBRP(tr, pr, p2->next->back, q1, p, perSiteScores);
-            traverseInsertBranchesTBRP(tr, pr, p2->next->next->back, q1, p, perSiteScores);
+            traverseInsertBranchesTBRP(tr, pr, p2->next->back, q1, p,
+                                       perSiteScores);
+            traverseInsertBranchesTBRP(tr, pr, p2->next->next->back, q1, p,
+                                       perSiteScores);
             if (q2->number > tr->mxtips) {
-                traverseInsertBranchesTBRP(tr, pr, p2->next->back, q2->next->back,
-                                           p, perSiteScores);
                 traverseInsertBranchesTBRP(tr, pr, p2->next->back,
-                                           q2->next->next->back, p, perSiteScores);
+                                           q2->next->back, p, perSiteScores);
+                traverseInsertBranchesTBRP(tr, pr, p2->next->back,
+                                           q2->next->next->back, p,
+                                           perSiteScores);
                 traverseInsertBranchesTBRP(tr, pr, p2->next->next->back,
                                            q2->next->back, p, perSiteScores);
                 traverseInsertBranchesTBRP(tr, pr, p2->next->next->back,
-                                           q2->next->next->back, p, perSiteScores);
+                                           q2->next->next->back, p,
+                                           perSiteScores);
             }
         }
     }
@@ -5604,6 +5777,71 @@ void applyTBR(nodeptr u, nodeptr p1, nodeptr q1) {
     u->next->next->back = p2;
     v->next->back = q1;
     v->next->next->back = q2;
+}
+int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
+                         int maxtrav, IQTree *_iqtree) {
+    int perSiteScores = globalParam->gbo_replicates > 0;
+
+    iqtree = _iqtree; // update pointer to IQTree
+
+    if (globalParam->ratchet_iter >= 0 &&
+        (iqtree->on_ratchet_hclimb1 || iqtree->on_ratchet_hclimb2)) {
+        // oct 23: in non-ratchet iteration, allocate is not triggered
+        _updateInternalPllOnRatchet(tr, pr);
+        _allocateParsimonyDataStructuresUppass(
+            tr, pr, perSiteScores); // called once if not running ratchet
+    } else if (first_call || (iqtree && iqtree->on_opt_btree))
+        _allocateParsimonyDataStructuresUppass(
+            tr, pr, perSiteScores); // called once if not running ratchet
+
+    if (first_call) {
+        first_call = false;
+    }
+    unsigned int randomMP, startMP;
+    assert(!tr->constrained);
+
+    nodeRectifierPars(tr);
+    tr->bestParsimony = UINT_MAX;
+    tr->bestParsimony =
+        _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
+
+    assert(-iqtree->curScore == tr->bestParsimony);
+    // cout << "Start MP = " << tr->bestParsimony << '\n';
+    unsigned int bestIterationScoreHits = 1;
+    randomMP = tr->bestParsimony;
+    do {
+        startMP = randomMP;
+        nodeRectifierPars(tr);
+        for (int i = 2; i <= tr->mxtips + tr->mxtips - 2; ++i) {
+            tr->TBR_removeBranch = NULL;
+            tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
+            bestTreeScoreHits = 1;
+            if (i > tr->mxtips && tr->nodep[i]->back->number > tr->mxtips) {
+                rearrangeTBR(tr, pr, tr->nodep[i], mintrav, maxtrav,
+                             perSiteScores);
+            } else {
+                rearrangeSPR(tr, pr, tr->nodep[i], mintrav, maxtrav,
+                             perSiteScores);
+            }
+            if (tr->bestParsimony == randomMP)
+                bestIterationScoreHits++;
+            if (tr->bestParsimony < randomMP)
+                bestIterationScoreHits = 1;
+            if (((tr->bestParsimony < randomMP) ||
+                 ((tr->bestParsimony == randomMP) &&
+                  (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                tr->TBR_removeBranch && tr->TBR_insertBranch1) {
+                if (tr->TBR_insertBranch2) {
+                    applyTBR(tr->TBR_removeBranch, tr->TBR_insertBranch1,
+                             tr->TBR_insertBranch2);
+                } else {
+                    applySPR(tr->TBR_removeBranch, tr->TBR_insertBranch1);
+                }
+                randomMP = tr->bestParsimony;
+            }
+        }
+    } while (randomMP < startMP);
+    return startMP;
 }
 int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree) {
     int perSiteScores = globalParam->gbo_replicates > 0;

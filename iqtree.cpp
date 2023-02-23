@@ -480,7 +480,7 @@ IQTree::~IQTree() {
 
     for (vector<double *>::reverse_iterator it = treels_ptnlh.rbegin();
          it != treels_ptnlh.rend(); it++)
-        delete[](*it);
+        delete[] (*it);
     treels_ptnlh.clear();
     for (vector<SplitGraph *>::reverse_iterator it2 = boot_splits.rbegin();
          it2 != boot_splits.rend(); it2++)
@@ -2528,7 +2528,9 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                                             params->tbr_maxtrav, this);
                 }
             } else if (params->uppass == true) {
-                pllOptimizeTbrUppass(pllInst, pllPartitions, this);
+                pllOptimizeTbrUppass(pllInst, pllPartitions,
+                                     params->tbr_mintrav, params->tbr_maxtrav,
+                                     this);
             } else {
                 pllOptimizeSprParsimony(pllInst, pllPartitions,
                                         params->spr_mintrav, max_spr_rad, this);
@@ -2557,7 +2559,8 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                 //			if(((params->ratchet_iter >= 0) &&
                 // (!params->hclimb1_nni))) {
                 if (params->uppass) {
-                    _pllFreeParsimonyDataStructuresUppass(pllInst, pllPartitions);
+                    _pllFreeParsimonyDataStructuresUppass(pllInst,
+                                                          pllPartitions);
                 } else {
                     _pllFreeParsimonyDataStructures(pllInst, pllPartitions);
                 }
@@ -3308,7 +3311,7 @@ void IQTree::optimizeBootTrees() {
             clearAllPartialLH();
 
             //			// tmp, to-be-removed
-            //#############################################
+            // #############################################
             // stringstream ostr1; 			printTree(ostr1,
             // WT_SORT_TAXA);
             // tree = ostr1.str(); 			outb << tree << endl;
@@ -3323,7 +3326,7 @@ void IQTree::optimizeBootTrees() {
             //			out << curScore << endl;
 
             //			// tmp, to-be-removed
-            //#############################################
+            // #############################################
             // ostr1.str(""); 			printTree(ostr1, WT_SORT_TAXA);
             // tree = ostr1.str(); 			outa
             //<< tree << endl;
@@ -3990,9 +3993,9 @@ void IQTree::saveCurrentTree(double cur_logl) {
             } else {
                 // TODO: The following parallel is not very efficient, should
                 // wrap the above loop
-                //#ifdef _OPENMP
-                //#pragma omp parallel for reduction(+: rell)
-                //#endif
+                // #ifdef _OPENMP
+                // #pragma omp parallel for reduction(+: rell)
+                // #endif
                 //            if (sse == LK_NORMAL || sse == LK_EIGEN) {
                 //				if (true) {
                 //					BootValType *boot_sample

@@ -11,7 +11,8 @@
 #include "iqtree.h"
 #include "pllrepo/src/pll.h"
 
-void resetGlobalParamOnNewAln(); // Diep 2021-12-28: This serves analysis composed of multiple runs (such as SBS);
+void resetGlobalParamOnNewAln(); // Diep 2021-12-28: This serves analysis
+                                 // composed of multiple runs (such as SBS);
 
 /*
  * An alternative for pllComputeRandomizedStepwiseAdditionParsimonyTree
@@ -24,7 +25,7 @@ void _allocateParsimonyDataStructures(pllInstance *tr, partitionList *pr,
                                       int perSiteScores);
 void _pllFreeParsimonyDataStructures(pllInstance *tr, partitionList *pr);
 void _allocateParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr,
-                                      int perSiteScores);
+                                            int perSiteScores);
 void _pllFreeParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr);
 
 /**
@@ -37,7 +38,7 @@ void _pllFreeParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr);
 int pllOptimizeSprParsimony(pllInstance *tr, partitionList *pr, int mintrav,
                             int maxtrav, IQTree *_iqtree);
 int pllOptimizeSprParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
-                            int maxtrav, IQTree *_iqtree);
+                               int maxtrav, IQTree *_iqtree);
 
 int pllSaveCurrentTreeSprParsimony(pllInstance *tr, partitionList *pr,
                                    int cur_search_pars);
@@ -112,4 +113,6 @@ void _newviewParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
 void testUppassSPR(pllInstance *tr, partitionList *pr);
 void testUppassTBR(pllInstance *tr, partitionList *pr);
 int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree);
+int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
+                         int maxtrav, IQTree *_iqtree);
 #endif /* SPRPARSIMONY_H_ */
