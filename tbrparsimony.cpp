@@ -153,6 +153,9 @@ static nodeptr *numberToNodeptr = NULL;
 static int *subtree_sz = NULL;
 static bool *inCen = NULL;
 static int numRemoveBranch = 0;
+static int num_tbr_rearrangements = 0;
+static int num_recalculate_nodes = 0;
+static int num_recalculate_nodes_sum = 0;
 static nodeptr centralBranch = NULL;
 static bool *recalculate = NULL;
 static parsimonyNumber
@@ -453,6 +456,7 @@ static void getRecalculateNodeTBR(nodeptr root, nodeptr root1, nodeptr u) {
     }
     u = tbr_par[u->number];
     while (recalculate[u->number] == false) {
+        // num_recalculate_nodes++;
         recalculate[u->number] = true;
         u = tbr_par[u->number];
     }
@@ -469,8 +473,10 @@ static unsigned int evaluateParsimonyTBR(pllInstance *tr, partitionList *pr,
     ti[1] = w->number;
     ti[2] = w->back->number;
     recalculate[p->number] = recalculate[q->number] = true;
+    // num_recalculate_nodes = 0;
     getRecalculateNodeTBR(p, q, u);
     getRecalculateNodeTBR(p, q, v);
+    // num_recalculate_nodes_sum += num_recalculate_nodes;
     computeTraversalInfoParsimonyTBR(w, ti, &counter, tr->mxtips,
                                      perSiteScores);
     computeTraversalInfoParsimonyTBR(w->back, ti, &counter, tr->mxtips,
@@ -1004,6 +1010,7 @@ static int pllTbrRemoveBranch(pllInstance *tr, partitionList *pr, nodeptr p,
     //     return PLL_FALSE;
     // }
 
+    // cout << "Remove branch 11: " << p->number << ' ' << p->back->number << '\n';
     p1 = p->next->back;
     p2 = p->next->next->back;
     q1 = p->back->next->back;
@@ -1056,8 +1063,6 @@ static int pllTbrConnectSubtrees(pllInstance *tr, nodeptr p, nodeptr q,
     nodeptr pb = p->back;
     nodeptr qb = q->back;
 
-    if ((*freeBranch)->back->xPars)
-        (*freeBranch) = (*freeBranch)->back;
     // Join subtrees
     if (insertNNI) {
         hookupDefault(p, (*freeBranch)->next);
@@ -1357,22 +1362,18 @@ static void drawTreeTBR(pllInstance *tr, partitionList *pr) {
 static int pllTestTBRMove(pllInstance *tr, partitionList *pr, nodeptr branch1,
                           nodeptr branch2, nodeptr *freeBranch,
                           int perSiteScores, bool insertNNI = false) {
-
     branch1 = (branch1->xPars ? branch1 : branch1->back);
     branch2 = (branch2->xPars ? branch2 : branch2->back);
     freeBranch = ((*freeBranch)->xPars ? freeBranch : (&((*freeBranch)->back)));
+
     // assert((*freeBranch)->xPars);
     nodeptr tmpNode = (insertNNI ? branch2 : branch1->back);
 
     assert(pllTbrConnectSubtrees(tr, branch1, branch2, freeBranch, insertNNI));
 
-    nodeptr TBR_removeBranch = NULL;
-    if (branch1->back->next->back == tmpNode) {
-        TBR_removeBranch = branch1->back->next->next;
-    } else {
-        TBR_removeBranch = branch1->back->next;
-    }
+    nodeptr TBR_removeBranch = *freeBranch;
     unsigned int mp = INT_MAX;
+    num_tbr_rearrangements++;
     // if (dupTreeEval->keepOptimizeTree(tr->nodep[1]->back)) {
     mp = evaluateParsimonyTBR(tr, pr, branch1, branch2, TBR_removeBranch,
                               perSiteScores);
@@ -1498,9 +1499,9 @@ static void pllTraverseUpdateTBRVer2Q(pllInstance *tr, partitionList *pr,
                                       nodeptr p, nodeptr q, nodeptr *r,
                                       int mintrav, int maxtrav, int distP,
                                       int distQ, int perSiteScores) {
-
     if (mintrav <= 0) {
         assert((pllTestTBRMove(tr, pr, p, q, r, perSiteScores, false)));
+
         if (globalParam->tbr_insert_nni == true) {
             assert((pllTestTBRMove(tr, pr, p, q, r, perSiteScores, true)));
         }
@@ -1784,7 +1785,6 @@ static int pllComputeTBRVer1(pllInstance *tr, partitionList *pr, nodeptr p,
  */
 static int pllComputeTBRVer2(pllInstance *tr, partitionList *pr, nodeptr p,
                              int mintrav, int maxtrav, int perSiteScores) {
-
     nodeptr p1, p2, q, q1, q2;
 
     q = p->back;
@@ -1840,13 +1840,12 @@ static int pllComputeTBRVer2(pllInstance *tr, partitionList *pr, nodeptr p,
         }
     }
     /* restore the topology as it was before the split */
-    nodeptr freeBranch = (p->xPars ? p : q);
-    p1 = (p1->xPars ? p1 : p1->back);
-    q1 = (q1->xPars ? q1 : q1->back);
-    assert(pllTbrConnectSubtrees(tr, p1, q1, &freeBranch));
-    evaluateParsimonyTBR(tr, pr, p1, q1, freeBranch, perSiteScores);
-    tr->curRoot = freeBranch;
-    tr->curRootBack = freeBranch->back;
+    nodeptr pp1 = (p1->xPars ? p1 : p1->back);
+    nodeptr qq1 = (q1->xPars ? q1 : q1->back);
+    assert(pllTbrConnectSubtrees(tr, p1, q1, &p));
+    evaluateParsimonyTBR(tr, pr, pp1, qq1, p, perSiteScores);
+    tr->curRoot = p;
+    tr->curRootBack = p->back;
 
     return PLL_TRUE;
 }
@@ -2038,7 +2037,8 @@ static int pllTestTBRMoveLeaf(pllInstance *tr, partitionList *pr,
         tr->bestParsimony = mp;
         tr->TBR_insertBranch1 =
             (insertBranch->xPars ? insertBranch : insertBranch->back);
-        tr->TBR_removeBranch = p;
+        tr->TBR_insertBranch2 = NULL;
+        tr->TBR_removeBranch = p->back;
     }
 
     // Remove
@@ -2120,20 +2120,20 @@ static int pllComputeTBRLeaf(pllInstance *tr, partitionList *pr, nodeptr p,
 static bool restoreTreeRearrangeParsimonyTBRLeaf(pllInstance *tr,
                                                  partitionList *pr,
                                                  int perSiteScores) {
-
-    hookupDefault(tr->TBR_removeBranch->next->back,
-                  tr->TBR_removeBranch->next->next->back);
+    assert(tr->TBR_removeBranch->xPars);
+    nodeptr q = tr->TBR_removeBranch->back;
+    hookupDefault(q->next->back,
+                  q->next->next->back);
 
     nodeptr r = tr->TBR_insertBranch1;
+    r = r->xPars ? r : r->back;
     nodeptr rb = r->back;
-    if (!r->xPars) {
-        swap(r, rb);
-    }
     assert(r->xPars);
-    assert(tr->TBR_removeBranch->xPars);
-    hookupDefault(r, tr->TBR_removeBranch->next);
-    hookupDefault(rb, tr->TBR_removeBranch->next->next);
-    evaluateParsimonyTBR(tr, pr, tr->TBR_removeBranch->back, r,
+    nodeptr p1 = q->next;
+    nodeptr p2 = q->next->next;
+    hookupDefault(r, p1);
+    hookupDefault(rb, p2);
+    evaluateParsimonyTBR(tr, pr, tr->TBR_removeBranch, r,
                          tr->TBR_removeBranch, perSiteScores);
     tr->curRoot = tr->TBR_removeBranch;
     tr->curRootBack = tr->TBR_removeBranch->back;
@@ -2300,9 +2300,82 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
             }
         }
     } while (randomMP < startMP);
+    // cout << "num_tbr_rearrangements = " << num_tbr_rearrangements << '\n';
+    // cout << "num_recalculate_nodes_sum = " << num_recalculate_nodes_sum << '\n';
     return startMP;
 }
 
+int pllOptimizeTbrParsimonySuperFull(pllInstance *tr, partitionList *pr, int mintrav,
+                            int maxtrav, IQTree *_iqtree) {
+    int perSiteScores = globalParam->gbo_replicates > 0;
+
+    iqtree = _iqtree; // update pointer to IQTree
+
+    if (globalParam->ratchet_iter >= 0 &&
+        (iqtree->on_ratchet_hclimb1 || iqtree->on_ratchet_hclimb2)) {
+        // oct 23: in non-ratchet iteration, allocate is not triggered
+        _updateInternalPllOnRatchet(tr, pr);
+        _allocateParsimonyDataStructuresTBR(
+            tr, pr, perSiteScores); // called once if not running ratchet
+    } else if (first_call || (iqtree && iqtree->on_opt_btree))
+        _allocateParsimonyDataStructuresTBR(
+            tr, pr, perSiteScores); // called once if not running ratchet
+
+    if (first_call) {
+        first_call = false;
+        // dupTreeEval = new DuplicatedTreeEval(tr->mxtips);
+    }
+    int i;
+    unsigned int startMP;
+
+    assert(!tr->constrained);
+
+    nodeRectifierParsVer2(tr, true);
+    tr->bestParsimony = UINT_MAX;
+    tr->bestParsimony =
+        _evaluateParsimony(tr, pr, tr->start, PLL_TRUE, perSiteScores);
+
+    assert(-iqtree->curScore == tr->bestParsimony);
+
+    unsigned int bestIterationScoreHits = 1;
+    randomMP = tr->bestParsimony;
+    do {
+        startMP = randomMP;
+        nodeRectifierParsVer2(tr, false);
+        tr->TBR_removeBranch = NULL;
+        tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
+        bestTreeScoreHits = 1;
+        for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
+            bool isLeaf = isTip(tr->nodep_dfs[i]->number, tr->mxtips) ||
+                          isTip(tr->nodep_dfs[i]->back->number, tr->mxtips);
+            if (isLeaf) {
+                pllComputeTBRLeaf(tr, pr, tr->nodep_dfs[i], mintrav, maxtrav,
+                                  perSiteScores);
+            } else {
+                pllComputeTBRVer2(tr, pr, tr->nodep_dfs[i], mintrav,
+                                  maxtrav, perSiteScores);
+            }
+        }
+        if (tr->bestParsimony == randomMP)
+            bestIterationScoreHits++;
+        if (tr->bestParsimony < randomMP)
+            bestIterationScoreHits = 1;
+        if (((tr->bestParsimony < randomMP) ||
+             ((tr->bestParsimony == randomMP) &&
+              (random_double() <= 1.0 / bestIterationScoreHits))) &&
+            tr->TBR_removeBranch && tr->TBR_insertBranch1) {
+            if (tr->TBR_insertBranch2) {
+                restoreTreeRearrangeParsimonyTBR(tr, pr, perSiteScores);
+            } else {
+                restoreTreeRearrangeParsimonyTBRLeaf(tr, pr, perSiteScores);
+            }
+            randomMP = tr->bestParsimony;
+        }
+    } while (randomMP < startMP);
+    // cout << "num_tbr_rearrangements = " << num_tbr_rearrangements << '\n';
+    // cout << "num_recalculate_nodes_sum = " << num_recalculate_nodes_sum << '\n';
+    return startMP;
+}
 int pllOptimizeTbrParsimonyCen(pllInstance *tr, partitionList *pr, int mintrav,
                                int maxtrav, IQTree *_iqtree) {
     int perSiteScores = globalParam->gbo_replicates > 0;
