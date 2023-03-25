@@ -21,6 +21,8 @@ int pllOptimizeTbrParsimonyCen(pllInstance *tr, partitionList *pr, int mintrav,
 int pllOptimizeTbrParsimonyFull(pllInstance *tr, partitionList *pr, IQTree *iqtree);
 int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
                             int maxtrav, IQTree *iqtree);
+int pllOptimizeTbrParsimonySuperFull(pllInstance *tr, partitionList *pr, int mintrav,
+                            int maxtrav, IQTree *iqtree);
 int pllOptimizeTbrParsimonyMix(pllInstance *tr, partitionList *pr, int mintrav,
                             int maxtrav, IQTree *iqtree);
 

@@ -1825,6 +1825,8 @@ double IQTree::doTreeSearch() {
          * -------------------------------------------------------------------------*/
         //		long tmp_num_ratchet_trees = treels_logl.size();
         //		long tmp_num_ratchet_bootcands = treels.size();
+        // cout << "params->ratchet_iter = " << params->ratchet_iter << '\n';
+        // cout << "ratchet_iter_count = " << ratchet_iter_count << '\n';
         if (params->ratchet_iter >= 0) {
             if (params->ratchet_iter == ratchet_iter_count) {
                 //				string candidateTree =
@@ -1859,6 +1861,7 @@ double IQTree::doTreeSearch() {
          *---------------------------------------*/
         double perturbScore;
         if (!on_ratchet_hclimb1) {
+            // cout << "Never touch this hehe\n";
             if (iqp_assess_quartet == IQP_BOOTSTRAP) {
                 // create bootstrap sample
                 Alignment *bootstrap_alignment;
@@ -2523,7 +2526,7 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                                                params->tbr_mintrav,
                                                params->tbr_maxtrav, this);
                 } else {
-                    pllOptimizeTbrParsimony(pllInst, pllPartitions,
+                    pllOptimizeTbrParsimonySuperFull(pllInst, pllPartitions,
                                             params->tbr_mintrav,
                                             params->tbr_maxtrav, this);
                 }
