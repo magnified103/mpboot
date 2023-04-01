@@ -2531,9 +2531,7 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                                             params->tbr_maxtrav, this);
                 }
             } else if (params->uppass == true) {
-                pllOptimizeTbrUppass(pllInst, pllPartitions,
-                                     params->tbr_mintrav, params->tbr_maxtrav,
-                                     this);
+                pllOptimizeTbrUppass(pllInst, pllPartitions, this);
             } else {
                 pllOptimizeSprParsimony(pllInst, pllPartitions,
                                         params->spr_mintrav, max_spr_rad, this);
