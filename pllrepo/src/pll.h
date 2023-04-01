@@ -1054,7 +1054,9 @@ typedef struct {
     /* Parsimony vectors at each node */
     size_t parsimonyLength;
     parsimonyNumber *parsVect;
-    parsimonyNumber *parsVectUppass;
+    parsimonyNumber *parsVectUppass; /* HynDuf added - for uppass optimize */
+    parsimonyNumber *parsVectUppassLocal; /* HynDuf added - for uppass optimize */
+    unsigned int *scoreIncrease; /* HynDuf added - for uppass optimize */
     parsimonyNumber *perSiteParsScores;
 
     parsimonyNumber *perSitePartialPars; /* Diep added - for UFBoot */
