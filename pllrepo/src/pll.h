@@ -1314,6 +1314,7 @@ typedef struct {
 
     // TBR move
     nodeptr TBR_removeBranch;
+    nodeptr TBR_removeBranchBack;
     nodeptr TBR_insertBranch1;
     nodeptr TBR_insertBranch2;
     pllBoolean TBR_insertNNI;
