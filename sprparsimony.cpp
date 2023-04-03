@@ -4057,7 +4057,7 @@ void testSPROnUserTree(Params &params) {
  */
 static void compressDNAUppass(pllInstance *tr, partitionList *pr,
                               int *informative, int perSiteScores) {
-    cout << "Begin compressDNAUppass\n";
+    // cout << "Begin compressDNAUppass\n";
     if (pllCostMatrix != NULL) {
         if (globalParam->sankoff_short_int)
             return compressSankoffDNA<parsimonyNumberShort, USHORT_PER_VECTOR>(
@@ -4108,7 +4108,7 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
         compressedEntriesPadded = compressedEntries;
 #endif
 
-        cout << "parsVect\n";
+        // cout << "parsVect\n";
         rax_posix_memalign((void **)&(pr->partitionData[model]->parsVect),
                            PLL_BYTE_ALIGNMENT,
                            (size_t)compressedEntriesPadded * states *
@@ -4117,7 +4117,7 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
         for (i = 0; i < compressedEntriesPadded * states * totalNodes; ++i)
             pr->partitionData[model]->parsVect[i] = 0;
 
-        cout << "scoreIncreaseparsVectUppass\n";
+        // cout << "scoreIncreaseparsVectUppass\n";
         rax_posix_memalign((void **)&(pr->partitionData[model]->parsVectUppass),
                            PLL_BYTE_ALIGNMENT,
                            (size_t)compressedEntriesPadded * states *
@@ -4126,7 +4126,7 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
         for (i = 0; i < compressedEntriesPadded * states * totalNodes; ++i)
             pr->partitionData[model]->parsVectUppass[i] = 0;
 
-        cout << "parsVectUppassLocal\n";
+        // cout << "parsVectUppassLocal\n";
         rax_posix_memalign(
             (void **)&(pr->partitionData[model]->parsVectUppassLocal),
             PLL_BYTE_ALIGNMENT,
@@ -4136,7 +4136,7 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
         for (i = 0; i < compressedEntriesPadded * states * totalNodes; ++i)
             pr->partitionData[model]->parsVectUppassLocal[i] = 0;
 
-        cout << "scoreIncrease\n";
+        // cout << "scoreIncrease\n";
         rax_posix_memalign((void **)&(pr->partitionData[model]->scoreIncrease),
                            PLL_BYTE_ALIGNMENT,
                            (size_t)compressedEntriesPadded * totalNodes *
@@ -4238,11 +4238,11 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
 
     for (i = 0; i < totalNodes; ++i)
         tr->parsimonyScore[i] = 0;
-    cout << "End compressDNAUppass\n";
+    // cout << "End compressDNAUppass\n";
 }
 void _allocateParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr,
                                             int perSiteScores) {
-    cout << "Begin _allocateParsimonyDataStructuresUppass\n";
+    // cout << "Begin _allocateParsimonyDataStructuresUppass\n";
     int i;
     int *informative =
         (int *)rax_malloc(sizeof(int) * (size_t)tr->originalCrunchedLength);
@@ -4277,11 +4277,11 @@ void _allocateParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr,
     tr->ti = (int *)rax_malloc(sizeof(int) * 4 * 2 * (size_t)tr->mxtips);
 
     rax_free(informative);
-    cout << "End _allocateParsimonyDataStructuresUppass\n";
+    // cout << "End _allocateParsimonyDataStructuresUppass\n";
 }
 
 void _pllFreeParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr) {
-    cout << "Begin _pllFreeParsimonyDataStructuresUppass\n";
+    // cout << "Begin _pllFreeParsimonyDataStructuresUppass\n";
     size_t model;
 
     if (tr->parsimonyScore != NULL) {
@@ -4341,7 +4341,7 @@ void _pllFreeParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr) {
         delete[] depth;
         depth = NULL;
     }
-    cout << "End _pllFreeParsimonyDataStructuresUppass\n";
+    // cout << "End _pllFreeParsimonyDataStructuresUppass\n";
 }
 
 static void computeTraversalInfoParsimonyUppass(nodeptr p, int *ti,
@@ -4534,9 +4534,6 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
 
         size_t pNumber = (size_t)ti[index];
         if (pNumber <= tr->mxtips) {
-            cout << "mxtips = " << tr->mxtips << '\n';
-            cout << pNumber << ' ' << ti[index + 1] << '\n';
-            cout << "newview leaf continue\n";
             continue;
         }
         size_t qNumber = (size_t)ti[index + 1], rNumber = (size_t)ti[index + 2];
@@ -4552,12 +4549,13 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
             size_t k, states = pr->partitionData[model]->states,
                       width = pr->partitionData[model]->parsimonyLength;
 
+            unsigned int *scoreInc =
+                &(pr->partitionData[model]->scoreIncrease[width * pNumber]);
             unsigned int i;
 
             switch (states) {
             case 2: {
                 parsimonyNumber *left[2], *right[2], *cur[2];
-                unsigned int *scoreInc;
 
                 for (k = 0; k < 2; ++k) {
                     left[k] =
@@ -4570,8 +4568,6 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
                         &(pr->partitionData[model]
                               ->parsVect[(width * 2 * pNumber) + width * k]);
                 }
-                scoreInc =
-                    &(pr->partitionData[model]->scoreIncrease[width * pNumber]);
 
                 for (i = 0; i < width; i += INTS_PER_VECTOR) {
                     INT_TYPE
@@ -4614,9 +4610,7 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
                 }
             } break;
             case 4: {
-                cout << "CASE 44444444\n";
                 parsimonyNumber *left[4], *right[4], *cur[4];
-                unsigned int *scoreInc;
                 for (k = 0; k < 4; ++k) {
                     left[k] =
                         &(pr->partitionData[model]
@@ -4628,8 +4622,6 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
                         &(pr->partitionData[model]
                               ->parsVect[(width * 4 * pNumber) + width * k]);
                 }
-                // scoreInc =
-                //     &(pr->partitionData[model]->scoreIncrease[width * pNumber]);
 
                 for (i = 0; i < width; i += INTS_PER_VECTOR) {
                     INT_TYPE
@@ -4669,18 +4661,18 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
 
                     v_N = VECTOR_AND_NOT(v_N, allOne);
 
-                    totalScore += vectorPopcount(v_N);
-                    // unsigned int counts[INTS_PER_VECTOR]
-                    //     __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-                    //
-                    // int ptr;
-                    //
-                    // VECTOR_STORE((CAST)counts, v_N);
-                    //
-                    // for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                    //     scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
-                    //     totalScore += scoreInc[i + ptr];
-                    // }
+                    // totalScore += vectorPopcount(v_N);
+                    unsigned int counts[INTS_PER_VECTOR]
+                        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+
+                    int ptr;
+
+                    VECTOR_STORE((CAST)counts, v_N);
+
+                    for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
+                        scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
+                        totalScore += scoreInc[i + ptr];
+                    }
                     if (perSiteScores)
                         storePerSiteNodeScores(pr, model, v_N, i, pNumber);
                 }
@@ -4688,7 +4680,6 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
             case 20: {
                 parsimonyNumber *left[20], *right[20], *cur[20];
 
-                unsigned int *scoreInc;
                 for (k = 0; k < 20; ++k) {
                     left[k] =
                         &(pr->partitionData[model]
@@ -4700,8 +4691,6 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
                         &(pr->partitionData[model]
                               ->parsVect[(width * 20 * pNumber) + width * k]);
                 }
-                scoreInc =
-                    &(pr->partitionData[model]->scoreIncrease[width * pNumber]);
 
                 for (i = 0; i < width; i += INTS_PER_VECTOR) {
                     size_t j;
@@ -4745,7 +4734,6 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
 
             {
                 parsimonyNumber *left[32], *right[32], *cur[32];
-                unsigned int *scoreInc;
 
                 assert(states <= 32);
 
@@ -4760,8 +4748,6 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
                         pr->partitionData[model]
                             ->parsVect[(width * states * pNumber) + width * k]);
                 }
-                scoreInc =
-                    &(pr->partitionData[model]->scoreIncrease[width * pNumber]);
 
                 for (i = 0; i < width; i += INTS_PER_VECTOR) {
                     size_t j;
@@ -5171,7 +5157,6 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
         _newviewParsimonyIterativeFastUppass(tr, pr, perSiteScores);
 
     sum = tr->parsimonyScore[pNumber] + tr->parsimonyScore[qNumber];
-    cout << "Sum0 = " << sum << '\n';
 
     if (perSiteScores) {
         resetPerSiteNodeScores(pr, tr->start->number);
@@ -5181,6 +5166,9 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
         size_t k, states = pr->partitionData[model]->states,
                   width = pr->partitionData[model]->parsimonyLength, i;
 
+        unsigned int *scoreInc =
+            &(pr->partitionData[model]
+                  ->scoreIncrease[width * (2 * tr->mxtips - 1)]);
         switch (states) {
         case 2: {
             parsimonyNumber *left[2], *right[2], *tem[2];
@@ -5214,8 +5202,19 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
                              VECTOR_BIT_OR(t_A, VECTOR_BIT_AND(t_N, o_A)));
                 VECTOR_STORE((CAST)(&tem[1][i]),
                              VECTOR_BIT_OR(t_C, VECTOR_BIT_AND(t_N, o_C)));
-                sum += vectorPopcount(t_N);
 
+                // sum += vectorPopcount(t_N);
+                unsigned int counts[INTS_PER_VECTOR]
+                    __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+
+                int ptr;
+
+                VECTOR_STORE((CAST)counts, t_N);
+
+                for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
+                    scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
+                    sum += scoreInc[i + ptr];
+                }
                 if (perSiteScores)
                     storePerSiteNodeScores(pr, model, t_N, i, pNumber);
                 //                 if(sum >= bestScore)
@@ -5269,7 +5268,18 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
                              VECTOR_BIT_OR(t_G, VECTOR_BIT_AND(t_N, o_G)));
                 VECTOR_STORE((CAST)(&tem[3][i]),
                              VECTOR_BIT_OR(t_T, VECTOR_BIT_AND(t_N, o_T)));
-                sum += vectorPopcount(t_N);
+                // sum += vectorPopcount(t_N);
+                unsigned int counts[INTS_PER_VECTOR]
+                    __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+
+                int ptr;
+
+                VECTOR_STORE((CAST)counts, t_N);
+
+                for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
+                    scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
+                    sum += scoreInc[i + ptr];
+                }
 
                 if (perSiteScores)
                     storePerSiteNodeScores(pr, model, t_N, i, pNumber);
@@ -5308,7 +5318,18 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
                         (CAST)(&tem[k][i]),
                         VECTOR_BIT_OR(t_A[k], VECTOR_BIT_AND(t_N, o_A[k])));
                 }
-                sum += vectorPopcount(t_N);
+                // sum += vectorPopcount(t_N);
+                unsigned int counts[INTS_PER_VECTOR]
+                    __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+
+                int ptr;
+
+                VECTOR_STORE((CAST)counts, t_N);
+
+                for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
+                    scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
+                    sum += scoreInc[i + ptr];
+                }
                 if (perSiteScores)
                     storePerSiteNodeScores(pr, model, t_N, i, pNumber);
                 //                  if(sum >= bestScore)
@@ -5348,7 +5369,18 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
                         (CAST)(&tem[k][i]),
                         VECTOR_BIT_OR(t_A[k], VECTOR_BIT_AND(t_N, o_A[k])));
                 }
-                sum += vectorPopcount(t_N);
+                // sum += vectorPopcount(t_N);
+                unsigned int counts[INTS_PER_VECTOR]
+                    __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+
+                int ptr;
+
+                VECTOR_STORE((CAST)counts, t_N);
+
+                for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
+                    scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
+                    sum += scoreInc[i + ptr];
+                }
                 if (perSiteScores)
                     storePerSiteNodeScores(pr, model, t_N, i, pNumber);
                 //                  if(sum >= bestScore)
@@ -5358,7 +5390,7 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
         }
     }
 
-    cout << "Sum = " << sum << '\n';
+    // cout << "Sum = " << sum << '\n';
     // uppassStatesIterativeCalculate(tr, pr);
     return sum;
 }
@@ -5769,7 +5801,7 @@ void getLeavesInSubtree(nodeptr p, int *ti, int *counter, int mxtips) {
 }
 unsigned int _evaluateParsimonyUppass(pllInstance *tr, partitionList *pr,
                                       nodeptr p, int perSiteScores) {
-    cout << "Begin _evaluateParsimonyUppass\n";
+    // cout << "Begin _evaluateParsimonyUppass\n";
     volatile unsigned int result;
     nodeptr q = p->back;
     int *ti = tr->ti, counter = 4;
@@ -5785,7 +5817,7 @@ unsigned int _evaluateParsimonyUppass(pllInstance *tr, partitionList *pr,
 
     ti[0] = counter;
     result = _evaluateParsimonyIterativeFastUppass(tr, pr, perSiteScores);
-    cout << "End _evaluateParsimonyUppass\n";
+    // cout << "End _evaluateParsimonyUppass\n";
     return result;
 }
 void testInsertSPR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr u,
@@ -5821,7 +5853,7 @@ void testInsertTBR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q,
 
     // Uppass Score
     unsigned int mp = evaluateInsertParsimonyUppassTBR(tr, pr, p, q);
-    cout << "Insert MP = " << mp << '\n';
+    // cout << "Insert MP = " << mp << '\n';
 
     if (perSiteScores) {
         // If UFBoot is enabled ...
@@ -5839,6 +5871,14 @@ void testInsertTBR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q,
         tr->TBR_insertBranch1 = p;
         tr->TBR_insertBranch2 = q;
         tr->TBR_removeBranch = r;
+        // if (mp == 873) {
+        //     cout << "Remove branch = " << r->number << ' ' << r->back->number
+        //          << '\n';
+        //     cout << "Insert branch 1 = " << p->number << ' '
+        //          << p->back->number << '\n';
+        //     cout << "Insert branch 2 = " << q->number << ' '
+        //          << q->back->number << '\n';
+        // }
     }
 }
 void testInsertTBRCorrectness(pllInstance *tr, partitionList *pr, nodeptr p,
@@ -5874,8 +5914,8 @@ void testInsertTBRCorrectness(pllInstance *tr, partitionList *pr, nodeptr p,
     q->back = q1;
     q1->back = q;
 
-    cout << "Uppass Score: " << uppassMP << '\n';
-    cout << "Real Score: " << mp << '\n';
+    // cout << "Uppass Score: " << uppassMP << '\n';
+    // cout << "Real Score: " << mp << '\n';
     assert(uppassMP == mp);
 }
 void testInsertSPRCorrectness(pllInstance *tr, partitionList *pr, nodeptr p,
@@ -6078,8 +6118,6 @@ parsimonyNumber downpassCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
     /* TODO: Add case 2, 4, 20 */
     default: {
         // assert(states <= 32)
-        /* TODO: Remember to delete[] uDownpass and downpass
-         * saved in the nodesRecalculated vector as well :)) */
         parsimonyNumber o_A[32], t_A[32];
         int posV1 = 0, posV2 = 0;
         for (int k = 0; k < states; ++k) {
@@ -6195,7 +6233,10 @@ void dfsRecalculateUppass(nodeptr u, parsimonyNumber *pUpVec, int stepPUp,
  */
 unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                                           nodeptr Nm, nodeptr Nz, nodeptr Ns) {
-    cout << "Begin recalculateDownpassAndUppass\n";
+    // cout << "Begin recalculateDownpassAndUppass\n";
+    if (depth[Ns->number] < depth[Nz->number]) {
+        swap(Ns, Nz);
+    }
     nodeptr Nx = Nm->back;
     /* TODO: Mark which nodes are changed and reassign "global" to "local" on
      * only those nodes
@@ -6203,6 +6244,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
     copyGlobalToLocalUppass(pr, 2 * tr->mxtips - 1);
     /* WARNING: What if Nm is a leaf? Will the score be 0? */
     unsigned int scoreClippedSubtree = tr->parsimonyScore[Nm->number];
+    // cout << "CUR scoreClippedSubtree = " << scoreClippedSubtree << '\n';
     unsigned int scoreMainSubtree = 0;
 
     if (depth[Nx->number] == 0 && depth[Nm->number] == 0) {
@@ -6215,6 +6257,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
     } else {
         scoreMainSubtree = oldScore - tr->parsimonyScore[Nx->number] +
                            tr->parsimonyScore[Ns->number];
+        // cout << "CUR scoreMainSubtree = " << scoreMainSubtree << '\n';
         /* score has to be updated below */
     }
 
@@ -6224,6 +6267,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
         for (int w = 0; w < width; ++w) {
             int posNm = width * states * Nm->number + w;
             int posNs = width * states * Ns->number + w;
+            int posNx = width * states * Nx->number + w;
             /* STEP 2d: Recalculate Nm and its subtree
              * if old (global) uppass != old (global) downpass
              * (Because its new uppass is now its downpass) */
@@ -6255,15 +6299,12 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
 
             /* Nx MUST be parent of Nm or Nx-Nm is the root branch */
             assert(depth[Nm->number] >= depth[Nx->number]);
-            cout << "depth[Nm] = " << depth[Nm->number] << '\n';
-            cout << "depth[Nx] = " << depth[Nx->number] << '\n';
             if (depth[Nx->number] == 0 && depth[Nm->number] == 0) {
-                cout << "Remove branch is root branch\n";
+                // cout << "Remove branch is root branch\n";
                 /**
                  * Nx - Nm is the root branch
                  * Skip STEP 1, 2a, 2c
                  */
-                int posNx = width * states * Nx->number + w;
                 /**
                  * If old downpass (= new uppass) != old uppass of Nx
                  * -> Recalculate its subtree
@@ -6283,19 +6324,17 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     /* Nx must have 2 children (Ns and Nz). */
                     dfsRecalculateUppass(
                         Ns,
-                        &(pr->partitionData[model]
-                              ->parsVectUppassLocal[posNx]),
+                        &(pr->partitionData[model]->parsVectUppassLocal[posNx]),
                         width, pr->partitionData[model], w, tr->mxtips);
                     dfsRecalculateUppass(
                         Nz,
-                        &(pr->partitionData[model]
-                              ->parsVectUppassLocal[posNx]),
+                        &(pr->partitionData[model]->parsVectUppassLocal[posNx]),
                         width, pr->partitionData[model], w, tr->mxtips);
                 }
                 /* Continue to the next set of 32 columns */
                 continue;
             } else if (depth[Nx->number] == 0 && depth[Nm->number] == 1) {
-                cout << "Remove branch connected with root branch\n";
+                // cout << "Remove branch connected with root branch\n";
                 /* Nx-Nz must be the root branch here */
                 assert(depth[Nz->number] == 0);
 
@@ -6342,6 +6381,12 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                                 &(pr->partitionData[model]->parsVect[posNx]),
                                 width, width, states)) {
                 nodeptr u = Nz, lastU = NULL;
+                if (depth[u->next->back->number] <
+                    depth[u->next->next->back->number]) {
+                    u = u->next;
+                } else {
+                    u = u->next->next;
+                }
                 parsimonyNumber *uDownpass, *lastUDownpass = NULL;
                 struct pair2 {
                     nodeptr u;
@@ -6356,7 +6401,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
 
                 bool rootDownpassChanged = false;
 
-                cout << "STEP 1\n";
+                // cout << "STEP 1\n";
                 /* STEP 1: Do incremental downpass, from Nz up to the root while
                  * still needs recalculated */
                 while (true) {
@@ -6394,17 +6439,28 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     }
 
                     /* Fitch's Algo */
-                    /* TODO: Remember to delete[] uDownpass and downpass
-                     * saved in the nodesRecalculated vector as well :)) */
                     uDownpass = new parsimonyNumber[states];
                     parsimonyNumber isUnionDownpass =
                         downpassCalculate(uDownpass, v1Downpass, v2Downpass, 1,
                                           stepV1, stepV2, states);
                     /* Update score difference when recalculate downpass */
+                    // cout << "scoreMainSubtree BEGIN = " << scoreMainSubtree
+                    //      << '\n';
+                    // cout << "Score decrease: "
+                    //      << pr->partitionData[model]
+                    //             ->scoreIncrease[width * u->number + w]
+                    //      << '\n';
+
                     scoreMainSubtree -=
                         pr->partitionData[model]
                             ->scoreIncrease[width * u->number + w];
+
+                    // cout << "Score increase: "
+                    //      << __builtin_popcount(isUnionDownpass) << '\n';
                     scoreMainSubtree += __builtin_popcount(isUnionDownpass);
+
+                    // cout << "scoreMainSubtree AFTER = " << scoreMainSubtree
+                    //      << '\n';
 
                     /**
                      * Uppass of u MUST be recalculated in cases:
@@ -6445,12 +6501,10 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     lastUDownpass = uDownpass;
                     u = uppass_par[u->number];
                 }
-                cout << "STEP 2a\n";
+                // cout << "STEP 2a\n";
                 /* STEP 2a */
                 parsimonyNumber *rootDownpass = NULL;
                 if (depth[u->number] == 0) {
-                    cout << "depth[u->back] = " << depth[u->back->number]
-                         << '\n';
                     assert(depth[u->back->number] == 0);
                     /**
                      * NOTE: Calculate root downpass from u and u->back. Use
@@ -6471,11 +6525,25 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     if (rootDownpassChanged == true) {
                         /* Update scoreMainSubtree */
                         /* Subtract the old root downpass cost */
-                        scoreMainSubtree +=
-                            tr->parsimonyScore[u->number] +
-                            tr->parsimonyScore[u->back->number] - oldScore;
+                        // cout << "scoreMainSubtree BEGIN = " <<
+                        // scoreMainSubtree
+                        //      << '\n';
+                        // cout << "Score decrease: "
+                        //      << pr->partitionData[model]->scoreIncrease
+                        //             [width * (2 * tr->mxtips - 1) + w]
+                        //      << '\n';
+                        scoreMainSubtree -=
+                            pr->partitionData[model]
+                                ->scoreIncrease[width * (2 * tr->mxtips - 1) +
+                                                w];
                         /* Add the new increased cost */
+                        // cout << "Score increase: "
+                        //      << (__builtin_popcount(isUnionDownpass)) <<
+                        //      '\n';
                         scoreMainSubtree += __builtin_popcount(isUnionDownpass);
+                        // cout << "scoreMainSubtree AFTER = " <<
+                        // scoreMainSubtree
+                        //      << '\n';
                         dfsRecalculateUppass(u->back, rootDownpass, 1,
                                              pr->partitionData[model], w,
                                              tr->mxtips);
@@ -6578,7 +6646,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                               ->parsVectUppass[width * states * Nx->number +
                                                w]),
                         &(pr->partitionData[model]->parsVectUppassLocal
-                              [width * states * Nz->number + 2]),
+                              [width * states * Nz->number + w]),
                         width, width, states)) {
                     dfsRecalculateUppass(
                         Ns,
@@ -6593,12 +6661,12 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
             }
         }
     }
-    cout << "End recalculateDownpassAndUppass\n";
+    // cout << "End recalculateDownpassAndUppass\n";
     return scoreMainSubtree + scoreClippedSubtree;
 }
 void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
                   int perSiteScores) {
-    cout << "Begin rearrangeTBR\n";
+    // cout << "Begin rearrangeTBR\n";
     /**
      * p: N_m
      * p1, p2: 2 children of p
@@ -6618,12 +6686,9 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
     q1->back = q2;
     q2->back = q1;
     /* Nz is node that has smaller depth (closer to the root) */
-    if (depth[q2->number] < depth[q1->number]) {
-        swap(q1, q2);
-    }
-
     /* Delay cut N_m (p) for later after recalculate downpass and uppass */
     scoreTwoSubtrees = recalculateDownpassAndUppass(tr, pr, p, q1, q2);
+
     /**
      * Cut N_m from 2 of its children
      * Connect 2 of its children together
@@ -6632,8 +6697,9 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
     p1->back = p2;
     p2->back = p1;
     // cout << "scoreTwoSubtrees : " << scoreTwoSubtrees << '\n';
-    assert(scoreTwoSubtrees <= tr->bestParsimony);
-    if (scoreTwoSubtrees < tr->bestParsimony) {
+    // cout << "tr->bestParsimony : " << tr->bestParsimony << '\n';
+    assert(scoreTwoSubtrees <= oldScore);
+    if (scoreTwoSubtrees < oldScore) {
         traverseInsertBranchesTBRP(tr, pr, p1, q1, p, perSiteScores);
         if (q2->number > tr->mxtips) {
             traverseInsertBranchesTBRP(tr, pr, p1, q2->next->back, p,
@@ -6673,7 +6739,7 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
     p->next->next->back = p2;
     p1->back = p->next;
     p2->back = p->next->next;
-    cout << "End rearrangeTBR\n";
+    // cout << "End rearrangeTBR\n";
 }
 void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p,
                   int perSiteScores) {}
@@ -6717,6 +6783,11 @@ void applyTBR(nodeptr u, nodeptr p1, nodeptr q1) {
     nodeptr u2 = u->next->next->back;
     nodeptr v1 = v->next->back;
     nodeptr v2 = v->next->next->back;
+    // cout << "Remove branch = " << u->number << ' ' << v->number << '\n';
+    // cout << "Insert branch 1 = " << p1->number << ' ' << p1->back->number
+    //      << '\n';
+    // cout << "Insert branch 2 = " << q1->number << ' ' << q1->back->number
+    //      << '\n';
     u1->back = u2;
     u2->back = u1;
     v1->back = v2;
@@ -6738,7 +6809,7 @@ void applyTBR(nodeptr u, nodeptr p1, nodeptr q1) {
  * Find the middle branch of the tree, assigned to tr->start
  */
 int getNumLeavesSubtree(pllInstance *tr, nodeptr u) {
-    cout << "Edge: " << u->number << ' ' << u->back->number << '\n';
+    // cout << "Edge: " << u->number << ' ' << u->back->number << '\n';
     if (u->number <= tr->mxtips) {
         return 1;
     }
@@ -6750,7 +6821,7 @@ int getNumLeavesSubtree(pllInstance *tr, nodeptr u) {
     return num;
 }
 int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree) {
-    cout << "Begin pllOptimizeTbrUppass\n";
+    // cout << "Begin pllOptimizeTbrUppass\n";
     int perSiteScores = globalParam->gbo_replicates > 0;
 
     iqtree = _iqtree; // update pointer to IQTree
@@ -6773,13 +6844,14 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree) {
 
     tr->start = NULL;
     getNumLeavesSubtree(tr, tr->nodep[1]->back);
-    cout << "Root: " << tr->start->number << ' ' << tr->start->back->number << '\n';
+    // cout << "Root: " << tr->start->number << ' ' << tr->start->back->number
+    //      << '\n';
     // nodeRectifierPars(tr);
     tr->bestParsimony =
         _evaluateParsimonyUppass(tr, pr, tr->start, perSiteScores);
 
     assert(-iqtree->curScore == tr->bestParsimony);
-    cout << "Start MP = " << tr->bestParsimony << '\n';
+    // cout << "Start MP = " << tr->bestParsimony << '\n';
     unsigned int bestIterationScoreHits = 1;
     randomMP = tr->bestParsimony;
     oldScore = tr->bestParsimony;
@@ -6792,11 +6864,11 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree) {
         tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
         /* Iterate through all remove-branches */
         for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
-            cout << "Remove branch: " << tr->nodep[i]->number << ' '
-                 << tr->nodep[i]->back->number << '\n';
+            // cout << "Remove branch: " << tr->nodep[i]->number << ' '
+                 // << tr->nodep[i]->back->number << '\n';
             if (lastRemoveBranch && (tr->nodep[i] == lastRemoveBranch ||
                                      tr->nodep[i] == lastRemoveBranch->back)) {
-                cout << "Don't consider last remove-branch";
+                // cout << "Don't consider last remove-branch";
                 continue;
             }
             if (i > tr->mxtips && tr->nodep[i]->back->number > tr->mxtips) {
@@ -6805,32 +6877,35 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree) {
                 // rearrangeSPR(tr, pr, tr->nodep[i], perSiteScores);
             }
         }
-        // if (tr->bestParsimony == randomMP)
-        //     bestIterationScoreHits++;
-        // if (tr->bestParsimony < randomMP)
-        //     bestIterationScoreHits = 1;
-        // if (((tr->bestParsimony < randomMP) ||
-        //      ((tr->bestParsimony == randomMP) &&
-        //       (random_double() <= 1.0 / bestIterationScoreHits))) &&
-        //     tr->TBR_removeBranch && tr->TBR_insertBranch1) {
-        //     if (tr->TBR_insertBranch2) {
-        //         applyTBR(tr->TBR_removeBranch, tr->TBR_insertBranch1,
-        //                  tr->TBR_insertBranch2);
-        //     } else {
-        //         applySPR(tr->TBR_removeBranch, tr->TBR_insertBranch1);
-        //     }
-        //     /**
-        //      * TODO: Improve with incremental uppass/downpass too.
-        //      * TBR and SPR is different.
-        //      * Beware of recalculate stuff like scoreIncrease, oldScore...
-        //      */
-        //     randomMP =
-        //         _evaluateParsimonyUppass(tr, pr, tr->start, perSiteScores);
-        //     oldScore = randomMP;
-        //     assert(randomMP == tr->bestParsimony);
-        // }
+        if (tr->bestParsimony == randomMP)
+            bestIterationScoreHits++;
+        if (tr->bestParsimony < randomMP)
+            bestIterationScoreHits = 1;
+        if (((tr->bestParsimony < randomMP) ||
+             ((tr->bestParsimony == randomMP) &&
+              (random_double() <= 1.0 / bestIterationScoreHits))) &&
+            tr->TBR_removeBranch && tr->TBR_insertBranch1) {
+            if (tr->TBR_insertBranch2) {
+                applyTBR(tr->TBR_removeBranch, tr->TBR_insertBranch1,
+                         tr->TBR_insertBranch2);
+            } else {
+                applySPR(tr->TBR_removeBranch, tr->TBR_insertBranch1);
+            }
+            /**
+             * TODO: Improve with incremental uppass/downpass too.
+             * TBR and SPR is different.
+             * Beware of recalculate stuff like scoreIncrease, oldScore...
+             */
+            randomMP =
+                _evaluateParsimonyUppass(tr, pr, tr->start, perSiteScores);
+            oldScore = randomMP;
+            // cout << "randomMP = " << randomMP << '\n';
+            // cout << "tr->bestParsimony = " << tr->bestParsimony << '\n';
+            assert(randomMP == tr->bestParsimony);
+        }
     } while (randomMP < startMP);
-    cout << "End pllOptimizeTbrUppass\n";
+    tr->start = tr->nodep[1];
+    // cout << "End pllOptimizeTbrUppass\n";
     return startMP;
 }
 void testUppassTBR(pllInstance *tr, partitionList *pr) {
