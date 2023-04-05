@@ -1168,7 +1168,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
  */
 void _newviewSankoffParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                                            int perSiteScores) {
-    cout << "newviewSankoffParsimonyIterativeFast...";
+    // cout << "newviewSankoffParsimonyIterativeFast...";
     int model, *ti = tr->ti, count = ti[0], index;
 
     for (index = 4; index < count; index += 4) {
@@ -1508,13 +1508,12 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
         tr->parsimonyScore[pNumber] = totalScore + tr->parsimonyScore[rNumber] +
                                       tr->parsimonyScore[qNumber];
     }
-    cout << "newhere1\n";
 }
 
 unsigned int _evaluateSankoffParsimonyIterativeFast(pllInstance *tr,
                                                     partitionList *pr,
                                                     int perSiteScores) {
-    cout << "evaluateSankoffParsimonyIterativeFast ...";
+    // cout << "evaluateSankoffParsimonyIterativeFast ...";
     size_t pNumber = (size_t)tr->ti[1], qNumber = (size_t)tr->ti[2];
 
     int model;
@@ -4091,11 +4090,13 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
                 pr->partitionData[model]->numInformativePatterns++;
             }
 
+        // cout << "entries = " << entries << '\n';
         compressedEntries = entries / PLL_PCF;
 
         if (entries % PLL_PCF != 0)
             compressedEntries++;
-
+            // cout << "compressedEntries = " << compressedEntries << '\n';
+            // assert(compressedEntries % 8 != 0);
 #if (defined(__SSE3) || defined(__AVX))
         if (compressedEntries % INTS_PER_VECTOR != 0)
             compressedEntriesPadded =
@@ -4669,6 +4670,10 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
                     VECTOR_STORE((CAST)counts, v_N);
 
                     for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
+                        // if (ptr == 7) {
+                        //     cout << "Bitset of last block = "
+                        //          << (bitset<31>(counts[ptr])) << '\n';
+                        // }
                         scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
                         totalScore += scoreInc[i + ptr];
                     }
@@ -5390,7 +5395,7 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
     }
 
     // cout << "Sum = " << sum << '\n';
-    // uppassStatesIterativeCalculate(tr, pr);
+    uppassStatesIterativeCalculate(tr, pr);
     return sum;
 }
 
@@ -6040,7 +6045,7 @@ inline bool equalStatesCmp(parsimonyNumber *uStatesVec,
                            int &states) {
     int posU = 0, posV = 0;
     for (int k = 0; k < states; ++k) {
-        if ((uStatesVec[posU] ^ vStatesVec[posV]) > 0) {
+        if ((uStatesVec[posU] ^ vStatesVec[posV]) != 0) {
             return false;
         }
         posU += stepU;
@@ -6233,6 +6238,7 @@ void dfsRecalculateUppass(nodeptr u, parsimonyNumber *pUpVec, int stepPUp,
 unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                                           nodeptr Nm, nodeptr Nz, nodeptr Ns) {
     // cout << "Begin recalculateDownpassAndUppass\n";
+    // cout << "Nz = " << Nz->number << '\n';
     if (depth[Ns->number] < depth[Nz->number]) {
         swap(Ns, Nz);
     }
@@ -6249,7 +6255,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
     if (depth[Nx->number] == 0 && depth[Nm->number] == 0) {
         scoreMainSubtree = tr->parsimonyScore[Nx->number];
     } else if (depth[Nx->number] == 0 && depth[Nm->number] == 1) {
-        /* WARNING: What if Nz or Ns is a leaf? Will the score be 0? */
+        // /* WARNING: What if Nz or Ns is a leaf? Will the score be 0? */
         scoreMainSubtree =
             tr->parsimonyScore[Nz->number] + tr->parsimonyScore[Ns->number];
         /* score has to be updated below */
@@ -6388,10 +6394,10 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                 }
                 parsimonyNumber *uDownpass, *lastUDownpass = NULL;
                 struct pair2 {
-                    nodeptr u;
-                    parsimonyNumber *uDownpass;
-                    pair2(nodeptr _u, parsimonyNumber *_uDownpass)
-                        : u(_u), uDownpass(_uDownpass) {}
+                    nodeptr v;
+                    parsimonyNumber *vDownpass;
+                    pair2(nodeptr _v, parsimonyNumber *_vDownpass)
+                        : v(_v), vDownpass(_vDownpass) {}
                 };
 
                 /* HACK: Is this good? */
@@ -6458,7 +6464,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     //      << __builtin_popcount(isUnionDownpass) << '\n';
                     scoreMainSubtree += __builtin_popcount(isUnionDownpass);
 
-                    // cout << "scoreMainSubtree AFTER = " << scoreMainSubtree
+                    // cout v< "scoreMainSubtree AFTER = " << scoreMainSubtree
                     //      << '\n';
 
                     /**
@@ -6487,6 +6493,8 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                             &(pr->partitionData[model]
                                   ->parsVect[width * states * u->number + w]),
                             1, width, states)) {
+
+                        // cout << "u->back->number = " << u->back->number << '\n';
                         break;
                     }
                     /* if u is root branch, break the while loop */
@@ -6513,36 +6521,23 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
 
                     /* Calculate new downpass (= new uppass) of the old root */
                     rootDownpass = new parsimonyNumber[states];
-                    parsimonyNumber isUnionDownpass = downpassCalculate(
-                        rootDownpass,
-                        &(pr->partitionData[model]
-                              ->parsVect[width * states * u->number + w]),
+                    parsimonyNumber isUnionDownpassRoot = downpassCalculate(
+                        rootDownpass, uDownpass,
                         &(pr->partitionData[model]
                               ->parsVect[width * states * u->back->number + w]),
-                        1, width, width, states);
+                        1, 1, width, states);
 
                     if (rootDownpassChanged == true) {
+                        // cout << "rootDownpassChanged\n";
                         /* Update scoreMainSubtree */
                         /* Subtract the old root downpass cost */
-                        // cout << "scoreMainSubtree BEGIN = " <<
-                        // scoreMainSubtree
-                        //      << '\n';
-                        // cout << "Score decrease: "
-                        //      << pr->partitionData[model]->scoreIncrease
-                        //             [width * (2 * tr->mxtips - 1) + w]
-                        //      << '\n';
-                        scoreMainSubtree -=
-                            pr->partitionData[model]
-                                ->scoreIncrease[width * (2 * tr->mxtips - 1) +
-                                                w];
+
+                            scoreMainSubtree -=
+                                pr->partitionData[model]->scoreIncrease
+                                    [width * (2 * tr->mxtips - 1) + w];
                         /* Add the new increased cost */
-                        // cout << "Score increase: "
-                        //      << (__builtin_popcount(isUnionDownpass)) <<
-                        //      '\n';
-                        scoreMainSubtree += __builtin_popcount(isUnionDownpass);
-                        // cout << "scoreMainSubtree AFTER = " <<
-                        // scoreMainSubtree
-                        //      << '\n';
+                            scoreMainSubtree +=
+                                __builtin_popcount(isUnionDownpassRoot);
                         dfsRecalculateUppass(u->back, rootDownpass, 1,
                                              pr->partitionData[model], w,
                                              tr->mxtips);
@@ -6550,8 +6545,8 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                 }
                 for (int i = (int)nodesRecalculated.size() - 1; i >= 0; --i) {
                     pair2 cur = nodesRecalculated[i];
-                    nodeptr v = cur.u;
-                    parsimonyNumber *vDownpass = cur.uDownpass;
+                    nodeptr v = cur.v;
+                    parsimonyNumber *vDownpass = cur.vDownpass;
                     parsimonyNumber *pUpVec;
                     int stepPUp;
                     if (depth[v->number] == 0) {
@@ -6571,16 +6566,15 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     nodeptr v2 = v->next->next->back;
                     parsimonyNumber *v1Downpass = NULL;
                     if (i > 0) {
-                        nodeptr vTem = nodesRecalculated[i - 1].u;
+                        nodeptr vTem = nodesRecalculated[i - 1].v;
                         if (v1 == vTem) {
-                            v1Downpass = nodesRecalculated[i - 1].uDownpass;
+                            v1Downpass = nodesRecalculated[i - 1].vDownpass;
                         } else {
                             swap(v1, v2);
                             assert(v1 == vTem);
-                            v1Downpass = nodesRecalculated[i - 1].uDownpass;
+                            v1Downpass = nodesRecalculated[i - 1].vDownpass;
                         }
-                    }
-                    if (i > 0) {
+
                         assert(v1Downpass != NULL);
                         uppassInnerNodeCalculate(
                             vDownpass, v1Downpass,
@@ -6687,6 +6681,7 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
     /* Nz is node that has smaller depth (closer to the root) */
     /* Delay cut N_m (p) for later after recalculate downpass and uppass */
     scoreTwoSubtrees = recalculateDownpassAndUppass(tr, pr, p, q1, q2);
+    // cout << "scoreTwoSubtrees = " << scoreTwoSubtrees << '\n';
 
     /**
      * Cut N_m from 2 of its children
@@ -6695,6 +6690,27 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
     p->next->back = p->next->next->back = NULL;
     p1->back = p2;
     p2->back = p1;
+    // unsigned int correct = _evaluateParsimony(tr, pr, q1, PLL_TRUE, false) +
+    //                        _evaluateParsimony(tr, pr, p1, PLL_TRUE, false);
+    //
+    // // cout << "correct = "
+    // //      << correct << '\n';
+    // assert(scoreTwoSubtrees == correct);
+    // q->next->back = q1;
+    // q->next->next->back = q2;
+    // q1->back = q->next;
+    // q2->back = q->next->next;
+    // p->next->back = p1;
+    // p->next->next->back = p2;
+    // p1->back = p->next;
+    // p2->back = p->next->next;
+    // unsigned int tem = _evaluateParsimonyUppass(tr, pr, tr->start, false);
+    // q->next->back = q->next->next->back = NULL;
+    // q1->back = q2;
+    // q2->back = q1;
+    // p->next->back = p->next->next->back = NULL;
+    // p1->back = p2;
+    // p2->back = p1;
     // cout << "scoreTwoSubtrees : " << scoreTwoSubtrees << '\n';
     // cout << "tr->bestParsimony : " << tr->bestParsimony << '\n';
     assert(scoreTwoSubtrees <= oldScore);
@@ -6848,6 +6864,7 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree) {
     // nodeRectifierPars(tr);
     tr->bestParsimony =
         _evaluateParsimonyUppass(tr, pr, tr->start, perSiteScores);
+    // cout << "tr->bestParsimony = " << tr->bestParsimony << '\n';
 
     assert(-iqtree->curScore == tr->bestParsimony);
     // cout << "Start MP = " << tr->bestParsimony << '\n';
@@ -6863,8 +6880,8 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree) {
         tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
         /* Iterate through all remove-branches */
         for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
-            // cout << "Remove branch: " << tr->nodep[i]->number << ' '
-                 // << tr->nodep[i]->back->number << '\n';
+            // cout << "Remove branch: " << i << ' ' << tr->nodep[i]->number << ' '
+            //      << tr->nodep[i]->back->number << '\n';
             if (lastRemoveBranch && (tr->nodep[i] == lastRemoveBranch ||
                                      tr->nodep[i] == lastRemoveBranch->back)) {
                 // cout << "Don't consider last remove-branch";
@@ -6903,6 +6920,7 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree) {
             assert(randomMP == tr->bestParsimony);
         }
     } while (randomMP < startMP);
+    // assert(0);
     tr->start = tr->nodep[1];
     // cout << "End pllOptimizeTbrUppass\n";
     return startMP;
