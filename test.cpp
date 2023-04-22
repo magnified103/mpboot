@@ -3,6 +3,7 @@
 #include "alignment.h"
 #include "parstree.h"
 #include "sprparsimony.h"
+#include "uppass.h"
 
 void test(Params &params) {
     testWeightedParsimony(params);
@@ -71,51 +72,51 @@ void testWeightedParsimony(Params &params) {
 }
 
 // -s <alnfile> -test_uppass <treefile>
-void testUppassSPRCorrectness(Params &params) {
-
-    Alignment alignment(params.aln_file, params.sequence_type, params.intype);
-    IQTree *ptree = new IQTree(&alignment);
-
-    // cout << "Read user tree... 1st time";
-    ptree->readTree(params.user_file, params.is_rooted);
-
-    ptree->setAlignment(
-        &alignment); // IMPORTANT: Always call setAlignment() after readTree()
-    optimizeAlignment(ptree, params);
-
-    // cout << "Read user tree... 2nd time\n";
-    ptree->readTree(params.user_file, params.is_rooted);
-
-    ptree->setAlignment(
-        ptree->aln); // IMPORTANT: Always call setAlignment() after readTree()
-    ptree->initializeAllPartialPars();
-    ptree->clearAllPartialLH();
-    cout << "Parsimony score (by IQTree kernel) is: ";
-    cout << ptree->computeParsimony() << '\n';
-
-    ptree->initializePLL(params);
-    string tree_string = ptree->getTreeString();
-    pllNewickTree *pll_tree = pllNewickParseString(tree_string.c_str());
-    assert(pll_tree != NULL);
-    pllTreeInitTopologyNewick(ptree->pllInst, pll_tree, PLL_FALSE);
-    pllNewickParseDestroy(&pll_tree);
-    _allocateParsimonyDataStructures(ptree->pllInst, ptree->pllPartitions,
-                                     false);
-    ptree->pllInst->bestParsimony =
-        UINT_MAX; // Important because of early termination in
-                  // evaluateSankoffParsimonyIterativeFastSIMD
-    unsigned int pll_score =
-        _evaluateParsimony(ptree->pllInst, ptree->pllPartitions,
-                           ptree->pllInst->start, PLL_TRUE, false);
-    cout << "Parsimony score (by PLL kernel) is: " << pll_score << endl;
-
-    _pllFreeParsimonyDataStructures(ptree->pllInst, ptree->pllPartitions);
-    
-
-    testUppassTBR(ptree->pllInst, ptree->pllPartitions);
-
-    delete ptree;
-}
+// void testUppassSPRCorrectness(Params &params) {
+//
+//     Alignment alignment(params.aln_file, params.sequence_type, params.intype);
+//     IQTree *ptree = new IQTree(&alignment);
+//
+//     // cout << "Read user tree... 1st time";
+//     ptree->readTree(params.user_file, params.is_rooted);
+//
+//     ptree->setAlignment(
+//         &alignment); // IMPORTANT: Always call setAlignment() after readTree()
+//     optimizeAlignment(ptree, params);
+//
+//     // cout << "Read user tree... 2nd time\n";
+//     ptree->readTree(params.user_file, params.is_rooted);
+//
+//     ptree->setAlignment(
+//         ptree->aln); // IMPORTANT: Always call setAlignment() after readTree()
+//     ptree->initializeAllPartialPars();
+//     ptree->clearAllPartialLH();
+//     cout << "Parsimony score (by IQTree kernel) is: ";
+//     cout << ptree->computeParsimony() << '\n';
+//
+//     ptree->initializePLL(params);
+//     string tree_string = ptree->getTreeString();
+//     pllNewickTree *pll_tree = pllNewickParseString(tree_string.c_str());
+//     assert(pll_tree != NULL);
+//     pllTreeInitTopologyNewick(ptree->pllInst, pll_tree, PLL_FALSE);
+//     pllNewickParseDestroy(&pll_tree);
+//     _allocateParsimonyDataStructures(ptree->pllInst, ptree->pllPartitions,
+//                                      false);
+//     ptree->pllInst->bestParsimony =
+//         UINT_MAX; // Important because of early termination in
+//                   // evaluateSankoffParsimonyIterativeFastSIMD
+//     unsigned int pll_score =
+//         _evaluateParsimony(ptree->pllInst, ptree->pllPartitions,
+//                            ptree->pllInst->start, PLL_TRUE, false);
+//     cout << "Parsimony score (by PLL kernel) is: " << pll_score << endl;
+//
+//     _pllFreeParsimonyDataStructures(ptree->pllInst, ptree->pllPartitions);
+//     
+//
+//     testUppassTBR(ptree->pllInst, ptree->pllPartitions);
+//
+//     delete ptree;
+// }
 // -s <alnfile> -test_mode <treefile> -dna5
 void testComputeParsimonyDNA5(Params &params) {
 

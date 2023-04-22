@@ -387,6 +387,7 @@ checkpoint.cpp
 parstree.cpp
 sprparsimony.cpp
 tbrparsimony.cpp
+uppass.cpp
 test.cpp
 )
 
