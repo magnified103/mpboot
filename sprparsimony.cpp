@@ -5851,9 +5851,10 @@ void testInsertSPR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr u,
 }
 void testInsertTBR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q,
                    nodeptr r, int perSiteScores) {
-    // cout << "insert branch: " << p->number << " - " << p->back->number <<
-    // '\n'; cout << "insert branch: " << q->number << " - " << q->back->number
-    // << '\n';
+    // cout << "insert branch: " << p->number << " - " << p->back->number
+    //     << '\n';
+    // cout << "insert branch: " << q->number << " - " << q->back->number
+    //     << '\n';
 
     // Uppass Score
     unsigned int mp = evaluateInsertParsimonyUppassTBR(tr, pr, p, q);
@@ -5875,14 +5876,6 @@ void testInsertTBR(pllInstance *tr, partitionList *pr, nodeptr p, nodeptr q,
         tr->TBR_insertBranch1 = p;
         tr->TBR_insertBranch2 = q;
         tr->TBR_removeBranch = r;
-        // if (mp == 873) {
-        //     cout << "Remove branch = " << r->number << ' ' << r->back->number
-        //          << '\n';
-        //     cout << "Insert branch 1 = " << p->number << ' '
-        //          << p->back->number << '\n';
-        //     cout << "Insert branch 2 = " << q->number << ' '
-        //          << q->back->number << '\n';
-        // }
     }
 }
 void testInsertTBRCorrectness(pllInstance *tr, partitionList *pr, nodeptr p,
@@ -6273,6 +6266,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
             int posNm = width * states * Nm->number + w;
             int posNs = width * states * Ns->number + w;
             int posNx = width * states * Nx->number + w;
+            int posNz = width * states * Nz->number + w;
             /* STEP 2d: Recalculate Nm and its subtree
              * if old (global) uppass != old (global) downpass
              * (Because its new uppass is now its downpass) */
@@ -6494,7 +6488,8 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                                   ->parsVect[width * states * u->number + w]),
                             1, width, states)) {
 
-                        // cout << "u->back->number = " << u->back->number << '\n';
+                        // cout << "u->back->number = " << u->back->number <<
+                        // '\n';
                         break;
                     }
                     /* if u is root branch, break the while loop */
@@ -6532,12 +6527,13 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                         /* Update scoreMainSubtree */
                         /* Subtract the old root downpass cost */
 
-                            scoreMainSubtree -=
-                                pr->partitionData[model]->scoreIncrease
-                                    [width * (2 * tr->mxtips - 1) + w];
+                        scoreMainSubtree -=
+                            pr->partitionData[model]
+                                ->scoreIncrease[width * (2 * tr->mxtips - 1) +
+                                                w];
                         /* Add the new increased cost */
-                            scoreMainSubtree +=
-                                __builtin_popcount(isUnionDownpassRoot);
+                        scoreMainSubtree +=
+                            __builtin_popcount(isUnionDownpassRoot);
                         dfsRecalculateUppass(u->back, rootDownpass, 1,
                                              pr->partitionData[model], w,
                                              tr->mxtips);
@@ -6632,25 +6628,20 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                         }
                     }
                 }
-                /* STEP 2c: Because parent of N_s is now N_z and not N_x anymore
-                 */
-                if (!equalStatesCmp(
-                        &(pr->partitionData[model]
-                              ->parsVectUppass[width * states * Nx->number +
-                                               w]),
-                        &(pr->partitionData[model]->parsVectUppassLocal
-                              [width * states * Nz->number + w]),
-                        width, width, states)) {
-                    dfsRecalculateUppass(
-                        Ns,
-                        &(pr->partitionData[model]->parsVectUppassLocal
-                              [width * states * Nz->number + w]),
-                        width, pr->partitionData[model], w, tr->mxtips);
-                }
                 if (rootDownpass != NULL) {
                     assert(depth[u->number] == 0);
                     delete[] rootDownpass;
                 }
+            }
+            /* STEP 2c: Because parent of N_s is now N_z and not N_x anymore
+             */
+            if (!equalStatesCmp(
+                    &(pr->partitionData[model]->parsVectUppass[posNx]),
+                    &(pr->partitionData[model]->parsVectUppassLocal[posNz]),
+                    width, width, states)) {
+                dfsRecalculateUppass(
+                    Ns, &(pr->partitionData[model]->parsVectUppassLocal[posNz]),
+                    width, pr->partitionData[model], w, tr->mxtips);
             }
         }
     }
@@ -6681,7 +6672,6 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
     /* Nz is node that has smaller depth (closer to the root) */
     /* Delay cut N_m (p) for later after recalculate downpass and uppass */
     scoreTwoSubtrees = recalculateDownpassAndUppass(tr, pr, p, q1, q2);
-    // cout << "scoreTwoSubtrees = " << scoreTwoSubtrees << '\n';
 
     /**
      * Cut N_m from 2 of its children
@@ -6693,8 +6683,10 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
     // unsigned int correct = _evaluateParsimony(tr, pr, q1, PLL_TRUE, false) +
     //                        _evaluateParsimony(tr, pr, p1, PLL_TRUE, false);
     //
-    // // cout << "correct = "
-    // //      << correct << '\n';
+    // if (scoreTwoSubtrees != correct) {
+    //     cout << "scoreTwoSubtrees = " << scoreTwoSubtrees << '\n';
+    //     cout << "correct = " << correct << '\n';
+    // }
     // assert(scoreTwoSubtrees == correct);
     // q->next->back = q1;
     // q->next->next->back = q2;
@@ -6711,8 +6703,6 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p,
     // p->next->back = p->next->next->back = NULL;
     // p1->back = p2;
     // p2->back = p1;
-    // cout << "scoreTwoSubtrees : " << scoreTwoSubtrees << '\n';
-    // cout << "tr->bestParsimony : " << tr->bestParsimony << '\n';
     assert(scoreTwoSubtrees <= oldScore);
     if (scoreTwoSubtrees < oldScore) {
         traverseInsertBranchesTBRP(tr, pr, p1, q1, p, perSiteScores);
@@ -6880,7 +6870,8 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree) {
         tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
         /* Iterate through all remove-branches */
         for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
-            // cout << "Remove branch: " << i << ' ' << tr->nodep[i]->number << ' '
+            // cout << "Remove branch: " << i << ' ' << tr->nodep[i]->number <<
+            // ' '
             //      << tr->nodep[i]->back->number << '\n';
             if (lastRemoveBranch && (tr->nodep[i] == lastRemoveBranch ||
                                      tr->nodep[i] == lastRemoveBranch->back)) {
@@ -6912,12 +6903,20 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree) {
              * TBR and SPR is different.
              * Beware of recalculate stuff like scoreIncrease, oldScore...
              */
+            int temMP = _evaluateParsimony(tr, pr, tr->start, true, false);
             randomMP =
                 _evaluateParsimonyUppass(tr, pr, tr->start, perSiteScores);
             oldScore = randomMP;
-            // cout << "randomMP = " << randomMP << '\n';
-            // cout << "tr->bestParsimony = " << tr->bestParsimony << '\n';
-            assert(randomMP == tr->bestParsimony);
+            if (randomMP != tr->bestParsimony || randomMP != temMP) {
+                cout << "insert branch: " << tr->TBR_insertBranch1->number
+                     << " - " << tr->TBR_insertBranch1->back->number << '\n';
+                cout << "insert branch: " << tr->TBR_insertBranch2->number
+                     << " - " << tr->TBR_insertBranch2->back->number << '\n';
+                cout << "temMP = " << temMP << '\n';
+                cout << "randomMP = " << randomMP << '\n';
+                cout << "tr->bestParsimony = " << tr->bestParsimony << '\n';
+            }
+            assert(randomMP == tr->bestParsimony && randomMP == temMP);
         }
     } while (randomMP < startMP);
     // assert(0);
