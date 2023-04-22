@@ -24,9 +24,6 @@ void _pllComputeRandomizedStepwiseAdditionParsimonyTree(
 void _allocateParsimonyDataStructures(pllInstance *tr, partitionList *pr,
                                       int perSiteScores);
 void _pllFreeParsimonyDataStructures(pllInstance *tr, partitionList *pr);
-void _allocateParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr,
-                                            int perSiteScores);
-void _pllFreeParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr);
 
 /**
  * DTH: optimize whatever tree is stored in tr by parsimony SPR
@@ -109,8 +106,4 @@ unsigned int _evaluateParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
 
 void _newviewParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
                        int perSiteScores);
-
-void testUppassSPR(pllInstance *tr, partitionList *pr);
-void testUppassTBR(pllInstance *tr, partitionList *pr);
-int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree);
 #endif /* SPRPARSIMONY_H_ */

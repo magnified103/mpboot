@@ -2334,8 +2334,8 @@ int main(int argc, char *argv[])
 		testSPROnUserTree(params);
 	} else if(params.tbr_test){
 		testTBROnUserTree(params);
-	} else if(params.test_uppass){
-		testUppassSPRCorrectness(params);
+	// } else if(params.test_uppass){
+	// 	testUppassSPRCorrectness(params);
 	} else if(params.print_site_pars_user_tree){
 		printSiteParsimonyUserTree(params);
 	} else if (params.compute_parsimony) {

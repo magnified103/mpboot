@@ -156,6 +156,7 @@ static int numRemoveBranch = 0;
 static int num_tbr_rearrangements = 0;
 static int num_recalculate_nodes = 0;
 static int num_recalculate_nodes_sum = 0;
+static long long cnt = 0;
 static nodeptr centralBranch = NULL;
 static bool *recalculate = NULL;
 static parsimonyNumber
@@ -1373,7 +1374,7 @@ static int pllTestTBRMove(pllInstance *tr, partitionList *pr, nodeptr branch1,
 
     nodeptr TBR_removeBranch = *freeBranch;
     unsigned int mp = INT_MAX;
-    num_tbr_rearrangements++;
+    cnt++;
     // if (dupTreeEval->keepOptimizeTree(tr->nodep[1]->back)) {
     mp = evaluateParsimonyTBR(tr, pr, branch1, branch2, TBR_removeBranch,
                               perSiteScores);
@@ -2302,6 +2303,7 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
     } while (randomMP < startMP);
     // cout << "num_tbr_rearrangements = " << num_tbr_rearrangements << '\n';
     // cout << "num_recalculate_nodes_sum = " << num_recalculate_nodes_sum << '\n';
+    cout << "CNT = " << cnt << '\n';
     return startMP;
 }
 
