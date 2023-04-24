@@ -294,28 +294,67 @@ static inline void storePerSiteNodeScores (partitionList * pr, int model, INT_TY
 static inline void storePerSiteNodeScores (partitionList * pr, int model, INT_TYPE v, unsigned int offset , int nodeNumber)
 {
 
-	unsigned long
-		counts[LONG_INTS_PER_VECTOR] __attribute__ ((aligned (PLL_BYTE_ALIGNMENT)));
-		parsimonyNumber * buf;
+    unsigned int counts[INTS_PER_VECTOR]
+            __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+    parsimonyNumber *buf;
 
-	int
-		i,
-		j;
+    VECTOR_STORE((CAST)counts, v);
 
-	VECTOR_STORE((CAST)counts, v);
+    int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
+    int nodeStart = partialParsLength * nodeNumber;
+    int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
 
-	int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
-	int nodeStart = partialParsLength * nodeNumber;
-	int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
-	for (i = 0; i < LONG_INTS_PER_VECTOR; ++i){
-		buf = &(pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
-		nodeStartPlusOffset += ULINT_SIZE;
-//		buf = &(pr->partitionData[model]->perSitePartialPars[nodeStart + offset * PLL_PCF + i * ULINT_SIZE]); // Diep's
-//		buf = &(pr->partitionData[model]->perSitePartialPars[nodeStart + offset * PLL_PCF + i]); // Tomas's code
-		for (j = 0; j < ULINT_SIZE; ++ j)
-			buf[j] += ((counts[i] >> j) & 1);
-	}
-    
+    static_assert(sizeof(parsimonyNumber) == 4, "sizeof(parsimonyNumber) = 4");
+
+    for (int i = 0; i < INTS_PER_VECTOR; ++i) {
+        buf = &(
+                pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
+        nodeStartPlusOffset += sizeof(unsigned int) * 8;
+        //		buf =
+        //&(pr->partitionData[model]->perSitePartialPars[nodeStart +
+        // offset * PLL_PCF + i * ULINT_SIZE]); // Diep's 		buf =
+        //&(pr->partitionData[model]->perSitePartialPars[nodeStart + offset *
+        // PLL_PCF + i]); // Tomas's code
+
+        /* OLD CODE */
+        // for (int j = 0; j < ULINT_SIZE; ++j)
+        //     buf[j] += ((counts[i] >> j) & 1);
+#ifdef __AVX2
+        const int parsPerVector = 32 / 4;
+        const __m256i bit = _mm256_set_epi32(
+            (1 << 7), (1 << 6),
+            (1 << 5), (1 << 4),
+            (1 << 3), (1 << 2),
+            (1 << 1), (1 << 0)
+        );
+        __m256i base = _mm256_set1_epi32(counts[i]);
+
+        for (int j = 0; j < sizeof(unsigned int) * 8; j += parsPerVector) {
+            __m256i mask = _mm256_and_si256(base, bit);
+            mask = _mm256_cmpeq_epi32(mask, bit);
+            mask = _mm256_sub_epi32(_mm256_load_si256((__m256i*)(&buf[j])), mask);
+            _mm256_store_si256((__m256i*)(&buf[j]), mask);
+
+            base = _mm256_srli_epi32(base, parsPerVector);
+        }
+#else
+        const int parsPerVector = 16 / 4;
+        const __m128i bit = _mm_set_epi32(
+                (1 << 3), (1 << 2),
+                (1 << 1), (1 << 0)
+        );
+        __m128i base = _mm_set1_epi32(counts[i]);
+
+        for (int j = 0; j < sizeof(unsigned int) * 8; j += parsPerVector) {
+            __m128i mask = _mm_and_si128(base, bit);
+            mask = _mm_cmpeq_epi32(mask, bit);
+            mask = _mm_sub_epi32(_mm_load_si128((__m128i *) (&buf[j])), mask);
+            _mm_store_si128((__m128i *) (&buf[j]), mask);
+
+            base = _mm_srli_epi32(base, parsPerVector);
+        }
+#endif
+    }
 }
 
 #endif
