@@ -1056,6 +1056,7 @@ typedef struct {
     parsimonyNumber *parsVect;
     parsimonyNumber *parsVectUppass; /* HynDuf added - for uppass optimize */
     parsimonyNumber *parsVectUppassLocal; /* HynDuf added - for uppass optimize */
+    parsimonyNumber *branchVectUppass; /* HynDuf added - for uppass optimize */
     unsigned int *scoreIncrease; /* HynDuf added - for uppass optimize */
     parsimonyNumber *perSiteParsScores;
 
