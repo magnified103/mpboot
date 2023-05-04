@@ -29,8 +29,8 @@
 #include "pllrepo/src/pllInternal.h"
 #include "sprparsimony.h"
 #include "tbrparsimony.h"
-#include "uppass.h"
 #include "timeutil.h"
+#include "uppass.h"
 #include "vectorclass/vectorclass.h"
 #include "vectorclass/vectormath_common.h"
 #include <numeric>
@@ -2532,7 +2532,9 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                                             params->tbr_maxtrav, this);
                 }
             } else if (params->uppass == true) {
-                pllOptimizeTbrUppass(pllInst, pllPartitions, this);
+                pllOptimizeTbrUppass(pllInst, pllPartitions,
+                                     params->tbr_mintrav, params->tbr_maxtrav,
+                                     this);
             } else {
                 pllOptimizeSprParsimony(pllInst, pllPartitions,
                                         params->spr_mintrav, max_spr_rad, this);
