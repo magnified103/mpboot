@@ -16,5 +16,8 @@ void _pllFreeParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr);
 
 void testUppassSPR(pllInstance *tr, partitionList *pr);
 void testUppassTBR(pllInstance *tr, partitionList *pr);
-int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, IQTree *_iqtree);
+int pllOptimizeTbrUppassFull(pllInstance *tr, partitionList *pr, int mintrav,
+                         int maxtrav, IQTree *_iqtree);
+int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
+                         int maxtrav, IQTree *_iqtree);
 #endif /* UPPASS_H_ */

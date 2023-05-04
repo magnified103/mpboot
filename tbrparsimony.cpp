@@ -2301,9 +2301,9 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
             }
         }
     } while (randomMP < startMP);
+    cout << "CNT = " << cnt << '\n';
     // cout << "num_tbr_rearrangements = " << num_tbr_rearrangements << '\n';
     // cout << "num_recalculate_nodes_sum = " << num_recalculate_nodes_sum << '\n';
-    cout << "CNT = " << cnt << '\n';
     return startMP;
 }
 
