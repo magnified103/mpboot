@@ -146,6 +146,7 @@ static node **branchNode = NULL;
 static int *depth = NULL;
 static int *distFromRmvBranch = NULL;
 static bool *recalculate = NULL;
+static bool *inRadiusRange = NULL;
 double total_time_uppass;
 static unsigned long bestTreeScoreHits; // to count hits to bestParsimony
 
@@ -793,6 +794,12 @@ void _allocateParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr,
         recalculate = new bool[tr->mxtips + tr->mxtips - 1];
         for (i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
             recalculate[i] = false;
+        }
+    }
+    if (inRadiusRange == NULL) {
+        inRadiusRange = new bool[tr->mxtips + tr->mxtips - 1];
+        for (i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
+            inRadiusRange[i] = false;
         }
     }
     for (i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 1; ++i) {
@@ -2024,55 +2031,52 @@ void traversePrepareInsertBranches(partitionList *pr, nodeptr u, int maxTips,
     }
 }
 
-void traversePrepareInsertBranches(partitionList *pr, nodeptr u, int mintrav,
-                                   int maxtrav, int dist, int maxTips,
-                                   int &count) {
-    if (mintrav <= 0) {
-        size_t uNumber = u->number, u1Number = u->back->number;
-        for (int model = 0; model < pr->numberOfPartitions; ++model) {
-            size_t k, states = pr->partitionData[model]->states,
-                      width = pr->partitionData[model]->parsimonyLength, i;
-            switch (states) {
-            default: {
-                parsimonyNumber *uStates[32], *u1States[32], *branchStates[32];
+void traversePrepareInsertBranches(partitionList *pr, nodeptr u, int maxtrav,
+                                   int dist, int maxTips, int &count) {
+    size_t uNumber = u->number, u1Number = u->back->number;
+    for (int model = 0; model < pr->numberOfPartitions; ++model) {
+        size_t k, states = pr->partitionData[model]->states,
+                  width = pr->partitionData[model]->parsimonyLength, i;
+        switch (states) {
+        default: {
+            parsimonyNumber *uStates[32], *u1States[32], *branchStates[32];
 
-                assert(states <= 32);
+            assert(states <= 32);
 
-                for (k = 0; k < states; ++k) {
-                    uStates[k] =
-                        &(pr->partitionData[model]
-                              ->parsVectUppassLocal[(width * states * uNumber) +
-                                                    width * k]);
-                    u1States[k] = &(
-                        pr->partitionData[model]
-                            ->parsVectUppassLocal[(width * states * u1Number) +
-                                                  width * k]);
-                    branchStates[k] =
-                        &(pr->partitionData[model]
-                              ->branchVectUppass[(width * states * count) +
-                                                 width * k]);
-                }
-
-                for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                    for (int k = 0; k < states; ++k) {
-                        VECTOR_STORE((CAST)&branchStates[k][i],
-                                     VECTOR_BIT_OR(
-                                         VECTOR_LOAD((CAST)(&uStates[k][i])),
-                                         VECTOR_LOAD((CAST)(&u1States[k][i]))));
-                    }
-                }
+            for (k = 0; k < states; ++k) {
+                uStates[k] =
+                    &(pr->partitionData[model]
+                          ->parsVectUppassLocal[(width * states * uNumber) +
+                                                width * k]);
+                u1States[k] =
+                    &(pr->partitionData[model]
+                          ->parsVectUppassLocal[(width * states * u1Number) +
+                                                width * k]);
+                branchStates[k] =
+                    &(pr->partitionData[model]
+                          ->branchVectUppass[(width * states * count) +
+                                             width * k]);
             }
+
+            for (i = 0; i < width; i += INTS_PER_VECTOR) {
+                for (int k = 0; k < states; ++k) {
+                    VECTOR_STORE(
+                        (CAST)&branchStates[k][i],
+                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)(&uStates[k][i])),
+                                      VECTOR_LOAD((CAST)(&u1States[k][i]))));
+                }
             }
         }
-        branchNode[count] = u;
-        distFromRmvBranch[count] = dist;
-        count++;
+        }
     }
+    branchNode[count] = u;
+    distFromRmvBranch[count] = dist;
+    count++;
     if (u->number > maxTips && maxtrav >= 1) {
-        traversePrepareInsertBranches(pr, u->next->back, mintrav - 1,
-                                      maxtrav - 1, dist + 1, maxTips, count);
-        traversePrepareInsertBranches(pr, u->next->next->back, mintrav - 1,
-                                      maxtrav - 1, dist + 1, maxTips, count);
+        traversePrepareInsertBranches(pr, u->next->back, maxtrav - 1, dist + 1,
+                                      maxTips, count);
+        traversePrepareInsertBranches(pr, u->next->next->back, maxtrav - 1,
+                                      dist + 1, maxTips, count);
     }
 }
 #else
@@ -2813,6 +2817,9 @@ void uppassInnerNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
  */
 void dfsRecalculateUppassLocal(nodeptr u, parsimonyNumber *pUpVec, int stepPUp,
                                pInfo *prModel, int &w, int &mxTips) {
+    if (!inRadiusRange[u->number]) {
+        return;
+    }
     int width = prModel->parsimonyLength;
     int states = prModel->states;
     int posU = width * states * u->number + w;
@@ -2829,7 +2836,8 @@ void dfsRecalculateUppassLocal(nodeptr u, parsimonyNumber *pUpVec, int stepPUp,
             &(prModel->parsVect[width * states * v2->number + w]),
             &(prModel->parsVectUppassLocal[posU]), pUpVec, width, width, width,
             width, stepPUp, states);
-        if (!equalStatesCmp(&(prModel->parsVectUppassLocal[posU]),
+        if ((inRadiusRange[v1->number] || inRadiusRange[v2->number]) &&
+            !equalStatesCmp(&(prModel->parsVectUppassLocal[posU]),
                             &(prModel->parsVectUppass[posU]), width, width,
                             states)) {
             dfsRecalculateUppassLocal(v1, &(prModel->parsVectUppassLocal[posU]),
@@ -3307,6 +3315,14 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
     // cout << "End recalculateDownpassAndUppass\n";
     return scoreMainSubtree + scoreClippedSubtree;
 }
+void markNodesInRadiusRange(nodeptr p, int maxTips, int maxtrav) {
+    inRadiusRange[p->number] = true;
+    if (p->number <= maxTips || maxtrav <= 0) {
+        return;
+    }
+    markNodesInRadiusRange(p->next->back, maxTips, maxtrav - 1);
+    markNodesInRadiusRange(p->next->next->back, maxTips, maxtrav - 1);
+}
 void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p, int mintrav,
                   int maxtrav, int perSiteScores) {
     // cout << "Begin rearrangeTBR\n";
@@ -3325,6 +3341,14 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p, int mintrav,
     nodeptr q2 = q->next->next->back;
     nodeptr p1 = p->next->back;
     nodeptr p2 = p->next->next->back;
+    /* Get the nodes in range [mintrav, maxtrav] needed for recalculation */
+    for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
+        inRadiusRange[i] = false;
+    }
+    markNodesInRadiusRange(p1, tr->mxtips, maxtrav);
+    markNodesInRadiusRange(p2, tr->mxtips, maxtrav);
+    markNodesInRadiusRange(q1, tr->mxtips, maxtrav);
+    markNodesInRadiusRange(q2, tr->mxtips, maxtrav);
     q->next->back = q->next->next->back = NULL;
     q1->back = q2;
     q2->back = q1;
@@ -3365,23 +3389,21 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p, int mintrav,
     assert(scoreTwoSubtrees <= oldScore);
     if (scoreTwoSubtrees < oldScore) {
         int count = 1, fi = count, se = 0;
-        traversePrepareInsertBranches(pr, p1, mintrav, maxtrav, 0, tr->mxtips,
-                                      count);
+        traversePrepareInsertBranches(pr, p1, maxtrav, 0, tr->mxtips, count);
         if (p2->number > tr->mxtips) {
-            traversePrepareInsertBranches(pr, p2->next->back, mintrav - 1,
-                                          maxtrav - 1, 1, tr->mxtips, count);
-            traversePrepareInsertBranches(pr, p2->next->next->back, mintrav - 1,
-                                          maxtrav - 1, 1, tr->mxtips, count);
+            traversePrepareInsertBranches(pr, p2->next->back, maxtrav - 1, 1,
+                                          tr->mxtips, count);
+            traversePrepareInsertBranches(pr, p2->next->next->back, maxtrav - 1,
+                                          1, tr->mxtips, count);
         }
         // cout << "count = " << count << '\n';
         se = count;
-        traversePrepareInsertBranches(pr, q1, mintrav, maxtrav, 0, tr->mxtips,
-                                      count);
+        traversePrepareInsertBranches(pr, q1, maxtrav, 0, tr->mxtips, count);
         if (q2->number > tr->mxtips) {
-            traversePrepareInsertBranches(pr, q2->next->back, mintrav - 1,
-                                          maxtrav - 1, 1, tr->mxtips, count);
-            traversePrepareInsertBranches(pr, q2->next->next->back, mintrav - 1,
-                                          maxtrav - 1, 1, tr->mxtips, count);
+            traversePrepareInsertBranches(pr, q2->next->back, maxtrav - 1, 1,
+                                          tr->mxtips, count);
+            traversePrepareInsertBranches(pr, q2->next->next->back, maxtrav - 1,
+                                          1, tr->mxtips, count);
         }
         // cout << "FI = " << fi << '\n';
         // cout << "SE = " << se << '\n';
@@ -3693,7 +3715,8 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
         nodeRectifierParsUppass(tr);
         /* Iterate through all remove-branches */
         for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
-            // cout << "Remove branch: " << i << ' ' << tr->nodep[i]->number << ' '
+            // cout << "Remove branch: " << i << ' ' << tr->nodep[i]->number <<
+            // ' '
             //      << tr->nodep[i]->back->number << '\n';
             if (lastRemoveBranch && (tr->nodep[i] == lastRemoveBranch ||
                                      tr->nodep[i] == lastRemoveBranch->back)) {
@@ -3721,12 +3744,6 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
                 tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
                 bestTreeScoreHits = 1;
                 nodeRectifierParsUppass(tr);
-                break;
-                /**
-                 * TODO: Improve with incremental uppass/downpass too.
-                 * TBR and SPR is different.
-                 * Beware of recalculate stuff like scoreIncrease, oldScore...
-                 */
                 // int temMP = _evaluateParsimony(tr, pr, tr->start, true,
                 // false); randomMP =
                 //     _evaluateParsimonyUppass(tr, pr, tr->start,
@@ -3753,6 +3770,7 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
                 //     assert(0);
                 // }
                 assert(randomMP == tr->bestParsimony);
+                break;
             }
         }
     } while (randomMP < startMP);
