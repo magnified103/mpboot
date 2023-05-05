@@ -1583,27 +1583,26 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
                                   ->parsVectUppass[(width * states * pNumber) +
                                                    width * k]);
                     }
-
+                    INT_TYPE x, u_k[32], p_k[32];
                     for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                        INT_TYPE x = SET_ALL_BITS_ZERO, u_k, p_k;
+                        x = SET_ALL_BITS_ZERO;
                         for (k = 0; k < states; ++k) {
-                            u_k = VECTOR_LOAD((CAST)(&u[k][i]));
-                            p_k = VECTOR_LOAD((CAST)(&p[k][i]));
+                            u_k[k] = VECTOR_LOAD((CAST)(&u[k][i]));
+                            p_k[k] = VECTOR_LOAD((CAST)(&p[k][i]));
                             x = VECTOR_BIT_OR(
-                                x, VECTOR_BIT_AND(
-                                       VECTOR_AND_NOT(VECTOR_BIT_AND(u_k, p_k),
-                                                      allOne),
-                                       p_k));
+                                x,
+                                VECTOR_BIT_AND(
+                                    VECTOR_AND_NOT(
+                                        VECTOR_BIT_AND(u_k[k], p_k[k]), allOne),
+                                    p_k[k]));
                             // x |= (~(u[k][i] & p[k][i]) & p[k][i]);
                         }
                         x = VECTOR_AND_NOT(x, allOne);
                         for (k = 0; k < states; ++k) {
-                            u_k = VECTOR_LOAD((CAST)(&u[k][i]));
-                            p_k = VECTOR_LOAD((CAST)(&p[k][i]));
-                            u_k = VECTOR_BIT_XOR(
-                                u_k,
-                                VECTOR_BIT_AND(VECTOR_BIT_XOR(u_k, p_k), x));
-                            VECTOR_STORE((CAST)(&uUppass[k][i]), u_k);
+                            u_k[k] = VECTOR_BIT_XOR(
+                                u_k[k], VECTOR_BIT_AND(
+                                            VECTOR_BIT_XOR(u_k[k], p_k[k]), x));
+                            VECTOR_STORE((CAST)(&uUppass[k][i]), u_k[k]);
                             // u[k][i] ^= ((u[k][i] ^ p[k][i]) & x);
                         }
                     }
@@ -1653,42 +1652,42 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
                                                    width * k]);
                     }
 
+                    INT_TYPE x = SET_ALL_BITS_ZERO, y = SET_ALL_BITS_ZERO,
+                             u_k[32], p_k[32], v_1k[32], v_2k[32], u_up;
                     for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                        INT_TYPE x = SET_ALL_BITS_ZERO, y = SET_ALL_BITS_ZERO,
-                                 u_k, p_k, v_1k, v_2k, u_up;
+                        x = SET_ALL_BITS_ZERO, y = SET_ALL_BITS_ZERO;
                         for (k = 0; k < states; ++k) {
-                            u_k = VECTOR_LOAD((CAST)(&u[k][i]));
-                            p_k = VECTOR_LOAD((CAST)(&p[k][i]));
-                            v_1k = VECTOR_LOAD((CAST)(&v_1[k][i]));
-                            v_2k = VECTOR_LOAD((CAST)(&v_2[k][i]));
+                            u_k[k] = VECTOR_LOAD((CAST)(&u[k][i]));
+                            p_k[k] = VECTOR_LOAD((CAST)(&p[k][i]));
+                            v_1k[k] = VECTOR_LOAD((CAST)(&v_1[k][i]));
+                            v_2k[k] = VECTOR_LOAD((CAST)(&v_2[k][i]));
                             x = VECTOR_BIT_OR(
-                                x, VECTOR_BIT_AND(
-                                       VECTOR_AND_NOT(VECTOR_BIT_AND(u_k, p_k),
-                                                      allOne),
-                                       p_k));
-                            y = VECTOR_BIT_OR(y, VECTOR_BIT_AND(v_1k, v_2k));
+                                x,
+                                VECTOR_BIT_AND(
+                                    VECTOR_AND_NOT(
+                                        VECTOR_BIT_AND(u_k[k], p_k[k]), allOne),
+                                    p_k[k]));
+                            y = VECTOR_BIT_OR(y,
+                                              VECTOR_BIT_AND(v_1k[k], v_2k[k]));
 
                             // x |= (~(u[k][i] & p[k][i]) & p[k][i]);
                             // y |= (v_1[k][i] & v_2[k][i]);
                         }
                         for (k = 0; k < states; ++k) {
-                            u_k = VECTOR_LOAD((CAST)(&u[k][i]));
-                            p_k = VECTOR_LOAD((CAST)(&p[k][i]));
-                            v_1k = VECTOR_LOAD((CAST)(&v_1[k][i]));
-                            v_2k = VECTOR_LOAD((CAST)(&v_2[k][i]));
                             // is it possible to set u_up = u_k?
-                            u_up = VECTOR_BIT_AND(u_k, allOne);
+                            u_up = u_k[k];
 
                             u_up = VECTOR_BIT_XOR(
                                 u_up,
-                                VECTOR_BIT_AND(VECTOR_BIT_XOR(u_up, p_k),
+                                VECTOR_BIT_AND(VECTOR_BIT_XOR(u_up, p_k[k]),
                                                VECTOR_AND_NOT(x, allOne)));
                             u_up = VECTOR_BIT_XOR(
-                                u_up, VECTOR_BIT_AND(
-                                          VECTOR_BIT_XOR(
-                                              u_up, VECTOR_BIT_OR(u_up, p_k)),
-                                          VECTOR_BIT_AND(
-                                              x, VECTOR_AND_NOT(y, allOne))));
+                                u_up,
+                                VECTOR_BIT_AND(
+                                    VECTOR_BIT_XOR(u_up,
+                                                   VECTOR_BIT_OR(u_up, p_k[k])),
+                                    VECTOR_BIT_AND(x,
+                                                   VECTOR_AND_NOT(y, allOne))));
                             u_up = VECTOR_BIT_XOR(
                                 u_up,
                                 VECTOR_BIT_AND(
@@ -1696,8 +1695,9 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
                                         u_up,
                                         VECTOR_BIT_OR(
                                             u_up, VECTOR_BIT_AND(
-                                                      p_k, VECTOR_BIT_OR(
-                                                               v_1k, v_2k)))),
+                                                      p_k[k],
+                                                      VECTOR_BIT_OR(v_1k[k],
+                                                                    v_2k[k])))),
                                     VECTOR_BIT_AND(x, y)));
                             VECTOR_STORE((CAST)(&uUppass[k][i]), u_up);
                             // uUppass[k][i] = u[k][i];
@@ -2707,16 +2707,17 @@ void uppassLeafNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *uUpVec,
          */
         assert(states <= 32);
 
-        INT_TYPE x = SET_ALL_BITS_ZERO, u_k, p_k;
+        INT_TYPE x = SET_ALL_BITS_ZERO, u_k[32], p_k[32];
         // parsimonyNumber x = 0;
         int posU, posUUp, posPUp;
         posU = posPUp = 0;
         for (int k = 0; k < states; ++k) {
-            u_k = VECTOR_LOAD((CAST)(&uVec[posU]));
-            p_k = VECTOR_LOAD((CAST)(&pUpVec[posPUp]));
+            u_k[k] = VECTOR_LOAD((CAST)(&uVec[posU]));
+            p_k[k] = VECTOR_LOAD((CAST)(&pUpVec[posPUp]));
             x = VECTOR_BIT_OR(
                 x, VECTOR_BIT_AND(
-                       VECTOR_AND_NOT(VECTOR_BIT_AND(u_k, p_k), allOne), p_k));
+                       VECTOR_AND_NOT(VECTOR_BIT_AND(u_k[k], p_k[k]), allOne),
+                       p_k[k]));
             // x |= (~(uVec[posU] & pUpVec[posPUp]) & pUpVec[posPUp]);
             posU += stepU;
             posPUp += stepPUp;
@@ -2726,11 +2727,9 @@ void uppassLeafNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *uUpVec,
         // posUUp = posPUp = 0;
         posU = posUUp = posPUp = 0;
         for (int k = 0; k < states; ++k) {
-            u_k = VECTOR_LOAD((CAST)(&uVec[posU]));
-            p_k = VECTOR_LOAD((CAST)(&pUpVec[posPUp]));
-            u_k = VECTOR_BIT_XOR(u_k,
-                                 VECTOR_BIT_AND(VECTOR_BIT_XOR(u_k, p_k), x));
-            VECTOR_STORE((CAST)(&uUpVec[posUUp]), u_k);
+            u_k[k] = VECTOR_BIT_XOR(
+                u_k[k], VECTOR_BIT_AND(VECTOR_BIT_XOR(u_k[k], p_k[k]), x));
+            VECTOR_STORE((CAST)(&uUpVec[posUUp]), u_k[k]);
             // uUpVec[posUUp] = uVec[posU];
             // uUpVec[posUUp] ^= ((uUpVec[posUUp] ^ pUpVec[posPUp]) & x);
             posU += stepU;
@@ -2817,18 +2816,19 @@ void uppassInnerNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
          */
         // assert(states <= 32);
 
-        INT_TYPE x = SET_ALL_BITS_ZERO, y = SET_ALL_BITS_ZERO, u_k, p_k, v_1k,
-                 v_2k, u_up;
+        INT_TYPE x = SET_ALL_BITS_ZERO, y = SET_ALL_BITS_ZERO, u_k[32], p_k[32],
+                 v_1k[32], v_2k[32], u_up;
         // parsimonyNumber x = 0, y = 0;
         int posU, posV1, posV2, posUUp, posPUp;
         posU = posV1 = posV2 = posPUp = 0;
         for (int k = 0; k < states; ++k) {
-            u_k = VECTOR_LOAD((CAST)(&uVec[posU]));
-            p_k = VECTOR_LOAD((CAST)(&pUpVec[posPUp]));
-            v_1k = VECTOR_LOAD((CAST)(&v1Vec[posV1]));
-            v_2k = VECTOR_LOAD((CAST)(&v2Vec[posV2]));
-            x = VECTOR_BIT_OR(x, VECTOR_AND_NOT(VECTOR_BIT_AND(u_k, p_k), p_k));
-            y = VECTOR_BIT_OR(y, VECTOR_BIT_AND(v_1k, v_2k));
+            u_k[k] = VECTOR_LOAD((CAST)(&uVec[posU]));
+            p_k[k] = VECTOR_LOAD((CAST)(&pUpVec[posPUp]));
+            v_1k[k] = VECTOR_LOAD((CAST)(&v1Vec[posV1]));
+            v_2k[k] = VECTOR_LOAD((CAST)(&v2Vec[posV2]));
+            x = VECTOR_BIT_OR(
+                x, VECTOR_AND_NOT(VECTOR_BIT_AND(u_k[k], p_k[k]), p_k[k]));
+            y = VECTOR_BIT_OR(y, VECTOR_BIT_AND(v_1k[k], v_2k[k]));
             // x |= (~(uVec[posU] & pUpVec[posPUp]) & pUpVec[posPUp]);
             // y |= (v1Vec[posV1] & v2Vec[posV2]);
             posU += stepU;
@@ -2839,26 +2839,23 @@ void uppassInnerNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
         posU = posV1 = posV2 = posUUp = posPUp = 0;
         // posUUp = 0;
         for (int k = 0; k < states; ++k) {
-            u_k = VECTOR_LOAD((CAST)(&uVec[posU]));
-            p_k = VECTOR_LOAD((CAST)(&pUpVec[posPUp]));
-            v_1k = VECTOR_LOAD((CAST)(&v1Vec[posV1]));
-            v_2k = VECTOR_LOAD((CAST)(&v2Vec[posV2]));
-            u_up = VECTOR_BIT_AND(u_k, allOne);
+            u_up = u_k[k];
 
-            u_up =
-                VECTOR_BIT_XOR(u_up, VECTOR_BIT_AND(VECTOR_BIT_XOR(u_up, p_k),
-                                                    VECTOR_AND_NOT(x, allOne)));
+            u_up = VECTOR_BIT_XOR(u_up,
+                                  VECTOR_BIT_AND(VECTOR_BIT_XOR(u_up, p_k[k]),
+                                                 VECTOR_AND_NOT(x, allOne)));
             u_up = VECTOR_BIT_XOR(
-                u_up,
-                VECTOR_BIT_AND(VECTOR_BIT_XOR(u_up, VECTOR_BIT_OR(u_up, p_k)),
-                               VECTOR_BIT_AND(x, VECTOR_AND_NOT(y, allOne))));
+                u_up, VECTOR_BIT_AND(
+                          VECTOR_BIT_XOR(u_up, VECTOR_BIT_OR(u_up, p_k[k])),
+                          VECTOR_BIT_AND(x, VECTOR_AND_NOT(y, allOne))));
             u_up = VECTOR_BIT_XOR(
                 u_up,
                 VECTOR_BIT_AND(
                     VECTOR_BIT_XOR(
                         u_up, VECTOR_BIT_OR(
                                   u_up, VECTOR_BIT_AND(
-                                            p_k, VECTOR_BIT_OR(v_1k, v_2k)))),
+                                            p_k[k],
+                                            VECTOR_BIT_OR(v_1k[k], v_2k[k])))),
                     VECTOR_BIT_AND(x, y)));
             VECTOR_STORE((CAST)(&uUpVec[posUUp]), u_up);
             // uUpVec[posUUp] = uVec[posU];
@@ -4061,24 +4058,27 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
                 //     _evaluateParsimonyUppass(tr, pr, tr->start,
                 //     perSiteScores);
                 // assert(randomMP == oldScore);
-                if (randomMP != tr->bestParsimony) {
-                    cout << "remove branch: " << tr->TBR_removeBranch->number
-                         << " - " << tr->TBR_removeBranch->back->number << '\n';
-                    cout << "insert branch: " << tr->TBR_insertBranch1->number
-                         << " - " << tr->TBR_insertBranch1->back->number
-                         << '\n';
-                    // cout << "insert branch: " <<
-                    // tr->TBR_insertBranch2->number
-                    //      << " - " << tr->TBR_insertBranch2->back->number
-                    // <<
-                    //      '\n';
-                    cout << "randomMP = " << randomMP << '\n';
-                    cout << "tr->bestParsimony = " << tr->bestParsimony << '\n';
-                    randomMP = _evaluateParsimonyUppass(tr, pr, tr->start,
-                                                        perSiteScores);
-                    cout << "Correct randomMP = " << randomMP << '\n';
-                    assert(0);
-                }
+                // if (randomMP != tr->bestParsimony) {
+                //     cout << "remove branch: " << tr->TBR_removeBranch->number
+                //          << " - " << tr->TBR_removeBranch->back->number <<
+                //          '\n';
+                //     cout << "insert branch: " <<
+                //     tr->TBR_insertBranch1->number
+                //          << " - " << tr->TBR_insertBranch1->back->number
+                //          << '\n';
+                //     // cout << "insert branch: " <<
+                //     // tr->TBR_insertBranch2->number
+                //     //      << " - " << tr->TBR_insertBranch2->back->number
+                //     // <<
+                //     //      '\n';
+                //     cout << "randomMP = " << randomMP << '\n';
+                //     cout << "tr->bestParsimony = " << tr->bestParsimony <<
+                //     '\n'; randomMP = _evaluateParsimonyUppass(tr, pr,
+                //     tr->start,
+                //                                         perSiteScores);
+                //     cout << "Correct randomMP = " << randomMP << '\n';
+                //     assert(0);
+                // }
                 lastNodepId = i;
                 tr->TBR_removeBranch = NULL;
                 tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
@@ -4088,7 +4088,7 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
             }
         }
     } while (randomMP < startMP);
-    cout << "CNT = " << cnt << '\n';
+    // cout << "CNT = " << cnt << '\n';
     tr->start = tr->nodep[1];
     // cout << "End pllOptimizeTbrUppass\n";
     return startMP;
@@ -4151,7 +4151,8 @@ int pllOptimizeTbrUppassFull(pllInstance *tr, partitionList *pr, int mintrav,
                 rearrangeTBR(tr, pr, tr->nodep[i], mintrav, maxtrav,
                              perSiteScores);
             } else {
-                // rearrangeSPR(tr, pr, tr->nodep[i], perSiteScores);
+                rearrangeSPR(tr, pr, tr->nodep[i], mintrav, maxtrav,
+                             perSiteScores);
             }
         }
         if (tr->bestParsimony == randomMP)
@@ -4191,7 +4192,6 @@ int pllOptimizeTbrUppassFull(pllInstance *tr, partitionList *pr, int mintrav,
             assert(randomMP == tr->bestParsimony);
         }
     } while (randomMP < startMP);
-    // assert(0);
     tr->start = tr->nodep[1];
     // cout << "End pllOptimizeTbrUppass\n";
     cout << "CNT = " << cnt << '\n';
