@@ -50,7 +50,7 @@
 #define USHORT_PER_VECTOR 32
 #define INTS_PER_VECTOR 16
 #define LONG_INTS_PER_VECTOR 8
-//#define LONG_INTS_PER_VECTOR (64/sizeof(long))
+// #define LONG_INTS_PER_VECTOR (64/sizeof(long))
 #define INT_TYPE __m512i
 #define CAST double *
 #define SET_ALL_BITS_ONE _mm512_set1_epi32(0xFFFFFFFF)
@@ -73,7 +73,7 @@
 #define USHORT_PER_VECTOR 16
 #define INTS_PER_VECTOR 8
 #define LONG_INTS_PER_VECTOR 4
-//#define LONG_INTS_PER_VECTOR (32/sizeof(long))
+// #define LONG_INTS_PER_VECTOR (32/sizeof(long))
 #define INT_TYPE __m256d
 #define CAST double *
 #define SET_ALL_BITS_ONE                                                       \
@@ -100,11 +100,11 @@
 #ifdef __i386__
 #define ULINT_SIZE 32
 #define LONG_INTS_PER_VECTOR 4
-//#define LONG_INTS_PER_VECTOR (16/sizeof(long))
+// #define LONG_INTS_PER_VECTOR (16/sizeof(long))
 #else
 #define ULINT_SIZE 64
 #define LONG_INTS_PER_VECTOR 2
-//#define LONG_INTS_PER_VECTOR (16/sizeof(long))
+// #define LONG_INTS_PER_VECTOR (16/sizeof(long))
 #endif
 #define INT_TYPE __m128i
 #define CAST __m128i *
@@ -1011,7 +1011,8 @@ static int pllTbrRemoveBranch(pllInstance *tr, partitionList *pr, nodeptr p,
     //     return PLL_FALSE;
     // }
 
-    // cout << "Remove branch 11: " << p->number << ' ' << p->back->number << '\n';
+    // cout << "Remove branch 11: " << p->number << ' ' << p->back->number <<
+    // '\n';
     p1 = p->next->back;
     p2 = p->next->next->back;
     q1 = p->back->next->back;
@@ -2123,8 +2124,7 @@ static bool restoreTreeRearrangeParsimonyTBRLeaf(pllInstance *tr,
                                                  int perSiteScores) {
     assert(tr->TBR_removeBranch->xPars);
     nodeptr q = tr->TBR_removeBranch->back;
-    hookupDefault(q->next->back,
-                  q->next->next->back);
+    hookupDefault(q->next->back, q->next->next->back);
 
     nodeptr r = tr->TBR_insertBranch1;
     r = r->xPars ? r : r->back;
@@ -2134,8 +2134,8 @@ static bool restoreTreeRearrangeParsimonyTBRLeaf(pllInstance *tr,
     nodeptr p2 = q->next->next;
     hookupDefault(r, p1);
     hookupDefault(rb, p2);
-    evaluateParsimonyTBR(tr, pr, tr->TBR_removeBranch, r,
-                         tr->TBR_removeBranch, perSiteScores);
+    evaluateParsimonyTBR(tr, pr, tr->TBR_removeBranch, r, tr->TBR_removeBranch,
+                         perSiteScores);
     tr->curRoot = tr->TBR_removeBranch;
     tr->curRootBack = tr->TBR_removeBranch->back;
 
@@ -2303,12 +2303,14 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
     } while (randomMP < startMP);
     cout << "CNT = " << cnt << '\n';
     // cout << "num_tbr_rearrangements = " << num_tbr_rearrangements << '\n';
-    // cout << "num_recalculate_nodes_sum = " << num_recalculate_nodes_sum << '\n';
+    // cout << "num_recalculate_nodes_sum = " << num_recalculate_nodes_sum <<
+    // '\n';
     return startMP;
 }
 
-int pllOptimizeTbrParsimonySuperFull(pllInstance *tr, partitionList *pr, int mintrav,
-                            int maxtrav, IQTree *_iqtree) {
+int pllOptimizeTbrParsimonySuperFull(pllInstance *tr, partitionList *pr,
+                                     int mintrav, int maxtrav,
+                                     IQTree *_iqtree) {
     int perSiteScores = globalParam->gbo_replicates > 0;
 
     iqtree = _iqtree; // update pointer to IQTree
@@ -2354,8 +2356,8 @@ int pllOptimizeTbrParsimonySuperFull(pllInstance *tr, partitionList *pr, int min
                 pllComputeTBRLeaf(tr, pr, tr->nodep_dfs[i], mintrav, maxtrav,
                                   perSiteScores);
             } else {
-                pllComputeTBRVer2(tr, pr, tr->nodep_dfs[i], mintrav,
-                                  maxtrav, perSiteScores);
+                pllComputeTBRVer2(tr, pr, tr->nodep_dfs[i], mintrav, maxtrav,
+                                  perSiteScores);
             }
         }
         if (tr->bestParsimony == randomMP)
@@ -2375,7 +2377,8 @@ int pllOptimizeTbrParsimonySuperFull(pllInstance *tr, partitionList *pr, int min
         }
     } while (randomMP < startMP);
     // cout << "num_tbr_rearrangements = " << num_tbr_rearrangements << '\n';
-    // cout << "num_recalculate_nodes_sum = " << num_recalculate_nodes_sum << '\n';
+    // cout << "num_recalculate_nodes_sum = " << num_recalculate_nodes_sum <<
+    // '\n';
     return startMP;
 }
 int pllOptimizeTbrParsimonyCen(pllInstance *tr, partitionList *pr, int mintrav,
@@ -2508,7 +2511,8 @@ int pllOptimizeTbrParsimonyFull(pllInstance *tr, partitionList *pr,
         startMP = randomMP;
         nodeRectifierParsVerFull(tr, false);
         // cout << "Num: " << centralBranch->number << '\n';
-        pllComputeTBRVer3(tr, pr, centralBranch, 1, tr->mxtips + tr->mxtips, perSiteScores);
+        pllComputeTBRVer3(tr, pr, centralBranch, 1, tr->mxtips + tr->mxtips,
+                          perSiteScores);
 
     } while (randomMP < startMP);
     return startMP;
