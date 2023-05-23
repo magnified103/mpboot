@@ -146,6 +146,7 @@ static node **branchNode = NULL;
 static int *depth = NULL;
 static int *distFromRmvBranch = NULL;
 static bool *recalculate = NULL;
+static bool *isUppassCopied = NULL;
 static bool *inRadiusRange = NULL;
 double total_time_uppass;
 static unsigned long bestTreeScoreHits; // to count hits to bestParsimony
@@ -794,6 +795,12 @@ void _allocateParsimonyDataStructuresUppass(pllInstance *tr, partitionList *pr,
         recalculate = new bool[tr->mxtips + tr->mxtips - 1];
         for (i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
             recalculate[i] = false;
+        }
+    }
+    if (isUppassCopied == NULL) {
+        isUppassCopied = new bool[tr->mxtips + tr->mxtips - 1];
+        for (i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
+            isUppassCopied[i] = false;
         }
     }
     if (inRadiusRange == NULL) {
@@ -2044,14 +2051,28 @@ void traversePrepareInsertBranches(partitionList *pr, nodeptr u, int maxtrav,
             assert(states <= 32);
 
             for (k = 0; k < states; ++k) {
-                uStates[k] =
-                    &(pr->partitionData[model]
-                          ->parsVectUppassLocal[(width * states * uNumber) +
-                                                width * k]);
-                u1States[k] =
-                    &(pr->partitionData[model]
-                          ->parsVectUppassLocal[(width * states * u1Number) +
-                                                width * k]);
+                if (isUppassCopied[uNumber]) {
+                    uStates[k] =
+                        &(pr->partitionData[model]
+                              ->parsVectUppassLocal[(width * states * uNumber) +
+                                                    width * k]);
+                } else {
+                    uStates[k] =
+                        &(pr->partitionData[model]
+                              ->parsVectUppass[(width * states * uNumber) +
+                                               width * k]);
+                }
+                if (isUppassCopied[u1Number]) {
+                    u1States[k] = &(
+                        pr->partitionData[model]
+                            ->parsVectUppassLocal[(width * states * u1Number) +
+                                                  width * k]);
+                } else {
+                    u1States[k] =
+                        &(pr->partitionData[model]
+                              ->parsVectUppass[(width * states * u1Number) +
+                                               width * k]);
+                }
                 branchStates[k] =
                     &(pr->partitionData[model]
                           ->branchVectUppass[(width * states * count) +
@@ -2645,6 +2666,21 @@ void traverseInsertBranchesSPR(pllInstance *tr, partitionList *pr, nodeptr p,
                                   perSiteScores);
     }
 }
+void copySingleGlobalToLocalUppass(partitionList *pr, int uNumber) {
+    if (isUppassCopied[uNumber]) {
+        return;
+    }
+    isUppassCopied[uNumber] = true;
+    for (int model = 0; model < pr->numberOfPartitions; ++model) {
+        size_t states = pr->partitionData[model]->states,
+               width = pr->partitionData[model]->parsimonyLength;
+        for (int i = width * states * uNumber;
+             i < width * states * (uNumber + 1); ++i) {
+            pr->partitionData[model]->parsVectUppassLocal[i] =
+                pr->partitionData[model]->parsVectUppass[i];
+        }
+    }
+}
 void copyGlobalToLocalUppass(partitionList *pr, int limNodes) {
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         size_t states = pr->partitionData[model]->states,
@@ -2883,11 +2919,13 @@ void uppassInnerNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
  * Update new uppass calculated to parsVectUppassLocal
  */
 void dfsRecalculateUppassLocal(nodeptr u, parsimonyNumber *pUpVec, int stepPUp,
-                               pInfo *prModel, int &w, int &mxTips) {
+                               pInfo *prModel, partitionList *pr, int &w,
+                               int &mxTips) {
     // cout << "Begin dfsRecalculateUppassLocal\n";
     if (!inRadiusRange[u->number]) {
         return;
     }
+    copySingleGlobalToLocalUppass(pr, u->number);
     int width = prModel->parsimonyLength;
     int states = prModel->states;
     int posU = width * states * u->number + w;
@@ -2909,9 +2947,9 @@ void dfsRecalculateUppassLocal(nodeptr u, parsimonyNumber *pUpVec, int stepPUp,
                             &(prModel->parsVectUppass[posU]), width, width,
                             states)) {
             dfsRecalculateUppassLocal(v1, &(prModel->parsVectUppassLocal[posU]),
-                                      width, prModel, w, mxTips);
+                                      width, prModel, pr, w, mxTips);
             dfsRecalculateUppassLocal(v2, &(prModel->parsVectUppassLocal[posU]),
-                                      width, prModel, w, mxTips);
+                                      width, prModel, pr, w, mxTips);
         }
     }
     // cout << "End dfsRecalculateUppassLocal\n";
@@ -2970,7 +3008,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
     /* TODO: Mark which nodes are changed and reassign "global" to "local" on
      * only those nodes
      */
-    copyGlobalToLocalUppass(pr, 2 * tr->mxtips - 1);
+    // copyGlobalToLocalUppass(pr, 2 * tr->mxtips - 1);
     /* WARNING: What if Nm is a leaf? Will the score be 0? */
     unsigned int scoreClippedSubtree = tr->parsimonyScore[Nm->number];
     // cout << "CUR scoreClippedSubtree = " << scoreClippedSubtree << '\n';
@@ -3004,25 +3042,25 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     &(pr->partitionData[model]->parsVect[posNm]),
                     &(pr->partitionData[model]->parsVectUppass[posNm]), width,
                     width, states)) {
-                /**
-                 * Set new (local) uppass of Nm = old (global) downpass of Nm.
-                 * (As Nm is now the root of its subtree).
-                 * This MUST be done as SPR would use Nm's new (local) uppass.
-                 */
-                setStatesVec(
-                    &(pr->partitionData[model]->parsVectUppassLocal[posNm]),
-                    &(pr->partitionData[model]->parsVect[posNm]), width, width,
-                    states);
+                // /**
+                //  * Set new (local) uppass of Nm = old (global) downpass of Nm.
+                //  * (As Nm is now the root of its subtree).
+                //  * This MUST be done as SPR would use Nm's new (local) uppass.
+                //  */
+                // setStatesVec(
+                //     &(pr->partitionData[model]->parsVectUppassLocal[posNm]),
+                //     &(pr->partitionData[model]->parsVect[posNm]), width, width,
+                //     states);
                 /* Nm might be LEAF or might have 2 children. */
                 if (Nm->number > tr->mxtips) {
                     dfsRecalculateUppassLocal(
                         Nm->next->back,
-                        &(pr->partitionData[model]->parsVectUppassLocal[posNm]),
-                        width, pr->partitionData[model], w, tr->mxtips);
+                        &(pr->partitionData[model]->parsVect[posNm]),
+                        width, pr->partitionData[model], pr, w, tr->mxtips);
                     dfsRecalculateUppassLocal(
                         Nm->next->next->back,
-                        &(pr->partitionData[model]->parsVectUppassLocal[posNm]),
-                        width, pr->partitionData[model], w, tr->mxtips);
+                        &(pr->partitionData[model]->parsVect[posNm]),
+                        width, pr->partitionData[model], pr, w, tr->mxtips);
                 }
             }
             /* Nx MUST be parent of Nm or Nx-Nm is the root branch */
@@ -3041,23 +3079,23 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                         &(pr->partitionData[model]->parsVect[posNx]),
                         &(pr->partitionData[model]->parsVectUppass[posNx]),
                         width, width, states)) {
-                    /**
-                     * Set new (local) uppass of Nx = old (global) downpass
-                     * of Nx. (As Nx is now the root of its subtree).
-                     */
-                    setStatesVec(
-                        &(pr->partitionData[model]->parsVectUppassLocal[posNx]),
-                        &(pr->partitionData[model]->parsVect[posNx]), width,
-                        width, states);
+                    // /**
+                    //  * Set new (local) uppass of Nx = old (global) downpass
+                    //  * of Nx. (As Nx is now the root of its subtree).
+                    //  */
+                    // setStatesVec(
+                    //     &(pr->partitionData[model]->parsVectUppassLocal[posNx]),
+                    //     &(pr->partitionData[model]->parsVect[posNx]), width,
+                    //     width, states);
                     /* Nx must have 2 children (Ns and Nz). */
                     dfsRecalculateUppassLocal(
                         Ns,
-                        &(pr->partitionData[model]->parsVectUppassLocal[posNx]),
-                        width, pr->partitionData[model], w, tr->mxtips);
+                        &(pr->partitionData[model]->parsVect[posNx]),
+                        width, pr->partitionData[model], pr, w, tr->mxtips);
                     dfsRecalculateUppassLocal(
                         Nz,
-                        &(pr->partitionData[model]->parsVectUppassLocal[posNx]),
-                        width, pr->partitionData[model], w, tr->mxtips);
+                        &(pr->partitionData[model]->parsVect[posNx]),
+                        width, pr->partitionData[model], pr, w, tr->mxtips);
                 }
                 /* Continue to the next set of 32 columns */
                 continue;
@@ -3098,7 +3136,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                         &(pr->partitionData[model]->parsVectUppass[posNx]),
                         rootDownpass, width, INTS_PER_VECTOR, states)) {
                     dfsRecalculateUppassLocal(Ns, rootDownpass, INTS_PER_VECTOR,
-                                              pr->partitionData[model], w,
+                                              pr->partitionData[model], pr, w,
                                               tr->mxtips);
                 }
 
@@ -3108,7 +3146,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                  */
                 /* TODO: Add if */
                 dfsRecalculateUppassLocal(Nz, rootDownpass, INTS_PER_VECTOR,
-                                          pr->partitionData[model], w,
+                                          pr->partitionData[model], pr, w,
                                           tr->mxtips);
                 /* Continue to the next set of 32 columns */
                 // delete[] rootDownpass;
@@ -3320,8 +3358,13 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                         }
                         dfsRecalculateUppassLocal(
                             u->back, rootDownpass, INTS_PER_VECTOR,
-                            pr->partitionData[model], w, tr->mxtips);
+                            pr->partitionData[model], pr, w, tr->mxtips);
                     }
+                }
+                if (depth[nodesRecalculated.back().v->number] > 0) {
+                    copySingleGlobalToLocalUppass(
+                        pr,
+                        uppass_par[nodesRecalculated.back().v->number]->number);
                 }
                 for (int i = (int)nodesRecalculated.size() - 1; i >= 0; --i) {
                     pair2 cur = nodesRecalculated[i];
@@ -3329,6 +3372,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     parsimonyNumber *vDownpass = cur.vDownpass;
                     parsimonyNumber *pUpVec;
                     int stepPUp;
+                    copySingleGlobalToLocalUppass(pr, v->number);
                     if (depth[v->number] == 0) {
                         assert(rootDownpass != NULL);
                         pUpVec = rootDownpass;
@@ -3394,7 +3438,8 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                                 v2,
                                 &(pr->partitionData[model]->parsVectUppassLocal
                                       [width * states * v->number + w]),
-                                width, pr->partitionData[model], w, tr->mxtips);
+                                width, pr->partitionData[model], pr, w,
+                                tr->mxtips);
                         } else {
                             if (v1 != Ns) {
                                 assert(v2 == Ns);
@@ -3403,7 +3448,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                                     &(pr->partitionData[model]
                                           ->parsVectUppassLocal
                                               [width * states * v->number + w]),
-                                    width, pr->partitionData[model], w,
+                                    width, pr->partitionData[model], pr, w,
                                     tr->mxtips);
                             } else {
                                 assert(v2 != Ns);
@@ -3412,7 +3457,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                                     &(pr->partitionData[model]
                                           ->parsVectUppassLocal
                                               [width * states * v->number + w]),
-                                    width, pr->partitionData[model], w,
+                                    width, pr->partitionData[model], pr, w,
                                     tr->mxtips);
                             }
                         }
@@ -3433,7 +3478,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     width, width, states)) {
                 dfsRecalculateUppassLocal(
                     Ns, &(pr->partitionData[model]->parsVectUppassLocal[posNz]),
-                    width, pr->partitionData[model], w, tr->mxtips);
+                    width, pr->partitionData[model], pr, w, tr->mxtips);
             }
         }
     }
@@ -3584,6 +3629,10 @@ void rearrangeTBR(pllInstance *tr, partitionList *pr, nodeptr p, int mintrav,
         //                                    perSiteScores);
         //     }
         // }
+    }
+    /* Reset isUppassCopied[] array to false */
+    for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
+        isUppassCopied[i] = false;
     }
     /**
      * Rollback to old tree
@@ -3770,6 +3819,10 @@ void rearrangeSPR(pllInstance *tr, partitionList *pr, nodeptr p, int mintrav,
         //                                    perSiteScores);
         //     }
         // }
+    }
+    /* Reset isUppassCopied[] array to false */
+    for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
+        isUppassCopied[i] = false;
     }
     /**
      * Rollback to old tree
@@ -4060,10 +4113,8 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
                 // assert(randomMP == oldScore);
                 // if (randomMP != tr->bestParsimony) {
                 //     cout << "remove branch: " << tr->TBR_removeBranch->number
-                //          << " - " << tr->TBR_removeBranch->back->number <<
-                //          '\n';
-                //     cout << "insert branch: " <<
-                //     tr->TBR_insertBranch1->number
+                //          << " - " << tr->TBR_removeBranch->back->number << '\n';
+                //     cout << "insert branch: " << tr->TBR_insertBranch1->number
                 //          << " - " << tr->TBR_insertBranch1->back->number
                 //          << '\n';
                 //     // cout << "insert branch: " <<
@@ -4072,9 +4123,8 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
                 //     // <<
                 //     //      '\n';
                 //     cout << "randomMP = " << randomMP << '\n';
-                //     cout << "tr->bestParsimony = " << tr->bestParsimony <<
-                //     '\n'; randomMP = _evaluateParsimonyUppass(tr, pr,
-                //     tr->start,
+                //     cout << "tr->bestParsimony = " << tr->bestParsimony << '\n';
+                //     randomMP = _evaluateParsimonyUppass(tr, pr, tr->start,
                 //                                         perSiteScores);
                 //     cout << "Correct randomMP = " << randomMP << '\n';
                 //     assert(0);
