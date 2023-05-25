@@ -2959,7 +2959,8 @@ void dfsRecalculateUppassLocal(nodeptr u, parsimonyNumber *pUpVec, int stepPUp,
  * Update new uppass calculated to parsVectUppass
  */
 void dfsRecalculateUppass(nodeptr u, parsimonyNumber *pUpVec, int stepPUp,
-                          pInfo *prModel, int &w, int &mxTips) {
+                          pInfo *prModel, partitionList *pr, int &w,
+                          int &mxTips) {
     int width = prModel->parsimonyLength;
     int states = prModel->states;
     int posU = width * states * u->number + w;
@@ -2968,6 +2969,7 @@ void dfsRecalculateUppass(nodeptr u, parsimonyNumber *pUpVec, int stepPUp,
                                 &(prModel->parsVectUppass[posU]), pUpVec, width,
                                 width, stepPUp, states);
     } else {
+        copySingleGlobalToLocalUppass(pr, u->number);
         nodeptr v1 = u->next->back;
         nodeptr v2 = u->next->next->back;
         uppassInnerNodeCalculate(
@@ -2980,9 +2982,9 @@ void dfsRecalculateUppass(nodeptr u, parsimonyNumber *pUpVec, int stepPUp,
                             &(prModel->parsVectUppass[posU]), width, width,
                             states)) {
             dfsRecalculateUppass(v1, &(prModel->parsVectUppass[posU]), width,
-                                 prModel, w, mxTips);
+                                 prModel, pr, w, mxTips);
             dfsRecalculateUppass(v2, &(prModel->parsVectUppass[posU]), width,
-                                 prModel, w, mxTips);
+                                 prModel, pr, w, mxTips);
         }
     }
 }
@@ -3043,24 +3045,26 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     &(pr->partitionData[model]->parsVectUppass[posNm]), width,
                     width, states)) {
                 // /**
-                //  * Set new (local) uppass of Nm = old (global) downpass of Nm.
+                //  * Set new (local) uppass of Nm = old (global) downpass of
+                //  Nm.
                 //  * (As Nm is now the root of its subtree).
-                //  * This MUST be done as SPR would use Nm's new (local) uppass.
+                //  * This MUST be done as SPR would use Nm's new (local)
+                //  uppass.
                 //  */
                 // setStatesVec(
                 //     &(pr->partitionData[model]->parsVectUppassLocal[posNm]),
-                //     &(pr->partitionData[model]->parsVect[posNm]), width, width,
-                //     states);
+                //     &(pr->partitionData[model]->parsVect[posNm]), width,
+                //     width, states);
                 /* Nm might be LEAF or might have 2 children. */
                 if (Nm->number > tr->mxtips) {
                     dfsRecalculateUppassLocal(
                         Nm->next->back,
-                        &(pr->partitionData[model]->parsVect[posNm]),
-                        width, pr->partitionData[model], pr, w, tr->mxtips);
+                        &(pr->partitionData[model]->parsVect[posNm]), width,
+                        pr->partitionData[model], pr, w, tr->mxtips);
                     dfsRecalculateUppassLocal(
                         Nm->next->next->back,
-                        &(pr->partitionData[model]->parsVect[posNm]),
-                        width, pr->partitionData[model], pr, w, tr->mxtips);
+                        &(pr->partitionData[model]->parsVect[posNm]), width,
+                        pr->partitionData[model], pr, w, tr->mxtips);
                 }
             }
             /* Nx MUST be parent of Nm or Nx-Nm is the root branch */
@@ -3089,13 +3093,11 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     //     width, states);
                     /* Nx must have 2 children (Ns and Nz). */
                     dfsRecalculateUppassLocal(
-                        Ns,
-                        &(pr->partitionData[model]->parsVect[posNx]),
-                        width, pr->partitionData[model], pr, w, tr->mxtips);
+                        Ns, &(pr->partitionData[model]->parsVect[posNx]), width,
+                        pr->partitionData[model], pr, w, tr->mxtips);
                     dfsRecalculateUppassLocal(
-                        Nz,
-                        &(pr->partitionData[model]->parsVect[posNx]),
-                        width, pr->partitionData[model], pr, w, tr->mxtips);
+                        Nz, &(pr->partitionData[model]->parsVect[posNx]), width,
+                        pr->partitionData[model], pr, w, tr->mxtips);
                 }
                 /* Continue to the next set of 32 columns */
                 continue;
@@ -3920,15 +3922,20 @@ static void applyMove(pllInstance *tr, partitionList *pr) {
             (depth[r->number] < depth[r->back->number] ? r : r->back));
         applySPRTreeStructure(r, i1);
     }
-    copyGlobalToLocalUppass(pr, 2 * tr->mxtips - 1);
+    recalculate[tr->start->number] = recalculate[tr->start->back->number] =
+        true;
+    for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
+        if (recalculate[i]) {
+            copySingleGlobalToLocalUppass(pr, i);
+        }
+    }
+    // copyGlobalToLocalUppass(pr, 2 * tr->mxtips - 1);
     int *ti = tr->ti, counter = 4;
 
     ti[1] = tr->start->number;
     ti[2] = tr->start->back->number;
     // cout << "pNumber = " << p->number << '\n';
     // cout << "qNumber = " << q->number << '\n';
-    recalculate[tr->start->number] = recalculate[tr->start->back->number] =
-        true;
     // cout << "New root: " << tr->start->number << " - "
     //      << tr->start->back->number << '\n';
     computeTraversalInfoParsimonyUppass(tr->start, ti, &counter, tr->mxtips,
@@ -3968,7 +3975,7 @@ static void applyMove(pllInstance *tr, partitionList *pr) {
                                     v,
                                     &(prModel->parsVectUppass
                                           [width * states * u->number + w]),
-                                    width, prModel, w, tr->mxtips);
+                                    width, prModel, pr, w, tr->mxtips);
                             }
                         }
                     }
@@ -3978,7 +3985,7 @@ static void applyMove(pllInstance *tr, partitionList *pr) {
     }
     /* Reset recalculate[] array to false */
     for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
-        recalculate[i] = false;
+        recalculate[i] = isUppassCopied[i] = false;
     }
 }
 static void reorderNodesUppass(pllInstance *tr, nodeptr *np, nodeptr p,
@@ -4113,8 +4120,10 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
                 // assert(randomMP == oldScore);
                 // if (randomMP != tr->bestParsimony) {
                 //     cout << "remove branch: " << tr->TBR_removeBranch->number
-                //          << " - " << tr->TBR_removeBranch->back->number << '\n';
-                //     cout << "insert branch: " << tr->TBR_insertBranch1->number
+                //          << " - " << tr->TBR_removeBranch->back->number <<
+                //          '\n';
+                //     cout << "insert branch: " <<
+                //     tr->TBR_insertBranch1->number
                 //          << " - " << tr->TBR_insertBranch1->back->number
                 //          << '\n';
                 //     // cout << "insert branch: " <<
@@ -4123,8 +4132,9 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
                 //     // <<
                 //     //      '\n';
                 //     cout << "randomMP = " << randomMP << '\n';
-                //     cout << "tr->bestParsimony = " << tr->bestParsimony << '\n';
-                //     randomMP = _evaluateParsimonyUppass(tr, pr, tr->start,
+                //     cout << "tr->bestParsimony = " << tr->bestParsimony <<
+                //     '\n'; randomMP = _evaluateParsimonyUppass(tr, pr,
+                //     tr->start,
                 //                                         perSiteScores);
                 //     cout << "Correct randomMP = " << randomMP << '\n';
                 //     assert(0);
