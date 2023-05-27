@@ -3474,6 +3474,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
             }
             /* STEP 2c: Because parent of N_s is now N_z and not N_x anymore
              */
+            copySingleGlobalToLocalUppass(pr, Nz->number);
             if (!equalStatesCmp(
                     &(pr->partitionData[model]->parsVectUppass[posNx]),
                     &(pr->partitionData[model]->parsVectUppassLocal[posNz]),
