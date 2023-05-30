@@ -520,7 +520,8 @@ struct Params {
     /**
      * Do full SPR and full TBR with uppass algorithm
      */
-    bool uppass;
+    bool uppass_tbr;
+    bool uppass_spr;
 
     /**
      *  Number of starting parsimony trees

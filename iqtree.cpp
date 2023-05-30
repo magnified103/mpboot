@@ -2531,10 +2531,13 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                                             params->tbr_mintrav,
                                             params->tbr_maxtrav, this);
                 }
-            } else if (params->uppass == true) {
+            } else if (params->uppass_tbr == true) {
                 pllOptimizeTbrUppass(pllInst, pllPartitions,
                                      params->tbr_mintrav, params->tbr_maxtrav,
                                      this);
+            } else if (params->uppass_spr == true) {
+                pllOptimizeSprUppass(pllInst, pllPartitions,
+                                     params->spr_mintrav, max_spr_rad, this);
             } else {
                 pllOptimizeSprParsimony(pllInst, pllPartitions,
                                         params->spr_mintrav, max_spr_rad, this);
@@ -2562,7 +2565,7 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                  (!params->hclimb1_nni))) {
                 //			if(((params->ratchet_iter >= 0) &&
                 // (!params->hclimb1_nni))) {
-                if (params->uppass) {
+                if (params->uppass_tbr || params->uppass_spr) {
                     _pllFreeParsimonyDataStructuresUppass(pllInst,
                                                           pllPartitions);
                 } else {

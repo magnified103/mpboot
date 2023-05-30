@@ -4154,8 +4154,8 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
     // cout << "End pllOptimizeTbrUppass\n";
     return startMP;
 }
-int pllOptimizeTbrUppassFull(pllInstance *tr, partitionList *pr, int mintrav,
-                             int maxtrav, IQTree *_iqtree) {
+int pllOptimizeSprUppass(pllInstance *tr, partitionList *pr, int mintrav,
+                         int maxtrav, IQTree *_iqtree) {
     // cout << "Begin pllOptimizeTbrUppass\n";
     int perSiteScores = globalParam->gbo_replicates > 0;
 
@@ -4192,69 +4192,73 @@ int pllOptimizeTbrUppassFull(pllInstance *tr, partitionList *pr, int mintrav,
     randomMP = tr->bestParsimony;
     oldScore = tr->bestParsimony;
     tr->TBR_removeBranch = NULL;
+    int lastNodepId = -1;
+    nodeRectifierParsUppass(tr);
     do {
         startMP = randomMP;
-        nodeRectifierParsUppass(tr);
-        nodeptr lastRemoveBranch = tr->TBR_removeBranch;
-        tr->TBR_removeBranch = NULL;
-        tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
         /* Iterate through all remove-branches */
         for (int i = 1; i <= tr->mxtips + tr->mxtips - 2; ++i) {
             // cout << "Remove branch: " << i << ' ' << tr->nodep[i]->number <<
             // ' '
             //      << tr->nodep[i]->back->number << '\n';
-            if (lastRemoveBranch && (tr->nodep[i] == lastRemoveBranch ||
-                                     tr->nodep[i] == lastRemoveBranch->back)) {
-                // cout << "Don't consider last remove-branch";
-                continue;
+            if (lastNodepId != -1 && i == lastNodepId) {
+                // cout << "Don't consider last remove-branch\n";
+                break;
             }
-            if (i > tr->mxtips && tr->nodep[i]->back->number > tr->mxtips) {
-                rearrangeTBR(tr, pr, tr->nodep[i], mintrav, maxtrav,
-                             perSiteScores);
-            } else {
-                rearrangeSPR(tr, pr, tr->nodep[i], mintrav, maxtrav,
-                             perSiteScores);
+            rearrangeSPR(tr, pr, tr->nodep[i], mintrav, maxtrav,
+                         perSiteScores);
+            if (tr->bestParsimony == randomMP)
+                bestIterationScoreHits++;
+            if (tr->bestParsimony < randomMP) {
+                bestIterationScoreHits = 1;
             }
-        }
-        if (tr->bestParsimony == randomMP)
-            bestIterationScoreHits++;
-        if (tr->bestParsimony < randomMP)
-            bestIterationScoreHits = 1;
-        if (((tr->bestParsimony < randomMP) ||
-             ((tr->bestParsimony == randomMP) &&
-              (random_double() <= 1.0 / bestIterationScoreHits))) &&
-            tr->TBR_removeBranch && tr->TBR_insertBranch1) {
-            applyMove(tr, pr);
-            /**
-             * TODO: Improve with incremental uppass/downpass too.
-             * TBR and SPR is different.
-             * Beware of recalculate stuff like scoreIncrease, oldScore...
-             */
-            // int temMP = _evaluateParsimony(tr, pr, tr->start, true, false);
-            // randomMP =
-            //     _evaluateParsimonyUppass(tr, pr, tr->start, perSiteScores);
-            // assert(randomMP == oldScore);
-            randomMP = oldScore;
-            // if (randomMP != tr->bestParsimony) {
-            //     cout << "remove branch: " << tr->TBR_removeBranch->number
-            //          << " - " << tr->TBR_removeBranch->back->number << '\n';
-            //     cout << "insert branch: " << tr->TBR_insertBranch1->number
-            //          << " - " << tr->TBR_insertBranch1->back->number << '\n';
-            //     cout << "insert branch: " << tr->TBR_insertBranch2->number
-            //          << " - " << tr->TBR_insertBranch2->back->number << '\n';
-            //     cout << "randomMP = " << randomMP << '\n';
-            //     cout << "tr->bestParsimony = " << tr->bestParsimony << '\n';
-            //     randomMP =
-            //         _evaluateParsimonyUppass(tr, pr, tr->start,
-            //         perSiteScores);
-            //     cout << "Correct randomMP = " << randomMP << '\n';
-            //     assert(0);
-            // }
-            assert(randomMP == tr->bestParsimony);
+            if (((tr->bestParsimony < randomMP) ||
+                 ((tr->bestParsimony == randomMP) &&
+                  (random_double() <= 1.0 / bestIterationScoreHits))) &&
+                tr->TBR_removeBranch && tr->TBR_insertBranch1) {
+                // cout << "remove branch: " << tr->TBR_removeBranch->number
+                //      << " - " << tr->TBR_removeBranch->back->number << '\n';
+                // cout << "insert branch: " << tr->TBR_insertBranch1->number
+                //      << " - " << tr->TBR_insertBranch1->back->number << '\n';
+                applyMove(tr, pr);
+                randomMP = oldScore;
+                // int temMP = _evaluateParsimony(tr, pr, tr->start, true,
+                // false); randomMP =
+                //     _evaluateParsimonyUppass(tr, pr, tr->start,
+                //     perSiteScores);
+                // assert(randomMP == oldScore);
+                // if (randomMP != tr->bestParsimony) {
+                //     cout << "remove branch: " << tr->TBR_removeBranch->number
+                //          << " - " << tr->TBR_removeBranch->back->number <<
+                //          '\n';
+                //     cout << "insert branch: " <<
+                //     tr->TBR_insertBranch1->number
+                //          << " - " << tr->TBR_insertBranch1->back->number
+                //          << '\n';
+                //     // cout << "insert branch: " <<
+                //     // tr->TBR_insertBranch2->number
+                //     //      << " - " << tr->TBR_insertBranch2->back->number
+                //     // <<
+                //     //      '\n';
+                //     cout << "randomMP = " << randomMP << '\n';
+                //     cout << "tr->bestParsimony = " << tr->bestParsimony <<
+                //     '\n'; randomMP = _evaluateParsimonyUppass(tr, pr,
+                //     tr->start,
+                //                                         perSiteScores);
+                //     cout << "Correct randomMP = " << randomMP << '\n';
+                //     assert(0);
+                // }
+                lastNodepId = i;
+                tr->TBR_removeBranch = NULL;
+                tr->TBR_insertBranch1 = tr->TBR_insertBranch2 = NULL;
+                bestTreeScoreHits = 1;
+                assert(randomMP == tr->bestParsimony);
+                nodeRectifierParsUppass(tr);
+            }
         }
     } while (randomMP < startMP);
+    // cout << "CNT = " << cnt << '\n';
     tr->start = tr->nodep[1];
     // cout << "End pllOptimizeTbrUppass\n";
-    cout << "CNT = " << cnt << '\n';
     return startMP;
 }
