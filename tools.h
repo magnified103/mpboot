@@ -523,6 +523,14 @@ struct Params {
     bool uppass_tbr;
     bool uppass_spr;
 
+
+    /**
+     *  Uppass SPR's and TBR's radius
+     */
+    int uppass_tbr_mintrav;
+    int uppass_tbr_maxtrav;
+    int uppass_spr_mintrav;
+    int uppass_spr_maxtrav;
     /**
      *  Number of starting parsimony trees
      */
