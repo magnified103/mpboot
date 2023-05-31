@@ -2533,11 +2533,12 @@ string IQTree::doNNISearch(int &nniCount, int &nniSteps) {
                 }
             } else if (params->uppass_tbr == true) {
                 pllOptimizeTbrUppass(pllInst, pllPartitions,
-                                     params->tbr_mintrav, params->tbr_maxtrav,
-                                     this);
+                                     params->uppass_tbr_mintrav,
+                                     params->uppass_tbr_maxtrav, this);
             } else if (params->uppass_spr == true) {
                 pllOptimizeSprUppass(pllInst, pllPartitions,
-                                     params->spr_mintrav, max_spr_rad, this);
+                                     params->uppass_spr_mintrav,
+                                     params->uppass_spr_maxtrav, this);
             } else {
                 pllOptimizeSprParsimony(pllInst, pllPartitions,
                                         params->spr_mintrav, max_spr_rad, this);
