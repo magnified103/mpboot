@@ -27,7 +27,7 @@ VerboseMode verbose_mode;
         WIN32 does not define gettimeofday() function.
         Here declare it extra for WIN32 only.
  */
-//#if defined(WIN32) && !defined(HAVE_GETTIMEOFDAY)
+// #if defined(WIN32) && !defined(HAVE_GETTIMEOFDAY)
 #if defined(WIN32)
 #include <sstream>
 #endif
@@ -41,9 +41,9 @@ VerboseMode verbose_mode;
 //    t->tv_sec = timebuffer.time;
 //    t->tv_usec = 1000 * timebuffer.millitm;
 //}
-//#else
-//#include <sys/time.h>
-//#endif
+// #else
+// #include <sys/time.h>
+// #endif
 
 /********************************************************
         Defining DoubleMatrix methods
@@ -613,6 +613,10 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.test_uppass = false;
     params.uppass_tbr = false;
     params.uppass_spr = false;
+    params.uppass_tbr_mintrav = 1;
+    params.uppass_tbr_maxtrav = 5;
+    params.uppass_spr_mintrav = 1;
+    params.uppass_spr_maxtrav = 6;
     params.tree_gen = NONE;
     params.user_file = NULL;
     params.out_prefix = NULL;
@@ -1008,6 +1012,36 @@ void parseArg(int argc, char *argv[], Params &params) {
 
             if (strcmp(argv[cnt], "-uppass_spr") == 0) {
                 params.uppass_spr = true;
+                continue;
+            }
+
+            if (strcmp(argv[cnt], "-uppass_tbr_mintrav") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use -uppass_tbr_mintrav <mintrav>";
+                params.uppass_tbr_mintrav = convert_int(argv[cnt]);
+                continue;
+            }
+            if (strcmp(argv[cnt], "-uppass_tbr_maxtrav") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use -uppass_tbr_maxtrav <maxtrav>";
+                params.uppass_tbr_maxtrav = convert_int(argv[cnt]);
+                continue;
+            }
+
+            if (strcmp(argv[cnt], "-uppass_spr_mintrav") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use -uppass_spr_mintrav <mintrav>";
+                params.uppass_spr_mintrav = convert_int(argv[cnt]);
+                continue;
+            }
+            if (strcmp(argv[cnt], "-uppass_spr_maxtrav") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use -uppass_spr_maxtrav <maxtrav>";
+                params.uppass_spr_maxtrav = convert_int(argv[cnt]);
                 continue;
             }
 
