@@ -2665,6 +2665,11 @@ static inline Vec4ui operator ~ (Vec4ui const & a) {
 
 // Functions for this class
 
+// vector function andnot
+static inline Vec4ui andnot (Vec4ui const & a, Vec4ui const & b) {
+    return Vec4ui(andnot(Vec128b(a), Vec128b(b)));
+}
+
 // Select between two operands. Corresponds to this pseudocode:
 // for (int i = 0; i < 8; i++) result[i] = s[i] ? a[i] : b[i];
 // Each word in s must be either 0 (false) or -1 (true). No other values are allowed.

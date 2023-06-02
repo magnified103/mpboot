@@ -863,6 +863,11 @@ static inline Vec8f & operator ^= (Vec8f & a, Vec8f const & b) {
     return a;
 }
 
+// vector operator ~ : bitwise not
+static inline Vec8f operator ~ (Vec8f const & a) {
+    return _mm256_xor_ps(a, constant8f<-1,-1,-1,-1,-1,-1,-1,-1>());
+}
+
 // vector operator ! : logical not. Returns Boolean vector
 static inline Vec8fb operator ! (Vec8f const & a) {
     return a == Vec8f(0.0f);
@@ -874,6 +879,11 @@ static inline Vec8fb operator ! (Vec8f const & a) {
 *          Functions for Vec8f
 *
 *****************************************************************************/
+
+// andnot: a & ~ b
+static inline Vec8f andnot(Vec8f const & a, Vec8f const & b) {
+    return _mm256_andnot_ps(b, a);
+}
 
 // Select between two operands. Corresponds to this pseudocode:
 // for (int i = 0; i < 8; i++) result[i] = s[i] ? a[i] : b[i];
@@ -1617,6 +1627,11 @@ static inline Vec4d & operator ^= (Vec4d & a, Vec4d const & b) {
     return a;
 }
 
+// vector operator ~ : bitwise not
+static inline Vec4d operator ~ (Vec4d const & a) {
+    return _mm256_xor_pd(a, _mm256_castps_pd (constant8f<-1,-1,-1,-1,-1,-1,-1,-1>()));
+}
+
 // vector operator ! : logical not. Returns Boolean vector
 static inline Vec4db operator ! (Vec4d const & a) {
     return a == Vec4d(0.0);
@@ -1628,6 +1643,11 @@ static inline Vec4db operator ! (Vec4d const & a) {
 *          Functions for Vec4d
 *
 *****************************************************************************/
+
+// andnot: a & ~ b
+static inline Vec4d andnot(Vec4d const & a, Vec4d const & b) {
+    return _mm256_andnot_pd(b, a);
+}
 
 // Select between two operands. Corresponds to this pseudocode:
 // for (int i = 0; i < 2; i++) result[i] = s[i] ? a[i] : b[i];

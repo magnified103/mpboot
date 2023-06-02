@@ -2437,6 +2437,11 @@ static inline Vec8ui operator ~ (Vec8ui const & a) {
 
 // Functions for this class
 
+// function andnot: a & ~ b
+static inline Vec8ui andnot (Vec8ui const & a, Vec8ui const & b) {
+    return Vec8ui(andnot(Vec256b(a), Vec256b(b)));
+}
+
 // Select between two operands. Corresponds to this pseudocode:
 // for (int i = 0; i < 16; i++) result[i] = s[i] ? a[i] : b[i];
 // Each word in s must be either 0 (false) or -1 (true). No other values are allowed.
