@@ -1963,7 +1963,7 @@ void Alignment::extractSites(Alignment *aln, IntVector &site_id) {
 }
 
 void convert_range(const char *str, int &lower, int &upper, int &step_size,
-                   char *&endptr) throw(string) {
+                   char *&endptr) {
     // char *endptr;
     char *beginptr = (char *)str;
 

@@ -191,7 +191,7 @@ bool fileExists(string strFilename) {
     }
     return (blnReturn);
 }
-void convert_int_pair(const char *str, int &x, int &y) throw(string) {
+void convert_int_pair(const char *str, int &x, int &y) {
     // Must be 2 numbers separated by a colon
     // Save first number to x and second to y
     int len = strlen(str), i;
@@ -214,7 +214,7 @@ void convert_int_pair(const char *str, int &x, int &y) throw(string) {
         y = y * 10 + (str[i] - '0');
     }
 }
-int convert_int(const char *str) throw(string) {
+int convert_int(const char *str) {
     char *endptr;
     int i = strtol(str, &endptr, 10);
 
@@ -228,7 +228,7 @@ int convert_int(const char *str) throw(string) {
     return i;
 }
 
-int convert_int(const char *str, int &end_pos) throw(string) {
+int convert_int(const char *str, int &end_pos) {
     char *endptr;
     int i = strtol(str, &endptr, 10);
 
@@ -242,7 +242,7 @@ int convert_int(const char *str, int &end_pos) throw(string) {
     return i;
 }
 
-void convert_int_vec(const char *str, IntVector &vec) throw(string) {
+void convert_int_vec(const char *str, IntVector &vec) {
     char *beginptr = (char *)str, *endptr;
     vec.clear();
     do {
@@ -261,7 +261,7 @@ void convert_int_vec(const char *str, IntVector &vec) throw(string) {
     } while (*endptr != 0);
 }
 
-double convert_double(const char *str) throw(string) {
+double convert_double(const char *str) {
     char *endptr;
     double d = strtod(str, &endptr);
     if ((d == 0.0 && endptr == str) || fabs(d) == HUGE_VALF || *endptr != 0) {
@@ -273,7 +273,7 @@ double convert_double(const char *str) throw(string) {
     return d;
 }
 
-double convert_double(const char *str, int &end_pos) throw(string) {
+double convert_double(const char *str, int &end_pos) {
     char *endptr;
     double d = strtod(str, &endptr);
     if ((d == 0.0 && endptr == str) || fabs(d) == HUGE_VALF) {
@@ -297,7 +297,7 @@ string convert_time(const double sec) {
 }
 
 void convert_range(const char *str, int &lower, int &upper,
-                   int &step_size) throw(string) {
+                   int &step_size) {
     char *endptr;
     char *beginptr = (char *)str;
 
@@ -347,7 +347,7 @@ void convert_range(const char *str, int &lower, int &upper,
 }
 
 void convert_range(const char *str, double &lower, double &upper,
-                   double &step_size) throw(string) {
+                   double &step_size) {
     char *endptr;
     char *beginptr = (char *)str;
 
