@@ -57,50 +57,10 @@
 #define __func__ __FUNCTION__
 #endif
 
-#if defined(USE_HASH_MAP) && !defined(_MSC_VER)
-#if !defined(__GNUC__)
-#include <hash_map>
-#include <hash_set>
-using namespace stdext;
-#elif GCC_VERSION < 40300
-#include <ext/hash_map>
-#include <ext/hash_set>
-using namespace __gnu_cxx;
-#define unordered_map hash_map
-#define unordered_set hash_set
-#else
-#include <tr1/unordered_map>
-#include <tr1/unordered_set>
-using namespace std::tr1;
-#endif
-#else
 #include <map>
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
-#endif
-
-using namespace std;
-
-#if defined(USE_HASH_MAP) && GCC_VERSION < 40300 && !defined(_MSC_VER)
-/*
-        Define the hash function of Split
- */
-#if !defined(__GNUC__)
-namespace stdext {
-#else
-namespace __gnu_cxx {
-#endif
-
-template <> struct hash<string> {
-
-    size_t operator()(string str) const {
-        hash<const char *> hash_str;
-        return hash_str(str.c_str());
-    }
-};
-} // namespace
-#endif // USE_HASH_MAP
 
 class Linear {
   public:
