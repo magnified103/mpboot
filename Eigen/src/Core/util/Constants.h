@@ -13,12 +13,17 @@
 
 namespace Eigen {
 
-/** This value means that a quantity is not known at compile-time, and that instead the value is
+/** This value means that a positive quantity (e.g., a size) is not known at compile-time, and that instead the value is
   * stored in some runtime variable.
   *
   * Changing the value of Dynamic breaks the ABI, as Dynamic is often used as a template parameter for Matrix.
   */
 const int Dynamic = -1;
+
+/** This value means that a signed quantity (e.g., a signed index) is not known at compile-time, and that instead its value
+  * has to be specified at runtime.
+  */
+const int DynamicIndex = 0xffffff;
 
 /** This value means +Infinity; it is currently used only as the p parameter to MatrixBase::lpNorm<int>().
   * The value Infinity there means the L-infinity norm.
@@ -157,7 +162,7 @@ const unsigned int HereditaryBits = RowMajorBit
 /** \ingroup enums
   * Enum containing possible values for the \p Mode parameter of 
   * MatrixBase::selfadjointView() and MatrixBase::triangularView(). */
-enum {
+enum UpLoType {
   /** View matrix as a lower triangular matrix. */
   Lower=0x1,                      
   /** View matrix as an upper triangular matrix. */
@@ -182,7 +187,7 @@ enum {
 
 /** \ingroup enums
   * Enum for indicating whether an object is aligned or not. */
-enum { 
+enum AlignmentType {
   /** Object is not correctly aligned for vectorization. */
   Unaligned=0, 
   /** Object is aligned for vectorization. */
@@ -212,7 +217,7 @@ enum DirectionType {
 
 /** \internal \ingroup enums
   * Enum to specify how to traverse the entries of a matrix. */
-enum {
+enum TraversalType {
   /** \internal Default traversal, no vectorization, no index-based access */
   DefaultTraversal,
   /** \internal No vectorization, use index-based access to have only one for loop instead of 2 nested loops */
@@ -227,12 +232,14 @@ enum {
     * scalar loops to handle the unaligned boundaries */
   SliceVectorizedTraversal,
   /** \internal Special case to properly handle incompatible scalar types or other defecting cases*/
-  InvalidTraversal
+  InvalidTraversal,
+  /** \internal Evaluate all entries at once */
+  AllAtOnceTraversal
 };
 
 /** \internal \ingroup enums
   * Enum to specify whether to unroll loops when traversing over the entries of a matrix. */
-enum {
+enum UnrollingType {
   /** \internal Do not unroll loops. */
   NoUnrolling,
   /** \internal Unroll only the inner loop, but not the outer loop. */
@@ -244,7 +251,7 @@ enum {
 
 /** \internal \ingroup enums
   * Enum to specify whether to use the default (built-in) implementation or the specialization. */
-enum {
+enum SpecializedType {
   Specialized,
   BuiltIn
 };
@@ -252,20 +259,20 @@ enum {
 /** \ingroup enums
   * Enum containing possible values for the \p _Options template parameter of
   * Matrix, Array and BandMatrix. */
-enum {
+enum StorageOptions {
   /** Storage order is column major (see \ref TopicStorageOrders). */
   ColMajor = 0,
   /** Storage order is row major (see \ref TopicStorageOrders). */
   RowMajor = 0x1,  // it is only a coincidence that this is equal to RowMajorBit -- don't rely on that
-  /** \internal Align the matrix itself if it is vectorizable fixed-size */
+  /** Align the matrix itself if it is vectorizable fixed-size */
   AutoAlign = 0,
-  /** \internal Don't require alignment for the matrix itself (the array of coefficients, if dynamically allocated, may still be requested to be aligned) */ // FIXME --- clarify the situation
+  /** Don't require alignment for the matrix itself (the array of coefficients, if dynamically allocated, may still be requested to be aligned) */ // FIXME --- clarify the situation
   DontAlign = 0x2
 };
 
 /** \ingroup enums
   * Enum for specifying whether to apply or solve on the left or right. */
-enum {
+enum SideType {
   /** Apply transformation on the left. */
   OnTheLeft = 1,  
   /** Apply transformation on the right. */
@@ -411,7 +418,7 @@ namespace Architecture
 
 /** \internal \ingroup enums
   * Enum used as template parameter in GeneralProduct. */
-enum { CoeffBasedProductMode, LazyCoeffBasedProductMode, OuterProduct, InnerProduct, GemvProduct, GemmProduct };
+enum ProductImplType { CoeffBasedProductMode, LazyCoeffBasedProductMode, OuterProduct, InnerProduct, GemvProduct, GemmProduct };
 
 /** \internal \ingroup enums
   * Enum used in experimental parallel implementation. */
@@ -425,6 +432,19 @@ struct MatrixXpr {};
 
 /** The type used to identify an array expression */
 struct ArrayXpr {};
+
+namespace internal {
+  /** \internal
+  * Constants for comparison functors
+  */
+  enum ComparisonName {
+    cmp_EQ = 0,
+    cmp_LT = 1,
+    cmp_LE = 2,
+    cmp_UNORD = 3,
+    cmp_NEQ = 4
+  };
+}
 
 } // end namespace Eigen
 
