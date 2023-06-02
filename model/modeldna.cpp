@@ -189,7 +189,7 @@ void ModelDNA::init(const char *model_name, string model_params, StateFreqType f
 }
 
 
-void ModelDNA::readRates(string str) throw(const char*) {
+void ModelDNA::readRates(string str) {
 	int nrates = *max_element(param_spec.begin(), param_spec.end());
 	int end_pos = 0;
 	int i, j;

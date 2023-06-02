@@ -271,7 +271,7 @@ void ModelCodon::setRateGroup(IntVector group) {
 }
 
 
-void ModelCodon::readRates(string str) throw(const char*) {
+void ModelCodon::readRates(string str) {
 	int end_pos = 0;
 	int i, j;
 	for (i = 0; i < rate_constraints.size() && end_pos < str.length(); i++)

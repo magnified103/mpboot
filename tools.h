@@ -2014,7 +2014,7 @@ bool fileExists(string strFilename);
         @param str original string
         @return the number
  */
-int convert_int(const char *str) throw(string);
+int convert_int(const char *str);
 
 /**
         convert string to int, with error checking
@@ -2022,21 +2022,21 @@ int convert_int(const char *str) throw(string);
         @param end_pos end position
         @return the number
  */
-int convert_int(const char *str, int &end_pos) throw(string);
+int convert_int(const char *str, int &end_pos);
 
 /**
         convert comma-separated string to integer vector, with error checking
         @param str original string with integers separated by comma
         @param vec (OUT) integer vector
  */
-void convert_int_vec(const char *str, IntVector &vec) throw(string);
+void convert_int_vec(const char *str, IntVector &vec);
 
 /**
         convert string to double, with error checking
         @param str original string
         @return the double
  */
-double convert_double(const char *str) throw(string);
+double convert_double(const char *str);
 
 /**
         convert string to double, with error checking
@@ -2044,7 +2044,7 @@ double convert_double(const char *str) throw(string);
         @param end_pos end position
         @return the double
  */
-double convert_double(const char *str, int &end_pos) throw(string);
+double convert_double(const char *str, int &end_pos);
 
 /**
  * Convert seconds to hour, minute, second
@@ -2061,7 +2061,7 @@ string convert_time(const double sec);
         @param step_size (OUT) step size of the range
  */
 void convert_range(const char *str, int &lower, int &upper,
-                   int &step_size) throw(string);
+                   int &step_size);
 
 /**
         convert a string to to range lower:upper:step_size with error checking
@@ -2071,7 +2071,7 @@ void convert_range(const char *str, int &lower, int &upper,
         @param step_size (OUT) step size of the range
  */
 void convert_range(const char *str, double &lower, double &upper,
-                   double &step_size) throw(string);
+                   double &step_size);
 
 /**
         read the file containing branch/split scaling factor and taxa weights

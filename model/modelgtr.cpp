@@ -456,7 +456,7 @@ void ModelGTR::decomposeRateMatrix(){
 	delete [] rate_matrix;
 } 
 
-void ModelGTR::readRates(istream &in) throw(const char*) {
+void ModelGTR::readRates(istream &in) {
 	int nrates = getNumRateEntries();
 	for (int i = 0; i < nrates; i++) {
 		if (!(in >> rates[i]))
@@ -466,7 +466,7 @@ void ModelGTR::readRates(istream &in) throw(const char*) {
 	}
 }
 
-void ModelGTR::readRates(string str) throw(const char*) {
+void ModelGTR::readRates(string str) {
 	int nrates = getNumRateEntries();
 	int end_pos = 0;
 	cout << __func__ << " " << str << endl;
@@ -492,7 +492,7 @@ void ModelGTR::readRates(string str) throw(const char*) {
 
 }
 
-void ModelGTR::readStateFreq(istream &in) throw(const char*) {
+void ModelGTR::readStateFreq(istream &in) {
 	int i;
 	for (i = 0; i < num_states; i++) {
 		if (!(in >> state_freq[i])) 
@@ -506,7 +506,7 @@ void ModelGTR::readStateFreq(istream &in) throw(const char*) {
 		throw "State frequencies do not sum up to 1.0";
 }
 
-void ModelGTR::readStateFreq(string str) throw(const char*) {
+void ModelGTR::readStateFreq(string str) {
 	int i;
 	int end_pos = 0;
 	for (i = 0; i < num_states; i++) {

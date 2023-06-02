@@ -3211,7 +3211,7 @@ void ModelProtein::init(const char *model_name, string model_params, StateFreqTy
 	ModelGTR::init(freq);
 }
 
-void ModelProtein::readRates(istream &in) throw(const char*) {
+void ModelProtein::readRates(istream &in) {
 	int nrates = getNumRateEntries();
 	int row = 1, col = 0;
 	// since states for protein is stored in lower-triangle, special treatment is needed

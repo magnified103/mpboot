@@ -86,7 +86,7 @@ public:
 		It will throw error messages if failed
 		@param in input stream
 	*/
-	virtual void readRates(string str) throw(const char*);
+	virtual void readRates(string str);
 
 	/**
 	 * @return true if codon1<->codon2 involves more than 1 nucleotide
