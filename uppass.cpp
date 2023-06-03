@@ -168,7 +168,7 @@ static bool first_call =
     true; // is this the first call to pllOptimizeSprParsimony
 static bool doing_stepwise_addition = false; // is the stepwise addition on
 
-using DefaultParsProxyTraits = ParsProxyTraits<parsimonyNumber, INTS_PER_VECTOR>;
+using DefaultParsProxyTraits = ParsProxyTraits<parsimonyNumber, INTS_PER_VECTOR, std::align_val_t{PLL_BYTE_ALIGNMENT}>;
 
 constexpr std::size_t BLOCK_SIZE = INTS_PER_VECTOR;
 
@@ -2352,8 +2352,9 @@ inline void setStatesVec(parsimonyNumber *uStatesVec,
 /**
  * WARNING: Pls check!
  */
-void uppassLeafNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *uUpVec,
-                             parsimonyNumber *pUpVec, std::size_t states) {
+template <typename Traits = DefaultParsProxyTraits>
+void uppassLeafNodeCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> uUpVec,
+                             ParsProxy<Traits, 2> pUpVec, std::size_t states) {
     // cout << "Begin uppassLeafNodeCalculate\n";
     INT_TYPE
     allOne = SET_ALL_BITS_ONE;
@@ -2367,32 +2368,24 @@ void uppassLeafNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *uUpVec,
 
         INT_TYPE x = SET_ALL_BITS_ZERO, u_k[32], p_k[32];
         // parsimonyNumber x = 0;
-        std::size_t posU, posUUp, posPUp;
-        posU = posPUp = 0;
         for (int k = 0; k < states; ++k) {
-            u_k[k] = VECTOR_LOAD((CAST)(&uVec[posU]));
-            p_k[k] = VECTOR_LOAD((CAST)(&pUpVec[posPUp]));
+            u_k[k] = VECTOR_LOAD((CAST)uVec[k]);
+            p_k[k] = VECTOR_LOAD((CAST)pUpVec[k]);
             x = VECTOR_BIT_OR(
                 x, VECTOR_BIT_AND(
                        VECTOR_AND_NOT(VECTOR_BIT_AND(u_k[k], p_k[k]), allOne),
                        p_k[k]));
             // x |= (~(uVec[posU] & pUpVec[posPUp]) & pUpVec[posPUp]);
-            posU = next_state(posU);
-            posPUp = next_state(posPUp);
         }
         x = VECTOR_AND_NOT(x, allOne);
         // x = ~x;
         // posUUp = posPUp = 0;
-        posU = posUUp = posPUp = 0;
         for (int k = 0; k < states; ++k) {
             u_k[k] = VECTOR_BIT_XOR(
                 u_k[k], VECTOR_BIT_AND(VECTOR_BIT_XOR(u_k[k], p_k[k]), x));
-            VECTOR_STORE((CAST)(&uUpVec[posUUp]), u_k[k]);
+            VECTOR_STORE((CAST)uUpVec[k], u_k[k]);
             // uUpVec[posUUp] = uVec[posU];
             // uUpVec[posUUp] ^= ((uUpVec[posUUp] ^ pUpVec[posPUp]) & x);
-            posU = next_state(posU);
-            posUUp = next_state(posUUp);
-            posPUp = next_state(posPUp);
         }
     }
     }
@@ -2411,8 +2404,9 @@ void uppassLeafNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *uUpVec,
  * -> Number of bit 1 of t_N is the total cost of all the columns represented in
  * t_N.
  */
-INT_TYPE downpassCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
-                           parsimonyNumber *v2Vec, std::size_t states) {
+template <typename Traits = DefaultParsProxyTraits>
+INT_TYPE downpassCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> v1Vec,
+                           ParsProxy<Traits, 2> v2Vec, std::size_t states) {
     // cout << "Begin downpassCalculate\n";
     INT_TYPE
     allOne = SET_ALL_BITS_ONE;
@@ -2424,10 +2418,9 @@ INT_TYPE downpassCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
         // assert(states <= 32)
         INT_TYPE s_l, s_r, t_A[32], o_A[32];
         // parsimonyNumber o_A[32], t_A[32];
-        std::size_t posV1 = 0, posV2 = 0;
-        for (int k = 0; k < states; ++k) {
-            s_l = VECTOR_LOAD((CAST)(&v1Vec[posV1]));
-            s_r = VECTOR_LOAD((CAST)(&v2Vec[posV2]));
+        for (std::size_t k = 0; k < states; ++k) {
+            s_l = VECTOR_LOAD((CAST)v1Vec[k]);
+            s_r = VECTOR_LOAD((CAST)v2Vec[k]);
             o_A[k] = VECTOR_BIT_OR(s_l, s_r);
             t_A[k] = VECTOR_BIT_AND(s_l, s_r);
             // o_A[k] = v1Vec[posV1] | v2Vec[posV2];
@@ -2435,17 +2428,13 @@ INT_TYPE downpassCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
 
             t_N = VECTOR_BIT_OR(t_N, t_A[k]);
             // t_N |= t_A[k];
-            posV1 = next_state(posV1);
-            posV2 = next_state(posV2);
         }
         t_N = VECTOR_AND_NOT(t_N, allOne);
         // t_N = ~t_N;
-        std::size_t posU = 0;
-        for (int k = 0; k < states; ++k) {
-            VECTOR_STORE((CAST)(&uVec[posU]),
+        for (std::size_t k = 0; k < states; ++k) {
+            VECTOR_STORE((CAST)uVec[k],
                          VECTOR_BIT_OR(t_A[k], VECTOR_BIT_AND(t_N, o_A[k])));
             // uVec[posU] = t_A[k] | (t_N & o_A[k]);
-            posU = next_state(posU);
         }
     }
     }
@@ -2455,9 +2444,10 @@ INT_TYPE downpassCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
 /**
  * WARNING: Pls check.
  */
-void uppassInnerNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
-                              parsimonyNumber *v2Vec, parsimonyNumber *uUpVec,
-                              parsimonyNumber *pUpVec, std::size_t states) {
+template <typename Traits = DefaultParsProxyTraits>
+void uppassInnerNodeCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> v1Vec,
+                              ParsProxy<Traits, 2> v2Vec, ParsProxy<Traits, 2> uUpVec,
+                              ParsProxy<Traits, 2> pUpVec, std::size_t states) {
     // cout << "Begin uppassInnerNodeCalculate\n";
     INT_TYPE
     allOne = SET_ALL_BITS_ONE;
@@ -2474,24 +2464,17 @@ void uppassInnerNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
         INT_TYPE x = SET_ALL_BITS_ZERO, y = SET_ALL_BITS_ZERO, u_k[32], p_k[32],
                  v_1k[32], v_2k[32], u_up;
         // parsimonyNumber x = 0, y = 0;
-        std::size_t posU, posV1, posV2, posUUp, posPUp;
-        posU = posV1 = posV2 = posPUp = 0;
-        for (int k = 0; k < states; ++k) {
-            u_k[k] = VECTOR_LOAD((CAST)(&uVec[posU]));
-            p_k[k] = VECTOR_LOAD((CAST)(&pUpVec[posPUp]));
-            v_1k[k] = VECTOR_LOAD((CAST)(&v1Vec[posV1]));
-            v_2k[k] = VECTOR_LOAD((CAST)(&v2Vec[posV2]));
+        for (std::size_t k = 0; k < states; ++k) {
+            u_k[k] = VECTOR_LOAD((CAST)uVec[k]);
+            p_k[k] = VECTOR_LOAD((CAST)pUpVec[k]);
+            v_1k[k] = VECTOR_LOAD((CAST)v1Vec[k]);
+            v_2k[k] = VECTOR_LOAD((CAST)v2Vec[k]);
             x = VECTOR_BIT_OR(
                 x, VECTOR_AND_NOT(VECTOR_BIT_AND(u_k[k], p_k[k]), p_k[k]));
             y = VECTOR_BIT_OR(y, VECTOR_BIT_AND(v_1k[k], v_2k[k]));
             // x |= (~(uVec[posU] & pUpVec[posPUp]) & pUpVec[posPUp]);
             // y |= (v1Vec[posV1] & v2Vec[posV2]);
-            posU = next_state(posU);
-            posV1 = next_state(posV1);
-            posV2 = next_state(posV2);
-            posPUp = next_state(posPUp);
         }
-        posU = posV1 = posV2 = posUUp = posPUp = 0;
         // posUUp = 0;
         for (int k = 0; k < states; ++k) {
             u_up = u_k[k];
@@ -2512,7 +2495,7 @@ void uppassInnerNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
                                             p_k[k],
                                             VECTOR_BIT_OR(v_1k[k], v_2k[k])))),
                     VECTOR_BIT_AND(x, y)));
-            VECTOR_STORE((CAST)(&uUpVec[posUUp]), u_up);
+            VECTOR_STORE((CAST)uUpVec[k], u_up);
             // uUpVec[posUUp] = uVec[posU];
             // uUpVec[posUUp] ^= ((uUpVec[posUUp] ^ pUpVec[posPUp]) & (~x));
             // uUpVec[posUUp] ^=
@@ -2523,11 +2506,6 @@ void uppassInnerNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
             //       (uUpVec[posUUp] |
             //        (pUpVec[posPUp] & (v1Vec[posV1] | v2Vec[posV2])))) &
             //      (x & y));
-            posU = next_state(posU);
-            posV1 = next_state(posV1);
-            posV2 = next_state(posV2);
-            posUUp = next_state(posUUp);
-            posPUp = next_state(posPUp);
         }
     }
     }
@@ -2538,7 +2516,7 @@ void uppassInnerNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
  * Update new uppass calculated to parsVectUppassLocal
  */
 template <typename Traits = DefaultParsProxyTraits>
-void dfsRecalculateUppassLocal(nodeptr u, parsimonyNumber *pUpVec, pInfo *prModel, partitionList *pr, std::size_t w,
+void dfsRecalculateUppassLocal(nodeptr u, ParsProxy<Traits, 2> pUpVec, pInfo *prModel, partitionList *pr, std::size_t w,
                                std::size_t mxTips) {
     // cout << "Begin dfsRecalculateUppassLocal\n";
     if (!inRadiusRange[u->number]) {
@@ -2547,24 +2525,26 @@ void dfsRecalculateUppassLocal(nodeptr u, parsimonyNumber *pUpVec, pInfo *prMode
     copySingleGlobalToLocalUppass(pr, u->number);
     int width = prModel->parsimonyLength;
     int states = prModel->states;
-    std::size_t posU = table_index(width, states, u->number, 0, w);
+
     ParsProxy<Traits> parsVectUppassLocal(width, states, prModel->parsVectUppassLocal);
+    ParsProxy<Traits> parsVect(width, states, prModel->parsVect);
     ParsProxy<Traits> parsVectUppass(width, states, prModel->parsVectUppass);
+
     if (u->number <= mxTips) {
-        uppassLeafNodeCalculate(&(prModel->parsVect[posU]),
-                                &(prModel->parsVectUppassLocal[posU]), pUpVec, states);
+        uppassLeafNodeCalculate(parsVect[u->number][w],
+                                parsVectUppassLocal[u->number][w], pUpVec, states);
     } else {
         nodeptr v1 = u->next->back;
         nodeptr v2 = u->next->next->back;
         uppassInnerNodeCalculate(
-            &(prModel->parsVect[posU]),
-            &(prModel->parsVect[table_index(width, states, v1->number, 0, w)]),
-            &(prModel->parsVect[table_index(width, states, v2->number, 0, w)]),
-            &(prModel->parsVectUppassLocal[posU]), pUpVec, states);
+            parsVect[u->number][w],
+            parsVect[v1->number][w],
+            parsVect[v2->number][w],
+            parsVectUppassLocal[u->number][w], pUpVec, states);
         if ((inRadiusRange[v1->number] || inRadiusRange[v2->number]) &&
             !equalStatesCmp(parsVectUppassLocal[u->number][w], parsVectUppass[u->number][w])) {
-            dfsRecalculateUppassLocal(v1, &(prModel->parsVectUppassLocal[posU]), prModel, pr, w, mxTips);
-            dfsRecalculateUppassLocal(v2, &(prModel->parsVectUppassLocal[posU]), prModel, pr, w, mxTips);
+            dfsRecalculateUppassLocal(v1, parsVectUppassLocal[u->number][w], prModel, pr, w, mxTips);
+            dfsRecalculateUppassLocal(v2, parsVectUppassLocal[u->number][w], prModel, pr, w, mxTips);
         }
     }
     // cout << "End dfsRecalculateUppassLocal\n";
@@ -2574,30 +2554,28 @@ void dfsRecalculateUppassLocal(nodeptr u, parsimonyNumber *pUpVec, pInfo *prMode
  * Update new uppass calculated to parsVectUppass
  */
 template <typename Traits = DefaultParsProxyTraits>
-void dfsRecalculateUppass(nodeptr u, parsimonyNumber *pUpVec, pInfo *prModel,
+void dfsRecalculateUppass(nodeptr u, ParsProxy<Traits, 2> pUpVec, pInfo *prModel,
                           partitionList *pr, std::size_t w, std::size_t mxTips) {
-    int width = prModel->parsimonyLength;
-    int states = prModel->states;
-    std::size_t posU = table_index(width, states, u->number, 0, w);
+    std::size_t width = prModel->parsimonyLength;
+    std::size_t states = prModel->states;
     ParsProxy<Traits> parsVectUppassLocal(width, states, prModel->parsVectUppassLocal);
+    ParsProxy<Traits> parsVect(width, states, prModel->parsVect);
     ParsProxy<Traits> parsVectUppass(width, states, prModel->parsVectUppass);
+
     if (u->number <= mxTips) {
-        uppassLeafNodeCalculate(&(prModel->parsVect[posU]),
-                                &(prModel->parsVectUppass[posU]), pUpVec, states);
+        uppassLeafNodeCalculate(parsVect[u->number][w], parsVectUppass[u->number][w], pUpVec, states);
     } else {
         copySingleGlobalToLocalUppass(pr, u->number);
         nodeptr v1 = u->next->back;
         nodeptr v2 = u->next->next->back;
         uppassInnerNodeCalculate(
-            &(prModel->parsVect[posU]),
-//            &(prModel->parsVect[width * states * v1->number + w]),
-            &(prModel->parsVect[table_index(width, states, v1->number, 0, w)]),
-//            &(prModel->parsVect[width * states * v2->number + w]),
-            &(prModel->parsVect[table_index(width, states, v2->number, 0, w)]),
-            &(prModel->parsVectUppass[posU]), pUpVec, states);
+            parsVect[u->number][w],
+            parsVect[v1->number][w],
+            parsVect[v2->number][w],
+            parsVectUppass[u->number][w], pUpVec, states);
         if (!equalStatesCmp(parsVectUppassLocal[u->number][w], parsVectUppass[u->number][w])) {
-            dfsRecalculateUppass(v1, &(prModel->parsVectUppass[posU]), prModel, pr, w, mxTips);
-            dfsRecalculateUppass(v2, &(prModel->parsVectUppass[posU]), prModel, pr, w, mxTips);
+            dfsRecalculateUppass(v1, parsVectUppass[u->number][w], prModel, pr, w, mxTips);
+            dfsRecalculateUppass(v2, parsVectUppass[u->number][w], prModel, pr, w, mxTips);
         }
     }
 }
@@ -2676,12 +2654,8 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                 //     states);
                 /* Nm might be LEAF or might have 2 children. */
                 if (Nm->number > tr->mxtips) {
-                    dfsRecalculateUppassLocal(
-                        Nm->next->back,
-                        &(pr->partitionData[model]->parsVect[posNm]), pr->partitionData[model], pr, w, tr->mxtips);
-                    dfsRecalculateUppassLocal(
-                        Nm->next->next->back,
-                        &(pr->partitionData[model]->parsVect[posNm]), pr->partitionData[model], pr, w, tr->mxtips);
+                    dfsRecalculateUppassLocal(Nm->next->back, parsVect[Nm->number][w], pr->partitionData[model], pr, w, tr->mxtips);
+                    dfsRecalculateUppassLocal(Nm->next->next->back, parsVect[Nm->number][w], pr->partitionData[model], pr, w, tr->mxtips);
                 }
             }
             /* Nx MUST be parent of Nm or Nx-Nm is the root branch */
@@ -2707,11 +2681,9 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     //     width, states);
                     /* Nx must have 2 children (Ns and Nz). */
                     dfsRecalculateUppassLocal(
-                        Ns,
-                        &(pr->partitionData[model]->parsVect[posNx]), pr->partitionData[model], pr, w, tr->mxtips);
+                        Ns, parsVect[Nx->number][w], pr->partitionData[model], pr, w, tr->mxtips);
                     dfsRecalculateUppassLocal(
-                        Nz,
-                        &(pr->partitionData[model]->parsVect[posNx]), pr->partitionData[model], pr, w, tr->mxtips);
+                        Nz, parsVect[Nx->number][w], pr->partitionData[model], pr, w, tr->mxtips);
                 }
                 /* Continue to the next set of 32 columns */
                 continue;
@@ -2721,16 +2693,17 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
 
                 /* Calculate new downpass (= new uppass) of the new root branch
                  * Ns-Nz */
-                parsimonyNumber *rootDownpass = NULL;
-                rax_posix_memalign((void **)&(rootDownpass), PLL_BYTE_ALIGNMENT,
-                                   (size_t)INTS_PER_VECTOR * states *
-                                       sizeof(parsimonyNumber));
-                // parsimonyNumber *rootDownpass = new
-                // alignas(PLL_BYTE_ALIGNMENT)
-                //     parsimonyNumber[states * INTS_PER_VECTOR];
-                INT_TYPE isUnionDownpass = downpassCalculate(
-                    rootDownpass, &(pr->partitionData[model]->parsVect[posNs]),
-                    &(pr->partitionData[model]->parsVect[posNz]), states);
+//                parsimonyNumber *rootDownpass = NULL;
+//                rax_posix_memalign((void **)&(rootDownpass), PLL_BYTE_ALIGNMENT,
+//                                   (size_t)INTS_PER_VECTOR * states *
+//                                       sizeof(parsimonyNumber));
+
+                ParsWrapper<Traits, 2> rootDownpass(states);
+
+                INT_TYPE isUnionDownpass = downpassCalculate<Traits>(
+                    rootDownpass,
+                    parsVect[Ns->number][w],
+                    parsVect[Nz->number][w], states);
 
                 /* Update scoreMainSubtree */
                 // scoreMainSubtree += __builtin_popcount(isUnionDownpass);
@@ -2747,10 +2720,10 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
 
                 /* STEP 2c: If old uppass of Nx != new downpass (new uppass) of
                  * root branch Ns-Nz, do dfsRecalculateUppass on Ns */
-                if (!equalStatesCmp(
+                if (!equalStatesCmp<Traits>(
                         parsVectUppass[Nx->number][w],
-                        ParsProxy<Traits, 2>(width, states, rootDownpass))) {
-                    dfsRecalculateUppassLocal(Ns, rootDownpass,
+                        rootDownpass)) {
+                    dfsRecalculateUppassLocal<Traits>(Ns, rootDownpass,
                                               pr->partitionData[model], pr, w,
                                               tr->mxtips);
                 }
@@ -2760,15 +2733,15 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                  * -> Can't compare)
                  */
                 /* TODO: Add if */
-                dfsRecalculateUppassLocal(Nz, rootDownpass,
+                dfsRecalculateUppassLocal<Traits>(Nz, rootDownpass,
                                           pr->partitionData[model], pr, w,
                                           tr->mxtips);
                 /* Continue to the next set of 32 columns */
                 // delete[] rootDownpass;
-                if (rootDownpass != NULL) {
-                    rax_free(rootDownpass);
-                    rootDownpass = NULL;
-                }
+//                if (rootDownpass != NULL) {
+//                    rax_free(rootDownpass);
+//                    rootDownpass = NULL;
+//                }
                 continue;
             }
             /**
@@ -2783,12 +2756,11 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                 } else {
                     u = u->next->next;
                 }
-                parsimonyNumber *uDownpass, *lastUDownpass = NULL;
+                ParsWrapper<Traits, 2> uDownpass;
+                ParsProxy<Traits, 2> lastUDownpass;
                 struct pair2 {
                     nodeptr v;
-                    parsimonyNumber *vDownpass;
-                    pair2(nodeptr _v, parsimonyNumber *_vDownpass)
-                        : v(_v), vDownpass(_vDownpass) {}
+                    ParsWrapper<Traits, 2> vDownpass;
                 };
 
                 /* HACK: Is this good? */
@@ -2804,41 +2776,31 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     assert(u->number > tr->mxtips);
                     nodeptr v1 = u->next->back;
                     nodeptr v2 = u->next->next->back;
-                    parsimonyNumber *v1Downpass, *v2Downpass;
-//                    int stepV1, stepV2;
+                    ParsProxy<Traits, 2> v1Downpass, v2Downpass;
                     if (lastU != NULL && v1->number == lastU->number) {
-                        assert(lastUDownpass != NULL);
+                        assert(lastUDownpass.array != NULL);
                         v1Downpass = lastUDownpass;
-                        v2Downpass = &(
-                                pr->partitionData[model]
-                                        ->parsVect[init(v2->number, w)]);
+                        v2Downpass = parsVect[v2->number][w];
                     } else if (lastU != NULL && v2->number == lastU->number) {
-                        assert(lastUDownpass != NULL);
-                        v1Downpass = &(
-                                pr->partitionData[model]
-                                        ->parsVect[init(v1->number, w)]);
+                        assert(lastUDownpass.array != NULL);
+                        v1Downpass = parsVect[v1->number][w];
                         v2Downpass = lastUDownpass;
                     } else {
                         /* Happens only the first time (i.e. lastU = NULL)
                          */
                         assert(lastU == NULL);
-                        v1Downpass = &(
-                                pr->partitionData[model]
-                                        ->parsVect[init(v1->number, w)]);
-                        v2Downpass = &(
-                                pr->partitionData[model]
-                                        ->parsVect[init(v2->number, w)]);
+                        v1Downpass = parsVect[v1->number][w];
+                        v2Downpass = parsVect[v2->number][w];
                     }
 
                     /* Fitch's Algo */
-                    rax_posix_memalign((void **)&(uDownpass),
-                                       PLL_BYTE_ALIGNMENT,
-                                       (size_t)INTS_PER_VECTOR * states *
-                                           sizeof(parsimonyNumber));
+                    uDownpass = ParsWrapper<Traits, 2>(states);
                     // uDownpass = new alignas(PLL_BYTE_ALIGNMENT)
                     //     parsimonyNumber[states * INTS_PER_VECTOR];
-                    INT_TYPE isUnionDownpass = downpassCalculate(
-                        uDownpass, v1Downpass, v2Downpass, states);
+                    INT_TYPE isUnionDownpass = downpassCalculate<Traits>(
+                        uDownpass,
+                        v1Downpass,
+                        v2Downpass, states);
                     /* Update score difference when recalculate downpass */
                     // cout << "scoreMainSubtree BEGIN = " <<
                     // scoreMainSubtree
@@ -2878,7 +2840,9 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                      *  - Downpass of 2 children v1, v2 of u changed
                      *  - Uppass of parent p of u changed
                      */
-                    nodesRecalculated.emplace_back(pair2{u, uDownpass});
+                    nodesRecalculated.push_back(pair2{u, std::move(uDownpass)}); // uDownpass is destroyed, DO NOT USE
+                    assert(!uDownpass.array);
+                    ParsProxy<Traits, 2> uDownpass = nodesRecalculated.back().vDownpass; // now uDownpass is SAFE FOR USE
                     /**
                      * NOTE: u is root branch
                      * IF equalStatesCmp().. = TRUE
@@ -2893,7 +2857,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                      */
                     /* If downpass of u doesn't change, break the while
                      * loop */
-                    if (equalStatesCmp(ParsProxy<Traits, 2>(width, states, uDownpass), parsVect[u->number][w])) {
+                    if (equalStatesCmp(uDownpass, parsVect[u->number][w])) {
 
                         // cout << "u->back->number = " << u->back->number
                         // <<
@@ -2911,10 +2875,14 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     lastUDownpass = uDownpass;
                     u = uppass_par[u->number];
                 }
+                /**
+                 * NOTE: DO NOT USE uDownpass, it was destroyed in above steps
+                 */
                 /* STEP 2a */
-                parsimonyNumber *rootDownpass = NULL;
+                ParsWrapper<Traits, 2> rootDownpass;
                 if (depth[u->number] == 0) {
                     assert(depth[u->back->number] == 0);
+                    assert(!nodesRecalculated.empty());
                     /**
                      * NOTE: Calculate root downpass from u and u->back. Use
                      * root downpass to calculate uppass of u and u->back.
@@ -2923,16 +2891,14 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
 
                     /* Calculate new downpass (= new uppass) of the old root
                      */
-                    rax_posix_memalign((void **)&(rootDownpass),
-                                       PLL_BYTE_ALIGNMENT,
-                                       (size_t)INTS_PER_VECTOR * states *
-                                           sizeof(parsimonyNumber));
+                    rootDownpass = ParsWrapper<Traits, 2>(states);
                     // rootDownpass = new alignas(PLL_BYTE_ALIGNMENT)
                     //     parsimonyNumber[states * INTS_PER_VECTOR];
-                    INT_TYPE isUnionDownpassRoot = downpassCalculate(
-                        rootDownpass, uDownpass,
-                        &(pr->partitionData[model]
-                              ->parsVect[init(u->back->number, w)]), states);
+                    ParsProxy<Traits, 2> uDownpass = nodesRecalculated.back().vDownpass; // uDownpass
+                    INT_TYPE isUnionDownpassRoot = downpassCalculate<Traits>(
+                        rootDownpass,
+                        uDownpass,
+                        parsVect[u->back->number][w], states);
 
                     if (rootDownpassChanged == true) {
                         // cout << "rootDownpassChanged\n";
@@ -2958,7 +2924,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                                     __builtin_popcount(counts[ptr]);
                             }
                         }
-                        dfsRecalculateUppassLocal(
+                        dfsRecalculateUppassLocal<Traits>(
                             u->back, rootDownpass,
                             pr->partitionData[model], pr, w, tr->mxtips);
                     }
@@ -2969,24 +2935,24 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                         uppass_par[nodesRecalculated.back().v->number]->number);
                 }
                 for (int i = (int)nodesRecalculated.size() - 1; i >= 0; --i) {
-                    pair2 cur = nodesRecalculated[i];
+                    pair2 &cur = nodesRecalculated[i];
                     nodeptr v = cur.v;
-                    parsimonyNumber *vDownpass = cur.vDownpass;
-                    parsimonyNumber *pUpVec;
+                    ParsProxy<Traits, 2> vDownpass = cur.vDownpass;
+                    ParsProxy<Traits, 2> pUpVec;
                     copySingleGlobalToLocalUppass(pr, v->number);
                     if (depth[v->number] == 0) {
-                        assert(rootDownpass != NULL);
+                        assert(rootDownpass.array != NULL);
                         pUpVec = rootDownpass;
                     } else {
                         nodeptr par = uppass_par[v->number];
                         assert(par != NULL);
-                        pUpVec = &(pr->partitionData[model]->parsVectUppassLocal[init(par->number, w)]);
+                        pUpVec = parsVectUppassLocal[par->number][w];
                     }
                     /* v MUST NOT be leaf */
                     assert(v->number > tr->mxtips);
                     nodeptr v1 = v->next->back;
                     nodeptr v2 = v->next->next->back;
-                    parsimonyNumber *v1Downpass = NULL;
+                    ParsProxy<Traits, 2> v1Downpass;
                     if (i > 0) {
                         nodeptr vTem = nodesRecalculated[i - 1].v;
                         if (v1 == vTem) {
@@ -2997,62 +2963,59 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                             v1Downpass = nodesRecalculated[i - 1].vDownpass;
                         }
 
-                        assert(v1Downpass != NULL);
-                        uppassInnerNodeCalculate(
-                            vDownpass, v1Downpass,
-                            &(pr->partitionData[model]
-                                    ->parsVect[init(v2->number, w)]),
-                            &(pr->partitionData[model]
-                                ->parsVectUppassLocal[init(v->number, w)]),
-                            pUpVec, states);
-                    } else {
-                        uppassInnerNodeCalculate(
+                        assert(v1Downpass.array != NULL);
+                        uppassInnerNodeCalculate<Traits>(
                             vDownpass,
-                            &(pr->partitionData[model]
-                                    ->parsVect[init(v1->number, w)]),
-                            &(pr->partitionData[model]
-                                    ->parsVect[init(v2->number, w)]),
-                            &(pr->partitionData[model]
-                                    ->parsVectUppassLocal[init(v->number, w)]),
-                            pUpVec, states);
+                            v1Downpass,
+                            parsVect[v2->number][w],
+                            parsVectUppassLocal[v->number][w],
+                            pUpVec,
+                            states
+                        );
+                    } else {
+                        uppassInnerNodeCalculate<Traits>(
+                            vDownpass,
+                            parsVect[v1->number][w],
+                            parsVect[v2->number][w],
+                            parsVectUppassLocal[v->number][w],
+                            pUpVec,
+                            states
+                        );
                     }
                     // delete[] vDownpass;
-                    if (vDownpass != NULL) {
-                        rax_free(vDownpass);
-                        vDownpass = NULL;
-                    }
+//                    if (vDownpass != NULL) {
+//                        rax_free(vDownpass);
+//                        vDownpass = NULL;
+//                    }
 
                     if (!equalStatesCmp(parsVectUppassLocal[v->number][w],parsVectUppass[v->number][w])) {
                         if (i > 0) {
                             dfsRecalculateUppassLocal(
                                 v2,
-                                &(pr->partitionData[model]
-                                    ->parsVectUppassLocal[init(v->number, w)]),
+                                parsVectUppassLocal[v->number][w],
                                 pr->partitionData[model], pr, w, tr->mxtips);
                         } else {
                             if (v1 != Ns) {
                                 assert(v2 == Ns);
                                 dfsRecalculateUppassLocal(
                                     v1,
-                                    &(pr->partitionData[model]
-                                            ->parsVectUppassLocal[init(v->number, w)]),
+                                    parsVectUppassLocal[v->number][w],
                                     pr->partitionData[model], pr, w, tr->mxtips);
                             } else {
                                 assert(v2 != Ns);
                                 dfsRecalculateUppassLocal(
                                     v2,
-                                    &(pr->partitionData[model]
-                                            ->parsVectUppassLocal[init(v->number, w)]),
+                                    parsVectUppassLocal[v->number][w],
                                     pr->partitionData[model], pr, w, tr->mxtips);
                             }
                         }
                     }
                 }
-                if (rootDownpass != NULL) {
+                if (rootDownpass.array != NULL) {
                     assert(depth[u->number] == 0);
                     // delete[] rootDownpass;
-                    rax_free(rootDownpass);
-                    rootDownpass = NULL;
+//                    rax_free(rootDownpass);
+//                    rootDownpass = NULL;
                 }
             }
             /* STEP 2c: Because parent of N_s is now N_z and not N_x anymore
@@ -3060,7 +3023,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
             copySingleGlobalToLocalUppass(pr, Nz->number);
             if (!equalStatesCmp(parsVectUppass[Nx->number][w], parsVectUppassLocal[Nz->number][w])) {
                 dfsRecalculateUppassLocal(
-                    Ns, &(pr->partitionData[model]->parsVectUppassLocal[posNz]),
+                    Ns, parsVectUppassLocal[Nz->number][w],
                     pr->partitionData[model], pr, w, tr->mxtips);
             }
         }
@@ -3555,7 +3518,7 @@ static void applyMove(pllInstance *tr, partitionList *pr) {
                                     parsVectUppass[u->number][w])) {
                                 dfsRecalculateUppass(
                                     v,
-                                    &(prModel->parsVectUppass[init(u->number, w)]),
+                                    parsVectUppass[u->number][w],
                                     prModel, pr, w, tr->mxtips);
                             }
                         }
