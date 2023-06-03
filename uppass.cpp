@@ -168,6 +168,8 @@ static bool first_call =
     true; // is this the first call to pllOptimizeSprParsimony
 static bool doing_stepwise_addition = false; // is the stepwise addition on
 
+using DefaultParsProxyTraits = ParsProxyTraits<parsimonyNumber, INTS_PER_VECTOR>;
+
 constexpr std::size_t BLOCK_SIZE = INTS_PER_VECTOR;
 
 inline constexpr std::size_t table_index(std::size_t width, std::size_t states, std::size_t node_id,
@@ -1076,13 +1078,8 @@ void printUppass(pllInstance *tr, partitionList *pr, int u) {
                   width = pr->partitionData[model]->parsimonyLength, i;
         switch (states) {
         default: {
-//            parsimonyNumber *uStates[32];
             assert(states <= 32);
-//            for (int k = 0; k < states; ++k) {
-//                uStates[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVectUppass[(width * states * u) + width * k]);
-//            }
+
             parsimonyNumber *uStates = &(pr->partitionData[model]->parsVectUppass[table_index(width, states, u, 0, 0)]);
 
             cout << "width: " << width << '\n';
@@ -1115,6 +1112,7 @@ void printAllUppass(pllInstance *tr, partitionList *pr) {
 /**
  * AVX version (Doesn't have normal version yet :<)
  */
+template <typename Traits = DefaultParsProxyTraits>
 void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
                                           int perSiteScores) {
     if (pllCostMatrix) {
@@ -1150,249 +1148,13 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
                 &(pr->partitionData[model]->scoreIncrease[width * pNumber]);
             unsigned int i;
 
-            auto idx = [width, states](int state_id, int col_id) -> int {
-                return table_index(width, states, 0, state_id, col_id);
-            };
-            auto init = [width, states](std::size_t node_id) -> std::size_t {
-                return table_index(width, states, node_id, 0, 0);
-            };
+            ParsProxy<Traits> parsVect(width, states, pr->partitionData[model]->parsVect);
 
             switch (states) {
-            case 2: {
-//                parsimonyNumber *left[2], *right[2], *cur[2];
-//
-//                for (k = 0; k < 2; ++k) {
-//                    left[k] =
-//                        &(pr->partitionData[model]
-//                              ->parsVect[(width * 2 * qNumber) + width * k]);
-//                    right[k] =
-//                        &(pr->partitionData[model]
-//                              ->parsVect[(width * 2 * rNumber) + width * k]);
-//                    cur[k] =
-//                        &(pr->partitionData[model]
-//                              ->parsVect[(width * 2 * pNumber) + width * k]);
-//                }
-                parsimonyNumber *left, *right, *cur;
-                left = &(pr->partitionData[model]->parsVect[init(qNumber)]);
-                right = &(pr->partitionData[model]->parsVect[init(rNumber)]);
-                cur = &(pr->partitionData[model]->parsVect[init(pNumber)]);
-
-                for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                    INT_TYPE
-                    s_r, s_l, v_N, l_A, l_C, v_A, v_C;
-
-//                    s_l = VECTOR_LOAD((CAST)(&left[0][i]));
-                    s_l = VECTOR_LOAD((CAST)(&left[idx(0, i)]));
-//                    s_r = VECTOR_LOAD((CAST)(&right[0][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[idx(0, i)]));
-                    l_A = VECTOR_BIT_AND(s_l, s_r);
-                    v_A = VECTOR_BIT_OR(s_l, s_r);
-
-//                    s_l = VECTOR_LOAD((CAST)(&left[1][i]));
-                    s_l = VECTOR_LOAD((CAST)(&left[idx(1, i)]));
-//                    s_r = VECTOR_LOAD((CAST)(&right[1][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[idx(1, i)]));
-                    l_C = VECTOR_BIT_AND(s_l, s_r);
-                    v_C = VECTOR_BIT_OR(s_l, s_r);
-
-                    v_N = VECTOR_BIT_OR(l_A, l_C);
-
-//                    VECTOR_STORE((CAST)(&cur[0][i]),
-                    VECTOR_STORE((CAST)(&cur[idx(0, i)]),
-                                 VECTOR_BIT_OR(l_A, VECTOR_AND_NOT(v_N, v_A)));
-//                    VECTOR_STORE((CAST)(&cur[1][i]),
-                    VECTOR_STORE((CAST)(&cur[idx(1, i)]),
-                                 VECTOR_BIT_OR(l_C, VECTOR_AND_NOT(v_N, v_C)));
-
-                    v_N = VECTOR_AND_NOT(v_N, allOne);
-
-                    // totalScore += vectorPopcount(v_N);
-
-                    unsigned int counts[INTS_PER_VECTOR]
-                        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-                    int ptr;
-
-                    VECTOR_STORE((CAST)counts, v_N);
-
-                    for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                        scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
-                        totalScore += scoreInc[i + ptr];
-                    }
-                    if (perSiteScores)
-                        storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                }
-            } break;
-            case 4: {
-//                parsimonyNumber *left[4], *right[4], *cur[4];
-//                for (k = 0; k < 4; ++k) {
-//                    left[k] =
-//                        &(pr->partitionData[model]
-//                              ->parsVect[(width * 4 * qNumber) + width * k]);
-//                    right[k] =
-//                        &(pr->partitionData[model]
-//                              ->parsVect[(width * 4 * rNumber) + width * k]);
-//                    cur[k] =
-//                        &(pr->partitionData[model]
-//                              ->parsVect[(width * 4 * pNumber) + width * k]);
-//                }
-                parsimonyNumber *left, *right, *cur;
-                left = &(pr->partitionData[model]->parsVect[init(qNumber)]);
-                right = &(pr->partitionData[model]->parsVect[init(rNumber)]);
-                cur = &(pr->partitionData[model]->parsVect[init(pNumber)]);
-
-                for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                    INT_TYPE
-                    s_r, s_l, v_N, l_A, l_C, l_G, l_T, v_A, v_C, v_G, v_T;
-
-//                    s_l = VECTOR_LOAD((CAST)(&left[0][i]));
-                    s_l = VECTOR_LOAD((CAST)(&left[idx(0, i)]));
-//                    s_r = VECTOR_LOAD((CAST)(&right[0][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[idx(0, i)]));
-                    l_A = VECTOR_BIT_AND(s_l, s_r);
-                    v_A = VECTOR_BIT_OR(s_l, s_r);
-
-//                    s_l = VECTOR_LOAD((CAST)(&left[1][i]));
-                    s_l = VECTOR_LOAD((CAST)(&left[idx(1, i)]));
-//                    s_r = VECTOR_LOAD((CAST)(&right[1][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[idx(1, i)]));
-                    l_C = VECTOR_BIT_AND(s_l, s_r);
-                    v_C = VECTOR_BIT_OR(s_l, s_r);
-
-//                    s_l = VECTOR_LOAD((CAST)(&left[2][i]));
-                    s_l = VECTOR_LOAD((CAST)(&left[idx(2, i)]));
-//                    s_r = VECTOR_LOAD((CAST)(&right[2][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[idx(2, i)]));
-                    l_G = VECTOR_BIT_AND(s_l, s_r);
-                    v_G = VECTOR_BIT_OR(s_l, s_r);
-
-//                    s_l = VECTOR_LOAD((CAST)(&left[3][i]));
-                    s_l = VECTOR_LOAD((CAST)(&left[idx(3, i)]));
-//                    s_r = VECTOR_LOAD((CAST)(&right[3][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[idx(3, i)]));
-                    l_T = VECTOR_BIT_AND(s_l, s_r);
-                    v_T = VECTOR_BIT_OR(s_l, s_r);
-
-                    v_N = VECTOR_BIT_OR(VECTOR_BIT_OR(l_A, l_C),
-                                        VECTOR_BIT_OR(l_G, l_T));
-
-//                    VECTOR_STORE((CAST)(&cur[0][i]),
-                    VECTOR_STORE((CAST)(&cur[idx(0, i)]),
-                                 VECTOR_BIT_OR(l_A, VECTOR_AND_NOT(v_N, v_A)));
-//                    VECTOR_STORE((CAST)(&cur[1][i]),
-                    VECTOR_STORE((CAST)(&cur[idx(1, i)]),
-                                 VECTOR_BIT_OR(l_C, VECTOR_AND_NOT(v_N, v_C)));
-//                    VECTOR_STORE((CAST)(&cur[2][i]),
-                    VECTOR_STORE((CAST)(&cur[idx(2, i)]),
-                                 VECTOR_BIT_OR(l_G, VECTOR_AND_NOT(v_N, v_G)));
-//                    VECTOR_STORE((CAST)(&cur[3][i]),
-                    VECTOR_STORE((CAST)(&cur[idx(3, i)]),
-                                 VECTOR_BIT_OR(l_T, VECTOR_AND_NOT(v_N, v_T)));
-
-                    v_N = VECTOR_AND_NOT(v_N, allOne);
-
-                    // totalScore += vectorPopcount(v_N);
-                    unsigned int counts[INTS_PER_VECTOR]
-                        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-                    int ptr;
-
-                    VECTOR_STORE((CAST)counts, v_N);
-
-                    for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                        // if (ptr == 7) {
-                        //     cout << "Bitset of last block = "
-                        //          << (bitset<31>(counts[ptr])) << '\n';
-                        // }
-                        scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
-                        totalScore += scoreInc[i + ptr];
-                    }
-                    if (perSiteScores)
-                        storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                }
-            } break;
-            case 20: {
-//                parsimonyNumber *left[20], *right[20], *cur[20];
-//
-//                for (k = 0; k < 20; ++k) {
-//                    left[k] =
-//                        &(pr->partitionData[model]
-//                              ->parsVect[(width * 20 * qNumber) + width * k]);
-//                    right[k] =
-//                        &(pr->partitionData[model]
-//                              ->parsVect[(width * 20 * rNumber) + width * k]);
-//                    cur[k] =
-//                        &(pr->partitionData[model]
-//                              ->parsVect[(width * 20 * pNumber) + width * k]);
-//                }
-                parsimonyNumber *left, *right, *cur;
-                left = &(pr->partitionData[model]->parsVect[init(qNumber)]);
-                right = &(pr->partitionData[model]->parsVect[init(rNumber)]);
-                cur = &(pr->partitionData[model]->parsVect[init(pNumber)]);
-
-                for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                    size_t j;
-
-                    INT_TYPE
-                    s_r, s_l, v_N = SET_ALL_BITS_ZERO, l_A[20], v_A[20];
-
-                    for (j = 0; j < 20; j++) {
-//                        s_l = VECTOR_LOAD((CAST)(&left[j][i]));
-                        s_l = VECTOR_LOAD((CAST)(&left[idx(j, i)]));
-//                        s_r = VECTOR_LOAD((CAST)(&right[j][i]));
-                        s_r = VECTOR_LOAD((CAST)(&right[idx(j, i)]));
-                        l_A[j] = VECTOR_BIT_AND(s_l, s_r);
-                        v_A[j] = VECTOR_BIT_OR(s_l, s_r);
-
-                        v_N = VECTOR_BIT_OR(v_N, l_A[j]);
-                    }
-
-                    for (j = 0; j < 20; j++)
-                        VECTOR_STORE(
-//                            (CAST)(&cur[j][i]),
-                            (CAST)(&cur[idx(j, i)]),
-                            VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
-
-                    v_N = VECTOR_AND_NOT(v_N, allOne);
-
-                    // totalScore += vectorPopcount(v_N);
-                    unsigned int counts[INTS_PER_VECTOR]
-                        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-                    int ptr;
-
-                    VECTOR_STORE((CAST)counts, v_N);
-
-                    for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                        scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
-                        totalScore += scoreInc[i + ptr];
-                    }
-                    if (perSiteScores)
-                        storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                }
-            } break;
-            default:
-
-            {
-//                parsimonyNumber *left[32], *right[32], *cur[32];
-
+            default: {
                 assert(states <= 32);
 
-//                for (k = 0; k < states; ++k) {
-//                    left[k] = &(
-//                        pr->partitionData[model]
-//                            ->parsVect[(width * states * qNumber) + width * k]);
-//                    right[k] = &(
-//                        pr->partitionData[model]
-//                            ->parsVect[(width * states * rNumber) + width * k]);
-//                    cur[k] = &(
-//                        pr->partitionData[model]
-//                            ->parsVect[(width * states * pNumber) + width * k]);
-//                }
-                parsimonyNumber *left, *right, *cur;
-                left = &(pr->partitionData[model]->parsVect[init(qNumber)]);
-                right = &(pr->partitionData[model]->parsVect[init(rNumber)]);
-                cur = &(pr->partitionData[model]->parsVect[init(pNumber)]);
+                auto left = parsVect[qNumber], right = parsVect[rNumber], cur = parsVect[pNumber];
 
                 for (i = 0; i < width; i += INTS_PER_VECTOR) {
                     size_t j;
@@ -1401,10 +1163,8 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
                     s_r, s_l, v_N = SET_ALL_BITS_ZERO, l_A[32], v_A[32];
 
                     for (j = 0; j < states; j++) {
-//                        s_l = VECTOR_LOAD((CAST)(&left[j][i]));
-                        s_l = VECTOR_LOAD((CAST)(&left[idx(j, i)]));
-//                        s_r = VECTOR_LOAD((CAST)(&right[j][i]));
-                        s_r = VECTOR_LOAD((CAST)(&right[idx(j, i)]));
+                        s_l = VECTOR_LOAD((CAST)left[i][j]);
+                        s_r = VECTOR_LOAD((CAST)right[i][j]);
                         l_A[j] = VECTOR_BIT_AND(s_l, s_r);
                         v_A[j] = VECTOR_BIT_OR(s_l, s_r);
 
@@ -1413,8 +1173,7 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
 
                     for (j = 0; j < states; j++)
                         VECTOR_STORE(
-//                            (CAST)(&cur[j][i]),
-                            (CAST)(&cur[idx(j, i)]),
+                            (CAST)cur[i][j],
                             VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
 
                     v_N = VECTOR_AND_NOT(v_N, allOne);
@@ -1449,6 +1208,7 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
 /*
  * AVX version
  */
+template <typename Traits = DefaultParsProxyTraits>
 unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
                                            int i1Number, int i2Number) {
     unsigned int score = scoreTwoSubtrees;
@@ -1457,32 +1217,14 @@ unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         size_t k, states = pr->partitionData[model]->states,
                   width = pr->partitionData[model]->parsimonyLength, i;
-        auto idx = [width, states](std::size_t state_id, std::size_t col_id) -> std::size_t {
-            return table_index_divisible(width, states, 0, state_id, col_id);
-        };
-        auto init = [width, states](std::size_t node_id) -> std::size_t {
-            return table_index_divisible(width, states, node_id, 0, 0);
-        };
+
+        ParsProxy<Traits> branchVectUppass(width, states, pr->partitionData[model]->branchVectUppass);
 
         switch (states) {
         default: {
-//            parsimonyNumber *i1States[32], *i2States[32];
-
             assert(states <= 32);
 
-//            for (k = 0; k < states; ++k) {
-//                i1States[k] =
-//                    &(pr->partitionData[model]
-//                          ->branchVectUppass[(width * states * i1Number) +
-//                                             width * k]);
-//                i2States[k] =
-//                    &(pr->partitionData[model]
-//                          ->branchVectUppass[(width * states * i2Number) +
-//                                             width * k]);
-//            }
-            parsimonyNumber *i1States, *i2States;
-            i1States = &(pr->partitionData[model]->branchVectUppass[init(i1Number)]);
-            i2States = &(pr->partitionData[model]->branchVectUppass[init(i2Number)]);
+            auto i1States = branchVectUppass[i1Number], i2States = branchVectUppass[i2Number];
 
             // cout << "width: " << width << '\n';
             for (i = 0; i < width; i += INTS_PER_VECTOR) {
@@ -1490,10 +1232,8 @@ unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
 
                 for (int k = 0; k < states; ++k) {
                     INT_TYPE t_A =
-//                        VECTOR_BIT_AND(VECTOR_LOAD((CAST)(&i1States[k][i])),
-//                                       VECTOR_LOAD((CAST)(&i2States[k][i])));
-                        VECTOR_BIT_AND(VECTOR_LOAD((CAST)(&i1States[idx(k, i)])),
-                                       VECTOR_LOAD((CAST)(&i2States[idx(k, i)])));
+                        VECTOR_BIT_AND(VECTOR_LOAD((CAST)i1States[i][k]),
+                                       VECTOR_LOAD((CAST)i2States[i][k]));
                     t_N = VECTOR_BIT_OR(t_N, t_A);
                 }
 
@@ -1525,6 +1265,7 @@ unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
 /*
  * AVX version
  */
+template <typename Traits = DefaultParsProxyTraits>
 unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr,
                                               partitionList *pr, nodeptr p,
                                               nodeptr q) {
@@ -1536,43 +1277,17 @@ unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr,
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         size_t k, states = pr->partitionData[model]->states,
                   width = pr->partitionData[model]->parsimonyLength, i;
-        auto idx = [width, states](std::size_t state_id, std::size_t col_id) -> std::size_t {
-            return table_index(width, states, 0, state_id, col_id);
-        };
-        auto init = [width, states](std::size_t node_id) -> std::size_t {
-            return table_index(width, states, node_id, 0, 0);
-        };
+
+        ParsProxy<Traits> parsVectUppassLocal(width, states, pr->partitionData[model]->parsVectUppassLocal);
 
         switch (states) {
         default: {
-//            parsimonyNumber *pStates[32], *p1States[32], *qStates[32],
-//                *q1States[32];
-
             assert(states <= 32);
 
-//            for (k = 0; k < states; ++k) {
-//                pStates[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVectUppassLocal[(width * states * pNumber) +
-//                                                width * k]);
-//                p1States[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVectUppassLocal[(width * states * p1Number) +
-//                                                width * k]);
-//                qStates[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVectUppassLocal[(width * states * qNumber) +
-//                                                width * k]);
-//                q1States[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVectUppassLocal[(width * states * q1Number) +
-//                                                width * k]);
-//            }
-            parsimonyNumber *pStates, *p1States, *qStates, *q1States;
-            pStates = &(pr->partitionData[model]->parsVectUppassLocal[init(pNumber)]);
-            p1States = &(pr->partitionData[model]->parsVectUppassLocal[init(p1Number)]);
-            qStates = &(pr->partitionData[model]->parsVectUppassLocal[init(qNumber)]);
-            q1States = &(pr->partitionData[model]->parsVectUppassLocal[init(q1Number)]);
+            auto pStates = parsVectUppassLocal[pNumber];
+            auto p1States = parsVectUppassLocal[p1Number];
+            auto qStates = parsVectUppassLocal[qNumber];
+            auto q1States = parsVectUppassLocal[q1Number];
 
             // cout << "width: " << width << '\n';
             for (i = 0; i < width; i += INTS_PER_VECTOR) {
@@ -1580,14 +1295,10 @@ unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr,
 
                 for (int k = 0; k < states; ++k) {
                     INT_TYPE t_A = VECTOR_BIT_AND(
-//                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)(&pStates[k][i])),
-//                                      VECTOR_LOAD((CAST)(&p1States[k][i]))),
-                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)(&pStates[idx(k, i)])),
-                                      VECTOR_LOAD((CAST)(&p1States[idx(k, i)]))),
-//                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)(&qStates[k][i])),
-//                                      VECTOR_LOAD((CAST)(&q1States[k][i]))));
-                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)(&qStates[idx(k, i)])),
-                                      VECTOR_LOAD((CAST)(&q1States[idx(k, i)]))));
+                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)pStates[i][k]),
+                                      VECTOR_LOAD((CAST)p1States[i][k])),
+                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)qStates[i][k]),
+                                      VECTOR_LOAD((CAST)q1States[i][k])));
                     t_N = VECTOR_BIT_OR(t_N, t_A);
                 }
 
@@ -1619,6 +1330,7 @@ unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr,
 /*
  * AVX version
  */
+template <typename Traits = DefaultParsProxyTraits>
 unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr,
                                               partitionList *pr, nodeptr p,
                                               nodeptr u) {
@@ -1629,37 +1341,16 @@ unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr,
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         size_t k, states = pr->partitionData[model]->states,
                   width = pr->partitionData[model]->parsimonyLength, i;
-        auto idx = [width, states](std::size_t state_id, std::size_t col_id) -> std::size_t {
-            return table_index(width, states, 0, state_id, col_id);
-        };
-        auto init = [width, states](std::size_t node_id) -> std::size_t {
-            return table_index(width, states, node_id, 0, 0);
-        };
+
+        ParsProxy<Traits> parsVectUppassLocal(width, states, pr->partitionData[model]->parsVectUppassLocal);
 
         switch (states) {
         default: {
-//            parsimonyNumber *pStates[32], *uStates[32], *vStates[32];
-
             assert(states <= 32);
 
-//            for (k = 0; k < states; ++k) {
-//                pStates[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVectUppassLocal[(width * states * pNumber) +
-//                                                width * k]);
-//                uStates[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVectUppassLocal[(width * states * uNumber) +
-//                                                width * k]);
-//                vStates[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVectUppassLocal[(width * states * vNumber) +
-//                                                width * k]);
-//            }
-            parsimonyNumber *pStates, *uStates, *vStates;
-            pStates = &(pr->partitionData[model]->parsVectUppassLocal[init(pNumber)]);
-            uStates = &(pr->partitionData[model]->parsVectUppassLocal[init(uNumber)]);
-            vStates = &(pr->partitionData[model]->parsVectUppassLocal[init(vNumber)]);
+            auto pStates = parsVectUppassLocal[pNumber];
+            auto uStates = parsVectUppassLocal[uNumber];
+            auto vStates = parsVectUppassLocal[vNumber];
 
             // cout << "width: " << width << '\n';
             for (i = 0; i < width; i += INTS_PER_VECTOR) {
@@ -1667,12 +1358,9 @@ unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr,
 
                 for (int k = 0; k < states; ++k) {
                     INT_TYPE t_A = VECTOR_BIT_AND(
-//                        VECTOR_LOAD((CAST)(&pStates[k][i])),
-                        VECTOR_LOAD((CAST)(&pStates[idx(k, i)])),
-//                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)(&uStates[k][i])),
-//                                      VECTOR_LOAD((CAST)(&vStates[k][i]))));
-                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)(&uStates[idx(k, i)])),
-                                      VECTOR_LOAD((CAST)(&vStates[idx(k, i)]))));
+                        VECTOR_LOAD((CAST)pStates[i][k]),
+                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)uStates[i][k]),
+                                      VECTOR_LOAD((CAST)vStates[i][k])));
                     t_N = VECTOR_BIT_OR(t_N, t_A);
                 }
 
@@ -1704,6 +1392,7 @@ unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr,
 /*
  * AVX version
  */
+template <typename Traits = DefaultParsProxyTraits>
 void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
     // auto t_start = std::chrono::high_resolution_clock::now();
     if (pllCostMatrix) {
@@ -1721,12 +1410,9 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
             for (model = 0; model < pr->numberOfPartitions; ++model) {
                 size_t k, states = pr->partitionData[model]->states,
                           width = pr->partitionData[model]->parsimonyLength;
-                auto idx = [width, states](std::size_t state_id, std::size_t col_id) -> std::size_t {
-                    return table_index(width, states, 0, state_id, col_id);
-                };
-                auto init = [width, states](std::size_t node_id) -> std::size_t {
-                    return table_index(width, states, node_id, 0, 0);
-                };
+
+                ParsProxy<Traits> parsVect(width, states, pr->partitionData[model]->parsVect);
+                ParsProxy<Traits> parsVectUppass(width, states, pr->partitionData[model]->parsVectUppass);
 
                 unsigned int i;
 
@@ -1738,34 +1424,17 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
                      * p:    uppass state of parent node
                      */
                     assert(states <= 32);
-//                    parsimonyNumber *u[32], *p[32], *uUppass[32];
 
-//                    for (k = 0; k < states; ++k) {
-//                        u[k] = &(pr->partitionData[model]
-//                                     ->parsVect[(width * states * uNumber) +
-//                                                width * k]);
-//                        uUppass[k] =
-//                            &(pr->partitionData[model]
-//                                  ->parsVectUppass[(width * states * uNumber) +
-//                                                   width * k]);
-//                        p[k] =
-//                            &(pr->partitionData[model]
-//                                  ->parsVectUppass[(width * states * pNumber) +
-//                                                   width * k]);
-//                    }
-                    parsimonyNumber *u, *p, *uUppass;
-                    u = &(pr->partitionData[model]->parsVect[init(uNumber)]);
-                    uUppass = &(pr->partitionData[model]->parsVectUppass[init(uNumber)]);
-                    p = &(pr->partitionData[model]->parsVectUppass[init(pNumber)]);
+                    auto u = parsVect[uNumber];
+                    auto uUppass = parsVectUppass[uNumber];
+                    auto p = parsVectUppass[pNumber];
 
                     INT_TYPE x, u_k[32], p_k[32];
                     for (i = 0; i < width; i += INTS_PER_VECTOR) {
                         x = SET_ALL_BITS_ZERO;
                         for (k = 0; k < states; ++k) {
-//                            u_k[k] = VECTOR_LOAD((CAST)(&u[k][i]));
-                            u_k[k] = VECTOR_LOAD((CAST)(&u[idx(k, i)]));
-//                            p_k[k] = VECTOR_LOAD((CAST)(&p[k][i]));
-                            p_k[k] = VECTOR_LOAD((CAST)(&p[idx(k, i)]));
+                            u_k[k] = VECTOR_LOAD((CAST)u[i][k]);
+                            p_k[k] = VECTOR_LOAD((CAST)p[i][k]);
                             x = VECTOR_BIT_OR(
                                 x,
                                 VECTOR_BIT_AND(
@@ -1779,8 +1448,7 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
                             u_k[k] = VECTOR_BIT_XOR(
                                 u_k[k], VECTOR_BIT_AND(
                                             VECTOR_BIT_XOR(u_k[k], p_k[k]), x));
-//                            VECTOR_STORE((CAST)(&uUppass[k][i]), u_k[k]);
-                            VECTOR_STORE((CAST)(&uUppass[idx(k, i)]), u_k[k]);
+                            VECTOR_STORE((CAST)(uUppass[i][k]), u_k[k]);
                             // u[k][i] ^= ((u[k][i] ^ p[k][i]) & x);
                         }
                     }
@@ -1795,12 +1463,8 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
             for (model = 0; model < pr->numberOfPartitions; ++model) {
                 size_t k, states = pr->partitionData[model]->states,
                           width = pr->partitionData[model]->parsimonyLength;
-                auto idx = [width, states](std::size_t state_id, std::size_t col_id) -> std::size_t {
-                    return table_index(width, states, 0, state_id, col_id);
-                };
-                auto init = [width, states](std::size_t node_id) -> std::size_t {
-                    return table_index(width, states, node_id, 0, 0);
-                };
+                ParsProxy<Traits> parsVect(width, states, pr->partitionData[model]->parsVect);
+                ParsProxy<Traits> parsVectUppass(width, states, pr->partitionData[model]->parsVectUppass);
 
                 unsigned int i;
 
@@ -1813,48 +1477,22 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
                      * v_2:  downpass state of children 2 of u
                      */
                     assert(states <= 32);
-//                    parsimonyNumber *u[32], *v_1[32], *v_2[32], *p[32],
-//                        *uUppass[32];
-//
-//                    for (k = 0; k < states; ++k) {
-//                        u[k] = &(pr->partitionData[model]
-//                                     ->parsVect[(width * states * uNumber) +
-//                                                width * k]);
-//                        v_1[k] = &(pr->partitionData[model]
-//                                       ->parsVect[(width * states * v1Number) +
-//                                                  width * k]);
-//                        v_2[k] = &(pr->partitionData[model]
-//                                       ->parsVect[(width * states * v2Number) +
-//                                                  width * k]);
-//                        uUppass[k] =
-//                            &(pr->partitionData[model]
-//                                  ->parsVectUppass[(width * states * uNumber) +
-//                                                   width * k]);
-//                        p[k] =
-//                            &(pr->partitionData[model]
-//                                  ->parsVectUppass[(width * states * pNumber) +
-//                                                   width * k]);
-//                    }
-                    parsimonyNumber *u, *v_1, *v_2, *p, *uUppass;
-                    u = &(pr->partitionData[model]->parsVect[init(uNumber)]);
-                    v_1 = &(pr->partitionData[model]->parsVect[init(v1Number)]);
-                    v_2 = &(pr->partitionData[model]->parsVect[init(v2Number)]);
-                    uUppass = &(pr->partitionData[model]->parsVectUppass[init(uNumber)]);
-                    p = &(pr->partitionData[model]->parsVectUppass[init(pNumber)]);
+
+                    auto u = parsVect[uNumber];
+                    auto v_1 = parsVect[v1Number];
+                    auto v_2 = parsVect[v2Number];
+                    auto uUppass = parsVectUppass[uNumber];
+                    auto p = parsVectUppass[pNumber];
 
                     INT_TYPE x = SET_ALL_BITS_ZERO, y = SET_ALL_BITS_ZERO,
                              u_k[32], p_k[32], v_1k[32], v_2k[32], u_up;
                     for (i = 0; i < width; i += INTS_PER_VECTOR) {
                         x = SET_ALL_BITS_ZERO, y = SET_ALL_BITS_ZERO;
                         for (k = 0; k < states; ++k) {
-//                            u_k[k] = VECTOR_LOAD((CAST)(&u[k][i]));
-                            u_k[k] = VECTOR_LOAD((CAST)(&u[idx(k, i)]));
-//                            p_k[k] = VECTOR_LOAD((CAST)(&p[k][i]));
-                            p_k[k] = VECTOR_LOAD((CAST)(&p[idx(k, i)]));
-//                            v_1k[k] = VECTOR_LOAD((CAST)(&v_1[k][i]));
-                            v_1k[k] = VECTOR_LOAD((CAST)(&v_1[idx(k, i)]));
-//                            v_2k[k] = VECTOR_LOAD((CAST)(&v_2[k][i]));
-                            v_2k[k] = VECTOR_LOAD((CAST)(&v_2[idx(k, i)]));
+                            u_k[k] = VECTOR_LOAD((CAST)u[i][k]);
+                            p_k[k] = VECTOR_LOAD((CAST)p[i][k]);
+                            v_1k[k] = VECTOR_LOAD((CAST)v_1[i][k]);
+                            v_2k[k] = VECTOR_LOAD((CAST)v_2[i][k]);
                             x = VECTOR_BIT_OR(
                                 x,
                                 VECTOR_BIT_AND(
@@ -1893,8 +1531,7 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
                                                       VECTOR_BIT_OR(v_1k[k],
                                                                     v_2k[k])))),
                                     VECTOR_BIT_AND(x, y)));
-//                            VECTOR_STORE((CAST)(&uUppass[k][i]), u_up);
-                            VECTOR_STORE((CAST)(&uUppass[idx(k, i)]), u_up);
+                            VECTOR_STORE((CAST)uUppass[i][k], u_up);
                             // uUppass[k][i] = u[k][i];
                             // uUppass[k][i] ^= ((uUppass[k][i] ^ p[k][i]) &
                             // (~x)); uUppass[k][i] ^=
@@ -1923,6 +1560,7 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
 /*
  * AVX version
  */
+template <typename Traits = DefaultParsProxyTraits>
 unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
                                                    partitionList *pr,
                                                    int perSiteScores) {
@@ -1950,243 +1588,26 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
     for (model = 0; model < pr->numberOfPartitions; ++model) {
         size_t k, states = pr->partitionData[model]->states,
                   width = pr->partitionData[model]->parsimonyLength, i;
-        auto idx = [width, states](std::size_t state_id, std::size_t col_id) -> std::size_t {
-            return table_index_divisible(width, states, 0, state_id, col_id);
-        };
-        auto init = [width, states](std::size_t node_id) -> std::size_t {
-            return table_index_divisible(width, states, node_id, 0, 0);
-        };
+        ParsProxy<Traits> parsVect(width, states, pr->partitionData[model]->parsVect);
+        ParsProxy<Traits> parsVectUppass(width, states, pr->partitionData[model]->parsVectUppass);
 
         unsigned int *scoreInc =
             &(pr->partitionData[model]
                   ->scoreIncrease[width * (2 * tr->mxtips - 1)]);
         switch (states) {
-        case 2: {
-//            parsimonyNumber *left[2], *right[2], *tem[2];
-
-//            for (k = 0; k < 2; ++k) {
-//                left[k] = &(pr->partitionData[model]
-//                                ->parsVect[(width * 2 * qNumber) + width * k]);
-//                right[k] = &(pr->partitionData[model]
-//                                 ->parsVect[(width * 2 * pNumber) + width * k]);
-//                tem[k] = &(
-//                    pr->partitionData[model]
-//                        ->parsVectUppass[(width * 2 * temNumber) + width * k]);
-//            }
-            parsimonyNumber *left, *right, *tem;
-            left = &(pr->partitionData[model]->parsVect[init(qNumber)]);
-            right = &(pr->partitionData[model]->parsVect[init(pNumber)]);
-            tem = &(pr->partitionData[model]->parsVectUppass[init(temNumber)]);
-
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                INT_TYPE t_A, t_C, o_A, o_C, t_N, s_l, s_r;
-//                s_l = VECTOR_LOAD((CAST)(&left[0][i]));
-                s_l = VECTOR_LOAD((CAST)(&left[idx(0, i)]));
-//                s_r = VECTOR_LOAD((CAST)(&right[0][i]));
-                s_r = VECTOR_LOAD((CAST)(&right[idx(0, i)]));
-                t_A = VECTOR_BIT_AND(s_l, s_r);
-                o_A = VECTOR_BIT_OR(s_l, s_r);
-
-//                s_l = VECTOR_LOAD((CAST)(&left[1][i]));
-                s_l = VECTOR_LOAD((CAST)(&left[idx(1, i)]));
-//                s_r = VECTOR_LOAD((CAST)(&right[1][i]));
-                s_r = VECTOR_LOAD((CAST)(&right[idx(1, i)]));
-                t_C = VECTOR_BIT_AND(s_l, s_r);
-                o_C = VECTOR_BIT_OR(s_l, s_r);
-
-                t_N = VECTOR_BIT_OR(t_A, t_C);
-                t_N = VECTOR_AND_NOT(t_N, allOne);
-
-//                VECTOR_STORE((CAST)(&tem[0][i]),
-                VECTOR_STORE((CAST)(&tem[idx(0, i)]),
-                             VECTOR_BIT_OR(t_A, VECTOR_BIT_AND(t_N, o_A)));
-//                VECTOR_STORE((CAST)(&tem[1][i]),
-                VECTOR_STORE((CAST)(&tem[idx(1, i)]),
-                             VECTOR_BIT_OR(t_C, VECTOR_BIT_AND(t_N, o_C)));
-
-                // sum += vectorPopcount(t_N);
-                unsigned int counts[INTS_PER_VECTOR]
-                    __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-                int ptr;
-
-                VECTOR_STORE((CAST)counts, t_N);
-
-                for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                    scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
-                    sum += scoreInc[i + ptr];
-                }
-                if (perSiteScores)
-                    storePerSiteNodeScores(pr, model, t_N, i, pNumber);
-                //                 if(sum >= bestScore)
-                //                   return sum;
-            }
-        } break;
-        case 4: {
-//            parsimonyNumber *left[4], *right[4], *tem[4];
-
-//            for (k = 0; k < 4; ++k) {
-//                left[k] = &(pr->partitionData[model]
-//                                ->parsVect[(width * 4 * qNumber) + width * k]);
-//                right[k] = &(pr->partitionData[model]
-//                                 ->parsVect[(width * 4 * pNumber) + width * k]);
-//                tem[k] = &(
-//                    pr->partitionData[model]
-//                        ->parsVectUppass[(width * 4 * temNumber) + width * k]);
-//            }
-            parsimonyNumber *left, *right, *tem;
-            left = &(pr->partitionData[model]->parsVect[init(qNumber)]);
-            right = &(pr->partitionData[model]->parsVect[init(pNumber)]);
-            tem = &(pr->partitionData[model]->parsVectUppass[init(temNumber)]);
-
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                INT_TYPE t_A, t_C, t_G, t_T, o_A, o_C, o_G, o_T, t_N, s_l, s_r;
-//                s_l = VECTOR_LOAD((CAST)(&left[0][i]));
-                s_l = VECTOR_LOAD((CAST)(&left[idx(0, i)]));
-//                s_r = VECTOR_LOAD((CAST)(&right[0][i]));
-                s_r = VECTOR_LOAD((CAST)(&right[idx(0, i)]));
-                t_A = VECTOR_BIT_AND(s_l, s_r);
-                o_A = VECTOR_BIT_OR(s_l, s_r);
-
-//                s_l = VECTOR_LOAD((CAST)(&left[1][i]));
-                s_l = VECTOR_LOAD((CAST)(&left[idx(1, i)]));
-//                s_r = VECTOR_LOAD((CAST)(&right[1][i]));
-                s_r = VECTOR_LOAD((CAST)(&right[idx(1, i)]));
-                t_C = VECTOR_BIT_AND(s_l, s_r);
-                o_C = VECTOR_BIT_OR(s_l, s_r);
-
-//                s_l = VECTOR_LOAD((CAST)(&left[2][i]));
-                s_l = VECTOR_LOAD((CAST)(&left[idx(2, i)]));
-//                s_r = VECTOR_LOAD((CAST)(&right[2][i]));
-                s_r = VECTOR_LOAD((CAST)(&right[idx(2, i)]));
-                t_G = VECTOR_BIT_AND(s_l, s_r);
-                o_G = VECTOR_BIT_OR(s_l, s_r);
-
-//                s_l = VECTOR_LOAD((CAST)(&left[3][i]));
-                s_l = VECTOR_LOAD((CAST)(&left[idx(3, i)]));
-//                s_r = VECTOR_LOAD((CAST)(&right[3][i]));
-                s_r = VECTOR_LOAD((CAST)(&right[idx(3, i)]));
-                t_T = VECTOR_BIT_AND(s_l, s_r);
-                o_T = VECTOR_BIT_OR(s_l, s_r);
-
-                t_N = VECTOR_BIT_OR(VECTOR_BIT_OR(t_A, t_C),
-                                    VECTOR_BIT_OR(t_G, t_T));
-                t_N = VECTOR_AND_NOT(t_N, allOne);
-
-//                VECTOR_STORE((CAST)(&tem[0][i]),
-                VECTOR_STORE((CAST)(&tem[idx(0, i)]),
-                             VECTOR_BIT_OR(t_A, VECTOR_BIT_AND(t_N, o_A)));
-//                VECTOR_STORE((CAST)(&tem[1][i]),
-                VECTOR_STORE((CAST)(&tem[idx(1, i)]),
-                             VECTOR_BIT_OR(t_C, VECTOR_BIT_AND(t_N, o_C)));
-//                VECTOR_STORE((CAST)(&tem[2][i]),
-                VECTOR_STORE((CAST)(&tem[idx(2, i)]),
-                             VECTOR_BIT_OR(t_G, VECTOR_BIT_AND(t_N, o_G)));
-//                VECTOR_STORE((CAST)(&tem[3][i]),
-                VECTOR_STORE((CAST)(&tem[idx(3, i)]),
-                             VECTOR_BIT_OR(t_T, VECTOR_BIT_AND(t_N, o_T)));
-                // sum += vectorPopcount(t_N);
-                unsigned int counts[INTS_PER_VECTOR]
-                    __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-                int ptr;
-
-                VECTOR_STORE((CAST)counts, t_N);
-
-                for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                    scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
-                    sum += scoreInc[i + ptr];
-                }
-
-                if (perSiteScores)
-                    storePerSiteNodeScores(pr, model, t_N, i, pNumber);
-                //                 if(sum >= bestScore)
-                //                   return sum;
-            }
-        } break;
-        case 20: {
-//            parsimonyNumber *left[20], *right[20], *tem[20];
-//            for (k = 0; k < 20; ++k) {
-//                left[k] = &(pr->partitionData[model]
-//                                ->parsVect[(width * 20 * qNumber) + width * k]);
-//                right[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVect[(width * 20 * pNumber) + width * k]);
-//                tem[k] = &(
-//                    pr->partitionData[model]
-//                        ->parsVectUppass[(width * 20 * temNumber) + width * k]);
-//            }
-            parsimonyNumber *left, *right, *tem;
-            left = &(pr->partitionData[model]->parsVect[init(qNumber)]);
-            right = &(pr->partitionData[model]->parsVect[init(pNumber)]);
-            tem = &(pr->partitionData[model]->parsVectUppass[init(temNumber)]);
-
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                INT_TYPE s_l, s_r, t_N = SET_ALL_BITS_ZERO, t_A[20], o_A[20];
-
-                for (k = 0; k < 20; ++k) {
-//                    s_l = VECTOR_LOAD((CAST)(&left[k][i]));
-                    s_l = VECTOR_LOAD((CAST)(&left[idx(k, i)]));
-//                    s_r = VECTOR_LOAD((CAST)(&right[k][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[idx(k, i)]));
-                    t_A[k] = VECTOR_BIT_AND(s_l, s_r);
-                    o_A[k] = VECTOR_BIT_OR(s_l, s_r);
-                    t_N = VECTOR_BIT_OR(t_N, t_A[k]);
-                }
-
-                t_N = VECTOR_AND_NOT(t_N, allOne);
-
-                for (k = 0; k < 20; ++k) {
-                    VECTOR_STORE(
-//                        (CAST)(&tem[k][i]),
-                        (CAST)(&tem[idx(k, i)]),
-                        VECTOR_BIT_OR(t_A[k], VECTOR_BIT_AND(t_N, o_A[k])));
-                }
-                // sum += vectorPopcount(t_N);
-                unsigned int counts[INTS_PER_VECTOR]
-                    __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-                int ptr;
-
-                VECTOR_STORE((CAST)counts, t_N);
-
-                for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                    scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
-                    sum += scoreInc[i + ptr];
-                }
-                if (perSiteScores)
-                    storePerSiteNodeScores(pr, model, t_N, i, pNumber);
-                //                  if(sum >= bestScore)
-                //                    return sum;
-            }
-        } break;
         default: {
-//            parsimonyNumber *left[32], *right[32], *tem[32];
             assert(states <= 32);
-//            for (k = 0; k < states; ++k) {
-//                left[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVect[(width * states * qNumber) + width * k]);
-//                right[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVect[(width * states * pNumber) + width * k]);
-//                tem[k] = &(pr->partitionData[model]
-//                               ->parsVectUppass[(width * states * temNumber) +
-//                                                width * k]);
-//            }
-            parsimonyNumber *left, *right, *tem;
-            left = &(pr->partitionData[model]->parsVect[init(qNumber)]);
-            right = &(pr->partitionData[model]->parsVect[init(pNumber)]);
-            tem = &(pr->partitionData[model]->parsVectUppass[init(temNumber)]);
+
+            auto left = parsVect[qNumber];
+            auto right = parsVect[pNumber];
+            auto tem = parsVectUppass[temNumber];
 
             for (i = 0; i < width; i += INTS_PER_VECTOR) {
                 INT_TYPE s_l, s_r, t_N = SET_ALL_BITS_ZERO, t_A[32], o_A[32];
 
                 for (k = 0; k < states; ++k) {
-//                    s_l = VECTOR_LOAD((CAST)(&left[k][i]));
-                    s_l = VECTOR_LOAD((CAST)(&left[idx(k, i)]));
-//                    s_r = VECTOR_LOAD((CAST)(&right[k][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[idx(k, i)]));
+                    s_l = VECTOR_LOAD((CAST)left[i][k]);
+                    s_r = VECTOR_LOAD((CAST)right[i][k]);
                     t_A[k] = VECTOR_BIT_AND(s_l, s_r);
                     o_A[k] = VECTOR_BIT_OR(s_l, s_r);
                     t_N = VECTOR_BIT_OR(t_N, t_A[k]);
@@ -2196,8 +1617,7 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
 
                 for (k = 0; k < states; ++k) {
                     VECTOR_STORE(
-//                        (CAST)(&tem[k][i]),
-                        (CAST)(&tem[idx(k, i)]),
+                        (CAST)tem[i][k],
                         VECTOR_BIT_OR(t_A[k], VECTOR_BIT_AND(t_N, o_A[k])));
                 }
                 // sum += vectorPopcount(t_N);
@@ -2226,54 +1646,31 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
     return sum;
 }
 
+template <typename Traits = DefaultParsProxyTraits>
 void traversePrepareInsertBranches(partitionList *pr, nodeptr u, int maxTips,
                                    int &count) {
     size_t uNumber = u->number, u1Number = u->back->number;
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         size_t k, states = pr->partitionData[model]->states,
                   width = pr->partitionData[model]->parsimonyLength, i;
-        auto idx = [width, states](std::size_t state_id, std::size_t col_id) -> std::size_t {
-            return table_index_divisible(width, states, 0, state_id, col_id);
-        };
-        auto init = [width, states](std::size_t node_id) -> std::size_t {
-            return table_index_divisible(width, states, node_id, 0, 0);
-        };
+        ParsProxy<Traits> parsVectUppassLocal(width, states, pr->partitionData[model]->parsVectUppassLocal);
+        ParsProxy<Traits> branchVectUppass(width, states, pr->partitionData[model]->branchVectUppass);
 
         switch (states) {
         default: {
-//            parsimonyNumber *uStates[32], *u1States[32], *branchStates[32];
-
             assert(states <= 32);
 
-//            for (k = 0; k < states; ++k) {
-//                uStates[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVectUppassLocal[(width * states * uNumber) +
-//                                                width * k]);
-//                u1States[k] =
-//                    &(pr->partitionData[model]
-//                          ->parsVectUppassLocal[(width * states * u1Number) +
-//                                                width * k]);
-//                branchStates[k] =
-//                    &(pr->partitionData[model]
-//                          ->branchVectUppass[(width * states * count) +
-//                                             width * k]);
-//            }
-            parsimonyNumber *uStates, *u1States, *branchStates;
-            uStates = &(pr->partitionData[model]->parsVectUppassLocal[init(uNumber)]);
-            u1States = &(pr->partitionData[model]->parsVectUppassLocal[init(u1Number)]);
-            branchStates = &(pr->partitionData[model]->branchVectUppass[init(count)]);
+            auto uStates = parsVectUppassLocal[uNumber];
+            auto u1States = parsVectUppassLocal[u1Number];
+            auto branchStates = branchVectUppass[count];
 
 
             for (i = 0; i < width; i += INTS_PER_VECTOR) {
                 for (int k = 0; k < states; ++k) {
                     VECTOR_STORE(
-//                        (CAST)&branchStates[k][i],
-                        (CAST)&branchStates[idx(k, i)],
-//                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)(&uStates[k][i])),
-//                                      VECTOR_LOAD((CAST)(&u1States[k][i]))));
-                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)(&uStates[idx(k, i)])),
-                                      VECTOR_LOAD((CAST)(&u1States[idx(k, i)]))));
+                        (CAST)branchStates[i][k],
+                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)uStates[i][k]),
+                                      VECTOR_LOAD((CAST)u1States[i][k])));
                 }
             }
         }
@@ -2287,75 +1684,40 @@ void traversePrepareInsertBranches(partitionList *pr, nodeptr u, int maxTips,
     }
 }
 
+template <typename Traits = DefaultParsProxyTraits>
 void traversePrepareInsertBranches(partitionList *pr, nodeptr u, int maxtrav,
                                    int dist, int maxTips, int &count) {
     size_t uNumber = u->number, u1Number = u->back->number;
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         size_t k, states = pr->partitionData[model]->states,
                   width = pr->partitionData[model]->parsimonyLength, i;
-        auto idx = [width, states](std::size_t state_id, std::size_t col_id) -> std::size_t {
-            return table_index_divisible(width, states, 0, state_id, col_id);
-        };
-        auto init = [width, states](std::size_t node_id) -> std::size_t {
-            return table_index_divisible(width, states, node_id, 0, 0);
-        };
+        ParsProxy<Traits> parsVectUppassLocal(width, states, pr->partitionData[model]->parsVectUppassLocal);
+        ParsProxy<Traits> parsVectUppass(width, states, pr->partitionData[model]->parsVectUppass);
+        ParsProxy<Traits> branchVectUppass(width, states, pr->partitionData[model]->branchVectUppass);
 
         switch (states) {
         default: {
-//            parsimonyNumber *uStates[32], *u1States[32], *branchStates[32];
-
             assert(states <= 32);
 
-//            for (k = 0; k < states; ++k) {
-//                if (isUppassCopied[uNumber]) {
-//                    uStates[k] =
-//                        &(pr->partitionData[model]
-//                              ->parsVectUppassLocal[(width * states * uNumber) +
-//                                                    width * k]);
-//                } else {
-//                    uStates[k] =
-//                        &(pr->partitionData[model]
-//                              ->parsVectUppass[(width * states * uNumber) +
-//                                               width * k]);
-//                }
-//                if (isUppassCopied[u1Number]) {
-//                    u1States[k] = &(
-//                        pr->partitionData[model]
-//                            ->parsVectUppassLocal[(width * states * u1Number) +
-//                                                  width * k]);
-//                } else {
-//                    u1States[k] =
-//                        &(pr->partitionData[model]
-//                              ->parsVectUppass[(width * states * u1Number) +
-//                                               width * k]);
-//                }
-//                branchStates[k] =
-//                    &(pr->partitionData[model]
-//                          ->branchVectUppass[(width * states * count) +
-//                                             width * k]);
-//            }
-            parsimonyNumber *uStates, *u1States, *branchStates;
+            ParsProxy<Traits, 1> uStates, u1States, branchStates;
             if (isUppassCopied[uNumber]) {
-                uStates = &(pr->partitionData[model]->parsVectUppassLocal[init(uNumber)]);
+                uStates = parsVectUppassLocal[uNumber];
             } else {
-                uStates = &(pr->partitionData[model]->parsVectUppass[init(uNumber)]);
+                uStates = parsVectUppass[uNumber];
             }
             if (isUppassCopied[u1Number]) {
-                u1States = &(pr->partitionData[model]->parsVectUppassLocal[init(u1Number)]);
+                u1States = parsVectUppassLocal[u1Number];
             } else {
-                u1States = &(pr->partitionData[model]->parsVectUppass[init(u1Number)]);
+                u1States = parsVectUppass[u1Number];
             }
-            branchStates = &(pr->partitionData[model]->branchVectUppass[init(count)]);
+            branchStates = branchVectUppass[count];
 
             for (i = 0; i < width; i += INTS_PER_VECTOR) {
                 for (int k = 0; k < states; ++k) {
                     VECTOR_STORE(
-//                        (CAST)&branchStates[k][i],
-                        (CAST)&branchStates[idx(k, i)],
-//                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)(&uStates[k][i])),
-//                                      VECTOR_LOAD((CAST)(&u1States[k][i]))));
-                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)(&uStates[idx(k, i)])),
-                                      VECTOR_LOAD((CAST)(&u1States[idx(k, i)]))));
+                        (CAST)branchStates[i][k],
+                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)uStates[i][k]),
+                                      VECTOR_LOAD((CAST)u1States[i][k])));
                 }
             }
         }
@@ -2967,19 +2329,10 @@ void copyGlobalToLocalUppass(partitionList *pr, int limNodes) {
 /**
  * WARNING: Haven't tested yet.
  */
-inline bool equalStatesCmp(parsimonyNumber *uStatesVec,
-                           parsimonyNumber *vStatesVec, std::size_t states) {
-//    int posU = 0, posV = 0;
-//    for (int k = 0; k < states; ++k) {
-//        for (int i = 0; i < INTS_PER_VECTOR; ++i) {
-//            if (uStatesVec[posU + i] != vStatesVec[posV + i]) {
-//                return false;
-//            }
-//        }
-//        posU += stepU;
-//        posV += stepV;
-//    }
-    return std::equal(uStatesVec, uStatesVec + (states * INTS_PER_VECTOR), vStatesVec);
+template <typename Traits = DefaultParsProxyTraits>
+inline bool equalStatesCmp(ParsProxy<Traits, 2> uStatesVec,
+                           ParsProxy<Traits, 2> vStatesVec) {
+    return std::equal(uStatesVec[0], uStatesVec[0] + (uStatesVec.states * INTS_PER_VECTOR), vStatesVec[0]);
 }
 /**
  * Set u = v.
@@ -3024,8 +2377,6 @@ void uppassLeafNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *uUpVec,
                        VECTOR_AND_NOT(VECTOR_BIT_AND(u_k[k], p_k[k]), allOne),
                        p_k[k]));
             // x |= (~(uVec[posU] & pUpVec[posPUp]) & pUpVec[posPUp]);
-//            posU += stepU;
-//            posPUp += stepPUp;
             posU = next_state(posU);
             posPUp = next_state(posPUp);
         }
@@ -3039,9 +2390,6 @@ void uppassLeafNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *uUpVec,
             VECTOR_STORE((CAST)(&uUpVec[posUUp]), u_k[k]);
             // uUpVec[posUUp] = uVec[posU];
             // uUpVec[posUUp] ^= ((uUpVec[posUUp] ^ pUpVec[posPUp]) & x);
-//            posU += stepU;
-//            posUUp += stepUUp;
-//            posPUp += stepPUp;
             posU = next_state(posU);
             posUUp = next_state(posUUp);
             posPUp = next_state(posPUp);
@@ -3087,8 +2435,6 @@ INT_TYPE downpassCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
 
             t_N = VECTOR_BIT_OR(t_N, t_A[k]);
             // t_N |= t_A[k];
-//            posV1 += stepV1;
-//            posV2 += stepV2;
             posV1 = next_state(posV1);
             posV2 = next_state(posV2);
         }
@@ -3099,7 +2445,6 @@ INT_TYPE downpassCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
             VECTOR_STORE((CAST)(&uVec[posU]),
                          VECTOR_BIT_OR(t_A[k], VECTOR_BIT_AND(t_N, o_A[k])));
             // uVec[posU] = t_A[k] | (t_N & o_A[k]);
-//            posU += stepU;
             posU = next_state(posU);
         }
     }
@@ -3136,17 +2481,11 @@ void uppassInnerNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
             p_k[k] = VECTOR_LOAD((CAST)(&pUpVec[posPUp]));
             v_1k[k] = VECTOR_LOAD((CAST)(&v1Vec[posV1]));
             v_2k[k] = VECTOR_LOAD((CAST)(&v2Vec[posV2]));
-//            x = VECTOR_BIT_OR(
-//                x, VECTOR_AND_NOT(VECTOR_BIT_AND(u_k[k], p_k[k]), p_k[k]));
             x = VECTOR_BIT_OR(
-                    x, VECTOR_AND_NOT(u_k[k], p_k[k]));
+                x, VECTOR_AND_NOT(VECTOR_BIT_AND(u_k[k], p_k[k]), p_k[k]));
             y = VECTOR_BIT_OR(y, VECTOR_BIT_AND(v_1k[k], v_2k[k]));
             // x |= (~(uVec[posU] & pUpVec[posPUp]) & pUpVec[posPUp]);
             // y |= (v1Vec[posV1] & v2Vec[posV2]);
-//            posU += stepU;
-//            posV1 += stepV1;
-//            posV2 += stepV2;
-//            posPUp += stepPUp;
             posU = next_state(posU);
             posV1 = next_state(posV1);
             posV2 = next_state(posV2);
@@ -3184,11 +2523,6 @@ void uppassInnerNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
             //       (uUpVec[posUUp] |
             //        (pUpVec[posPUp] & (v1Vec[posV1] | v2Vec[posV2])))) &
             //      (x & y));
-//            posU += stepU;
-//            posV1 += stepV1;
-//            posV2 += stepV2;
-//            posUUp += stepUUp;
-//            posPUp += stepPUp;
             posU = next_state(posU);
             posV1 = next_state(posV1);
             posV2 = next_state(posV2);
@@ -3203,6 +2537,7 @@ void uppassInnerNodeCalculate(parsimonyNumber *uVec, parsimonyNumber *v1Vec,
  * STEP 2b
  * Update new uppass calculated to parsVectUppassLocal
  */
+template <typename Traits = DefaultParsProxyTraits>
 void dfsRecalculateUppassLocal(nodeptr u, parsimonyNumber *pUpVec, pInfo *prModel, partitionList *pr, std::size_t w,
                                std::size_t mxTips) {
     // cout << "Begin dfsRecalculateUppassLocal\n";
@@ -3212,8 +2547,9 @@ void dfsRecalculateUppassLocal(nodeptr u, parsimonyNumber *pUpVec, pInfo *prMode
     copySingleGlobalToLocalUppass(pr, u->number);
     int width = prModel->parsimonyLength;
     int states = prModel->states;
-//    int posU = width * states * u->number + w;
     std::size_t posU = table_index(width, states, u->number, 0, w);
+    ParsProxy<Traits> parsVectUppassLocal(width, states, prModel->parsVectUppassLocal);
+    ParsProxy<Traits> parsVectUppass(width, states, prModel->parsVectUppass);
     if (u->number <= mxTips) {
         uppassLeafNodeCalculate(&(prModel->parsVect[posU]),
                                 &(prModel->parsVectUppassLocal[posU]), pUpVec, states);
@@ -3222,14 +2558,11 @@ void dfsRecalculateUppassLocal(nodeptr u, parsimonyNumber *pUpVec, pInfo *prMode
         nodeptr v2 = u->next->next->back;
         uppassInnerNodeCalculate(
             &(prModel->parsVect[posU]),
-//            &(prModel->parsVect[width * states * v1->number + w]),
             &(prModel->parsVect[table_index(width, states, v1->number, 0, w)]),
-//            &(prModel->parsVect[width * states * v2->number + w]),
             &(prModel->parsVect[table_index(width, states, v2->number, 0, w)]),
             &(prModel->parsVectUppassLocal[posU]), pUpVec, states);
         if ((inRadiusRange[v1->number] || inRadiusRange[v2->number]) &&
-            !equalStatesCmp(&(prModel->parsVectUppassLocal[posU]),
-                            &(prModel->parsVectUppass[posU]), states)) {
+            !equalStatesCmp(parsVectUppassLocal[u->number][w], parsVectUppass[u->number][w])) {
             dfsRecalculateUppassLocal(v1, &(prModel->parsVectUppassLocal[posU]), prModel, pr, w, mxTips);
             dfsRecalculateUppassLocal(v2, &(prModel->parsVectUppassLocal[posU]), prModel, pr, w, mxTips);
         }
@@ -3240,12 +2573,14 @@ void dfsRecalculateUppassLocal(nodeptr u, parsimonyNumber *pUpVec, pInfo *prMode
  * STEP 2b
  * Update new uppass calculated to parsVectUppass
  */
+template <typename Traits = DefaultParsProxyTraits>
 void dfsRecalculateUppass(nodeptr u, parsimonyNumber *pUpVec, pInfo *prModel,
                           partitionList *pr, std::size_t w, std::size_t mxTips) {
     int width = prModel->parsimonyLength;
     int states = prModel->states;
-//    int posU = width * states * u->number + w;
     std::size_t posU = table_index(width, states, u->number, 0, w);
+    ParsProxy<Traits> parsVectUppassLocal(width, states, prModel->parsVectUppassLocal);
+    ParsProxy<Traits> parsVectUppass(width, states, prModel->parsVectUppass);
     if (u->number <= mxTips) {
         uppassLeafNodeCalculate(&(prModel->parsVect[posU]),
                                 &(prModel->parsVectUppass[posU]), pUpVec, states);
@@ -3260,8 +2595,7 @@ void dfsRecalculateUppass(nodeptr u, parsimonyNumber *pUpVec, pInfo *prModel,
 //            &(prModel->parsVect[width * states * v2->number + w]),
             &(prModel->parsVect[table_index(width, states, v2->number, 0, w)]),
             &(prModel->parsVectUppass[posU]), pUpVec, states);
-        if (!equalStatesCmp(&(prModel->parsVectUppassLocal[posU]),
-                            &(prModel->parsVectUppass[posU]), states)) {
+        if (!equalStatesCmp(parsVectUppassLocal[u->number][w], parsVectUppass[u->number][w])) {
             dfsRecalculateUppass(v1, &(prModel->parsVectUppass[posU]), prModel, pr, w, mxTips);
             dfsRecalculateUppass(v2, &(prModel->parsVectUppass[posU]), prModel, pr, w, mxTips);
         }
@@ -3278,6 +2612,7 @@ void dfsRecalculateUppass(nodeptr u, parsimonyNumber *pUpVec, pInfo *prModel,
  *
  * @return sum of MP score of 2 divided trees.
  */
+template <typename Traits = DefaultParsProxyTraits>
 unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                                           nodeptr Nm, nodeptr Nz, nodeptr Ns) {
     // cout << "Begin recalculateDownpassAndUppass\n";
@@ -3317,12 +2652,11 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
         auto init = [width, states](std::size_t node_id, std::size_t col_id = 0) -> std::size_t {
             return table_index(width, states, node_id, 0, col_id);
         };
+        ParsProxy<Traits> parsVect(width, states, pr->partitionData[model]->parsVect);
+        ParsProxy<Traits> parsVectUppass(width, states, pr->partitionData[model]->parsVectUppass);
+        ParsProxy<Traits> parsVectUppassLocal(width, states, pr->partitionData[model]->parsVectUppassLocal);
 
         for (int w = 0; w < width; w += INTS_PER_VECTOR) {
-//            int posNm = width * states * Nm->number + w;
-//            int posNs = width * states * Ns->number + w;
-//            int posNx = width * states * Nx->number + w;
-//            int posNz = width * states * Nz->number + w;
             std::size_t posNm = init(Nm->number, w);
             std::size_t posNs = init(Ns->number, w);
             std::size_t posNx = init(Nx->number, w);
@@ -3330,9 +2664,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
             /* STEP 2d: Recalculate Nm and its subtree
              * if old (global) uppass != old (global) downpass
              * (Because its new uppass is now its downpass) */
-            if (!equalStatesCmp(
-                    &(pr->partitionData[model]->parsVect[posNm]),
-                    &(pr->partitionData[model]->parsVectUppass[posNm]), states)) {
+            if (!equalStatesCmp(parsVect[Nm->number][w], parsVectUppass[Nm->number][w])) {
                 // /**
                 //  * Set new (local) uppass of Nm = old (global) downpass of Nm.
                 //  * (As Nm is now the root of its subtree).
@@ -3364,9 +2696,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                  * If old downpass (= new uppass) != old uppass of Nx
                  * -> Recalculate its subtree
                  */
-                if (!equalStatesCmp(
-                        &(pr->partitionData[model]->parsVect[posNx]),
-                        &(pr->partitionData[model]->parsVectUppass[posNx]), states)) {
+                if (!equalStatesCmp(parsVect[Nx->number][w], parsVectUppass[Nx->number][w])) {
                     // /**
                     //  * Set new (local) uppass of Nx = old (global) downpass
                     //  * of Nx. (As Nx is now the root of its subtree).
@@ -3418,8 +2748,8 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                 /* STEP 2c: If old uppass of Nx != new downpass (new uppass) of
                  * root branch Ns-Nz, do dfsRecalculateUppass on Ns */
                 if (!equalStatesCmp(
-                        &(pr->partitionData[model]->parsVectUppass[posNx]),
-                        rootDownpass, states)) {
+                        parsVectUppass[Nx->number][w],
+                        ParsProxy<Traits, 2>(width, states, rootDownpass))) {
                     dfsRecalculateUppassLocal(Ns, rootDownpass,
                                               pr->partitionData[model], pr, w,
                                               tr->mxtips);
@@ -3445,8 +2775,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
              * old (global) downpass of N_s != old (global) downpass of N_x
              * -> Do STEP 1, 2a, 2b
              */
-            if (!equalStatesCmp(&(pr->partitionData[model]->parsVect[posNs]),
-                                &(pr->partitionData[model]->parsVect[posNx]), states)) {
+            if (!equalStatesCmp(parsVect[Ns->number][w], parsVect[Nx->number][w])) {
                 nodeptr u = Nz, lastU = NULL;
                 if (depth[u->next->back->number] <
                     depth[u->next->next->back->number]) {
@@ -3480,42 +2809,25 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     if (lastU != NULL && v1->number == lastU->number) {
                         assert(lastUDownpass != NULL);
                         v1Downpass = lastUDownpass;
-//                        v2Downpass = &(
-//                            pr->partitionData[model]
-//                                ->parsVect[(width * states * v2->number) + w]);
                         v2Downpass = &(
                                 pr->partitionData[model]
                                         ->parsVect[init(v2->number, w)]);
-//                        stepV1 = INTS_PER_VECTOR;
-//                        stepV2 = width;
                     } else if (lastU != NULL && v2->number == lastU->number) {
                         assert(lastUDownpass != NULL);
-//                        v1Downpass = &(
-//                            pr->partitionData[model]
-//                                ->parsVect[(width * states * v1->number) + w]);
                         v1Downpass = &(
                                 pr->partitionData[model]
                                         ->parsVect[init(v1->number, w)]);
                         v2Downpass = lastUDownpass;
-//                        stepV1 = width;
-//                        stepV2 = INTS_PER_VECTOR;
                     } else {
                         /* Happens only the first time (i.e. lastU = NULL)
                          */
                         assert(lastU == NULL);
-//                        v1Downpass = &(
-//                            pr->partitionData[model]
-//                                ->parsVect[(width * states * v1->number) + w]);
-//                        v2Downpass = &(
-//                            pr->partitionData[model]
-//                                ->parsVect[(width * states * v2->number) + w]);
                         v1Downpass = &(
                                 pr->partitionData[model]
                                         ->parsVect[init(v1->number, w)]);
                         v2Downpass = &(
                                 pr->partitionData[model]
                                         ->parsVect[init(v2->number, w)]);
-//                        stepV1 = stepV2 = width;
                     }
 
                     /* Fitch's Algo */
@@ -3581,10 +2893,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                      */
                     /* If downpass of u doesn't change, break the while
                      * loop */
-                    if (equalStatesCmp(
-                            uDownpass,
-                            &(pr->partitionData[model]
-                                  ->parsVect[init(u->number, w)]), states)) {
+                    if (equalStatesCmp(ParsProxy<Traits, 2>(width, states, uDownpass), parsVect[u->number][w])) {
 
                         // cout << "u->back->number = " << u->back->number
                         // <<
@@ -3664,19 +2973,14 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     nodeptr v = cur.v;
                     parsimonyNumber *vDownpass = cur.vDownpass;
                     parsimonyNumber *pUpVec;
-//                    int stepPUp;
                     copySingleGlobalToLocalUppass(pr, v->number);
                     if (depth[v->number] == 0) {
                         assert(rootDownpass != NULL);
                         pUpVec = rootDownpass;
-//                        stepPUp = INTS_PER_VECTOR;
                     } else {
                         nodeptr par = uppass_par[v->number];
                         assert(par != NULL);
-//                        pUpVec = &(pr->partitionData[model]->parsVectUppassLocal
-//                                       [width * states * par->number + w]);
                         pUpVec = &(pr->partitionData[model]->parsVectUppassLocal[init(par->number, w)]);
-//                        stepPUp = width;
                     }
                     /* v MUST NOT be leaf */
                     assert(v->number > tr->mxtips);
@@ -3696,28 +3000,18 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                         assert(v1Downpass != NULL);
                         uppassInnerNodeCalculate(
                             vDownpass, v1Downpass,
-//                            &(pr->partitionData[model]
-//                                  ->parsVect[width * states * v2->number + w]),
                             &(pr->partitionData[model]
                                     ->parsVect[init(v2->number, w)]),
-//                            &(pr->partitionData[model]->parsVectUppassLocal
-//                                  [width * states * v->number + w]),
                             &(pr->partitionData[model]
                                 ->parsVectUppassLocal[init(v->number, w)]),
                             pUpVec, states);
                     } else {
                         uppassInnerNodeCalculate(
                             vDownpass,
-//                            &(pr->partitionData[model]
-//                                  ->parsVect[width * states * v1->number + w]),
                             &(pr->partitionData[model]
                                     ->parsVect[init(v1->number, w)]),
-//                            &(pr->partitionData[model]
-//                                  ->parsVect[width * states * v2->number + w]),
                             &(pr->partitionData[model]
                                     ->parsVect[init(v2->number, w)]),
-//                            &(pr->partitionData[model]
-//                                ->parsVectUppassLocal[width * states * v->number + w]),
                             &(pr->partitionData[model]
                                     ->parsVectUppassLocal[init(v->number, w)]),
                             pUpVec, states);
@@ -3728,20 +3022,10 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                         vDownpass = NULL;
                     }
 
-                    if (!equalStatesCmp(
-//                            &(pr->partitionData[model]->parsVectUppassLocal
-//                                  [width * states * v->number + w]),
-                            &(pr->partitionData[model]
-                                    ->parsVectUppassLocal[init(v->number, w)]),
-//                            &(pr->partitionData[model]
-//                                  ->parsVectUppass[width * states * v->number + w]),
-                            &(pr->partitionData[model]
-                                    ->parsVectUppass[init(v->number, w)]), states)) {
+                    if (!equalStatesCmp(parsVectUppassLocal[v->number][w],parsVectUppass[v->number][w])) {
                         if (i > 0) {
                             dfsRecalculateUppassLocal(
                                 v2,
-//                                &(pr->partitionData[model]->parsVectUppassLocal
-//                                      [width * states * v->number + w]),
                                 &(pr->partitionData[model]
                                     ->parsVectUppassLocal[init(v->number, w)]),
                                 pr->partitionData[model], pr, w, tr->mxtips);
@@ -3750,8 +3034,6 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                                 assert(v2 == Ns);
                                 dfsRecalculateUppassLocal(
                                     v1,
-//                                    &(pr->partitionData[model]
-//                                          ->parsVectUppassLocal[width * states * v->number + w]),
                                     &(pr->partitionData[model]
                                             ->parsVectUppassLocal[init(v->number, w)]),
                                     pr->partitionData[model], pr, w, tr->mxtips);
@@ -3759,8 +3041,6 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                                 assert(v2 != Ns);
                                 dfsRecalculateUppassLocal(
                                     v2,
-//                                    &(pr->partitionData[model]
-//                                          ->parsVectUppassLocal[width * states * v->number + w]),
                                     &(pr->partitionData[model]
                                             ->parsVectUppassLocal[init(v->number, w)]),
                                     pr->partitionData[model], pr, w, tr->mxtips);
@@ -3778,9 +3058,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
             /* STEP 2c: Because parent of N_s is now N_z and not N_x anymore
              */
             copySingleGlobalToLocalUppass(pr, Nz->number);
-            if (!equalStatesCmp(
-                    &(pr->partitionData[model]->parsVectUppass[posNx]),
-                    &(pr->partitionData[model]->parsVectUppassLocal[posNz]), states)) {
+            if (!equalStatesCmp(parsVectUppass[Nx->number][w], parsVectUppassLocal[Nz->number][w])) {
                 dfsRecalculateUppassLocal(
                     Ns, &(pr->partitionData[model]->parsVectUppassLocal[posNz]),
                     pr->partitionData[model], pr, w, tr->mxtips);
@@ -4202,6 +3480,7 @@ static void markRecalculatedNode(nodeptr u) {
         u = uppass_par[u->number];
     }
 }
+template <typename Traits = DefaultParsProxyTraits>
 static void applyMove(pllInstance *tr, partitionList *pr) {
     recalculate[tr->start->number] = recalculate[tr->start->back->number] =
         true;
@@ -4264,25 +3543,18 @@ static void applyMove(pllInstance *tr, partitionList *pr) {
                         auto init = [width, states](std::size_t node_id, std::size_t col_id = 0) -> std::size_t {
                             return table_index(width, states, node_id, 0, col_id);
                         };
+                        ParsProxy<Traits> parsVectUppassLocal(width, states, prModel->parsVectUppassLocal);
+                        ParsProxy<Traits> parsVectUppass(width, states, prModel->parsVectUppass);
 
                         for (int w = 0; w < width; w += INTS_PER_VECTOR) {
                             /**
                              * NOTE: u                 is new parent of v
                              *       uppass[v->number] is old parent of v
                              */
-                            if (!equalStatesCmp(
-//                                    &(prModel->parsVectUppassLocal
-//                                          [width * states * uppass_par[v->number]->number + w]),
-                                    &(prModel
-                                        ->parsVectUppassLocal[init(uppass_par[v->number]->number, w)]),
-//                                    &(prModel->parsVectUppass
-//                                          [width * states * u->number + w]),
-                                    &(prModel
-                                        ->parsVectUppass[init(u->number, w)]), states)) {
+                            if (!equalStatesCmp(parsVectUppassLocal[uppass_par[v->number]->number][w],
+                                    parsVectUppass[u->number][w])) {
                                 dfsRecalculateUppass(
                                     v,
-//                                    &(prModel->parsVectUppass
-//                                          [width * states * u->number + w]),
                                     &(prModel->parsVectUppass[init(u->number, w)]),
                                     prModel, pr, w, tr->mxtips);
                             }
