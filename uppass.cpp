@@ -211,6 +211,21 @@ inline void table_transform(T* table, int nodes, int states, int width) {
     }
 }
 
+#if (defined(__SSE3) || defined(__AVX))
+static inline unsigned int vectorPopcount(INT_TYPE v) {
+    alignas(PLL_BYTE_ALIGNMENT) unsigned long counts[LONG_INTS_PER_VECTOR];
+
+    unsigned int sum = 0;
+
+    VECTOR_STORE((CAST)counts, v);
+
+    for (auto count: counts) {
+        sum += __builtin_popcountll(count);
+    }
+    return sum;
+}
+#endif
+
 /********************************DNA FUNCTIONS
  * *****************************************************************/
 
@@ -686,9 +701,9 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
         // cout << "scoreIncrease\n";
         rax_posix_memalign((void **)&(pr->partitionData[model]->scoreIncrease),
                            PLL_BYTE_ALIGNMENT,
-                           (size_t)compressedEntriesPadded * totalNodes *
+                           (size_t)(compressedEntriesPadded / INTS_PER_VECTOR) * totalNodes *
                                sizeof(parsimonyNumber));
-        for (i = 0; i < compressedEntriesPadded * totalNodes; ++i)
+        for (i = 0; i < (compressedEntriesPadded / INTS_PER_VECTOR) * totalNodes; ++i)
             pr->partitionData[model]->scoreIncrease[i] = 0;
 
         if (perSiteScores) {
@@ -1145,7 +1160,7 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
                       width = pr->partitionData[model]->parsimonyLength;
 
             unsigned int *scoreInc =
-                &(pr->partitionData[model]->scoreIncrease[width * pNumber]);
+                &(pr->partitionData[model]->scoreIncrease[(width / INTS_PER_VECTOR) * pNumber]);
             unsigned int i;
 
             ParsProxy<Traits> parsVect(width, states, pr->partitionData[model]->parsVect);
@@ -1178,18 +1193,11 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
 
                     v_N = VECTOR_AND_NOT(v_N, allOne);
 
-                    // totalScore += vectorPopcount(v_N);
-                    unsigned int counts[INTS_PER_VECTOR]
-                        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+                    unsigned int sum = vectorPopcount(v_N);
 
-                    int ptr;
+                    scoreInc[i / INTS_PER_VECTOR] = sum;
+                    totalScore += sum;
 
-                    VECTOR_STORE((CAST)counts, v_N);
-
-                    for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                        scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
-                        totalScore += scoreInc[i + ptr];
-                    }
                     if (perSiteScores)
                         storePerSiteNodeScores(pr, model, v_N, i, pNumber);
                 }
@@ -1241,15 +1249,12 @@ unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
 
                 // score += vectorPopcount(t_N);
 
-                unsigned int counts[INTS_PER_VECTOR]
-                    __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-                int ptr;
+                alignas(PLL_BYTE_ALIGNMENT) unsigned long counts[LONG_INTS_PER_VECTOR];
 
                 VECTOR_STORE((CAST)counts, t_N);
 
-                for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                    score += __builtin_popcount(counts[ptr]);
+                for (auto count : counts) {
+                    score += __builtin_popcountll(count);
                     if (score > tr->bestParsimony) {
                         return score;
                     }
@@ -1306,15 +1311,12 @@ unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr,
 
                 // score += vectorPopcount(t_N);
 
-                unsigned int counts[INTS_PER_VECTOR]
-                    __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-                int ptr;
+                alignas(PLL_BYTE_ALIGNMENT) unsigned long counts[LONG_INTS_PER_VECTOR];
 
                 VECTOR_STORE((CAST)counts, t_N);
 
-                for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                    score += __builtin_popcount(counts[ptr]);
+                for (auto count : counts) {
+                    score += __builtin_popcountll(count);
                     if (score > tr->bestParsimony) {
                         return score;
                     }
@@ -1367,15 +1369,12 @@ unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr,
                 t_N = VECTOR_AND_NOT(t_N, allOne);
 
                 // score += vectorPopcount(t_N);
-                unsigned int counts[INTS_PER_VECTOR]
-                    __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-                int ptr;
+                alignas(PLL_BYTE_ALIGNMENT) unsigned long counts[LONG_INTS_PER_VECTOR];
 
                 VECTOR_STORE((CAST)counts, t_N);
 
-                for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                    score += __builtin_popcount(counts[ptr]);
+                for (auto count : counts) {
+                    score += __builtin_popcountll(count);
                     if (score > tr->bestParsimony) {
                         return score;
                     }
@@ -1593,7 +1592,7 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
 
         unsigned int *scoreInc =
             &(pr->partitionData[model]
-                  ->scoreIncrease[width * (2 * tr->mxtips - 1)]);
+                  ->scoreIncrease[(width / INTS_PER_VECTOR) * (2 * tr->mxtips - 1)]);
         switch (states) {
         default: {
             assert(states <= 32);
@@ -1621,17 +1620,12 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
                         VECTOR_BIT_OR(t_A[k], VECTOR_BIT_AND(t_N, o_A[k])));
                 }
                 // sum += vectorPopcount(t_N);
-                unsigned int counts[INTS_PER_VECTOR]
-                    __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
 
-                int ptr;
+                unsigned int s = vectorPopcount(t_N);
 
-                VECTOR_STORE((CAST)counts, t_N);
+                sum += s;
+                scoreInc[i / INTS_PER_VECTOR] = s;
 
-                for (ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                    scoreInc[i + ptr] = __builtin_popcount(counts[ptr]);
-                    sum += scoreInc[i + ptr];
-                }
                 if (perSiteScores)
                     storePerSiteNodeScores(pr, model, t_N, i, pNumber);
                 //                  if(sum >= bestScore)
@@ -2332,7 +2326,7 @@ void copyGlobalToLocalUppass(partitionList *pr, int limNodes) {
 template <typename Traits = DefaultParsProxyTraits>
 inline bool equalStatesCmp(ParsProxy<Traits, 2> uStatesVec,
                            ParsProxy<Traits, 2> vStatesVec) {
-    return std::equal(uStatesVec[0], uStatesVec[0] + (uStatesVec.states * INTS_PER_VECTOR), vStatesVec[0]);
+    return std::equal(uStatesVec.array, uStatesVec.array + (uStatesVec.states * uStatesVec.N), vStatesVec.array);
 }
 /**
  * Set u = v.
@@ -2354,10 +2348,11 @@ inline void setStatesVec(parsimonyNumber *uStatesVec,
  */
 template <typename Traits = DefaultParsProxyTraits>
 void uppassLeafNodeCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> uUpVec,
-                             ParsProxy<Traits, 2> pUpVec, std::size_t states) {
+                             ParsProxy<Traits, 2> pUpVec) {
+    std::size_t states = uVec.states;
+    assert(states == uVec.states && states == uUpVec.states && states == pUpVec.states);
     // cout << "Begin uppassLeafNodeCalculate\n";
-    INT_TYPE
-    allOne = SET_ALL_BITS_ONE;
+    INT_TYPE allOne = SET_ALL_BITS_ONE;
     switch (states) {
     default: {
         /**
@@ -2405,17 +2400,18 @@ void uppassLeafNodeCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> uUp
  * t_N.
  */
 template <typename Traits = DefaultParsProxyTraits>
-INT_TYPE downpassCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> v1Vec,
-                           ParsProxy<Traits, 2> v2Vec, std::size_t states) {
+inline INT_TYPE downpassCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> v1Vec,
+                           ParsProxy<Traits, 2> v2Vec) {
+    std::size_t states = uVec.states;
+    assert(states == v1Vec.states && states == v2Vec.states);
     // cout << "Begin downpassCalculate\n";
-    INT_TYPE
-    allOne = SET_ALL_BITS_ONE;
+    INT_TYPE allOne = SET_ALL_BITS_ONE;
     INT_TYPE t_N = SET_ALL_BITS_ZERO;
     // parsimonyNumber t_N = 0;
     switch (states) {
     /* TODO: Add case 2, 4, 20 */
     default: {
-        // assert(states <= 32)
+        assert(states <= 32);
         INT_TYPE s_l, s_r, t_A[32], o_A[32];
         // parsimonyNumber o_A[32], t_A[32];
         for (std::size_t k = 0; k < states; ++k) {
@@ -2447,7 +2443,9 @@ INT_TYPE downpassCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> v1Vec
 template <typename Traits = DefaultParsProxyTraits>
 void uppassInnerNodeCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> v1Vec,
                               ParsProxy<Traits, 2> v2Vec, ParsProxy<Traits, 2> uUpVec,
-                              ParsProxy<Traits, 2> pUpVec, std::size_t states) {
+                              ParsProxy<Traits, 2> pUpVec) {
+    std::size_t states = uVec.states;
+    assert(states == v1Vec.states && states == v2Vec.states && states == uUpVec.states && states == pUpVec.states);
     // cout << "Begin uppassInnerNodeCalculate\n";
     INT_TYPE
     allOne = SET_ALL_BITS_ONE;
@@ -2532,7 +2530,7 @@ void dfsRecalculateUppassLocal(nodeptr u, ParsProxy<Traits, 2> pUpVec, pInfo *pr
 
     if (u->number <= mxTips) {
         uppassLeafNodeCalculate(parsVect[u->number][w],
-                                parsVectUppassLocal[u->number][w], pUpVec, states);
+                                parsVectUppassLocal[u->number][w], pUpVec);
     } else {
         nodeptr v1 = u->next->back;
         nodeptr v2 = u->next->next->back;
@@ -2540,7 +2538,7 @@ void dfsRecalculateUppassLocal(nodeptr u, ParsProxy<Traits, 2> pUpVec, pInfo *pr
             parsVect[u->number][w],
             parsVect[v1->number][w],
             parsVect[v2->number][w],
-            parsVectUppassLocal[u->number][w], pUpVec, states);
+            parsVectUppassLocal[u->number][w], pUpVec);
         if ((inRadiusRange[v1->number] || inRadiusRange[v2->number]) &&
             !equalStatesCmp(parsVectUppassLocal[u->number][w], parsVectUppass[u->number][w])) {
             dfsRecalculateUppassLocal(v1, parsVectUppassLocal[u->number][w], prModel, pr, w, mxTips);
@@ -2563,7 +2561,7 @@ void dfsRecalculateUppass(nodeptr u, ParsProxy<Traits, 2> pUpVec, pInfo *prModel
     ParsProxy<Traits> parsVectUppass(width, states, prModel->parsVectUppass);
 
     if (u->number <= mxTips) {
-        uppassLeafNodeCalculate(parsVect[u->number][w], parsVectUppass[u->number][w], pUpVec, states);
+        uppassLeafNodeCalculate(parsVect[u->number][w], parsVectUppass[u->number][w], pUpVec);
     } else {
         copySingleGlobalToLocalUppass(pr, u->number);
         nodeptr v1 = u->next->back;
@@ -2572,7 +2570,7 @@ void dfsRecalculateUppass(nodeptr u, ParsProxy<Traits, 2> pUpVec, pInfo *prModel
             parsVect[u->number][w],
             parsVect[v1->number][w],
             parsVect[v2->number][w],
-            parsVectUppass[u->number][w], pUpVec, states);
+            parsVectUppass[u->number][w], pUpVec);
         if (!equalStatesCmp(parsVectUppassLocal[u->number][w], parsVectUppass[u->number][w])) {
             dfsRecalculateUppass(v1, parsVectUppass[u->number][w], prModel, pr, w, mxTips);
             dfsRecalculateUppass(v2, parsVectUppass[u->number][w], prModel, pr, w, mxTips);
@@ -2624,21 +2622,12 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         std::size_t states = pr->partitionData[model]->states,
             width = pr->partitionData[model]->parsimonyLength;
-        auto idx = [width, states](std::size_t state_id, std::size_t col_id) -> std::size_t {
-            return table_index(width, states, 0, state_id, col_id);
-        };
-        auto init = [width, states](std::size_t node_id, std::size_t col_id = 0) -> std::size_t {
-            return table_index(width, states, node_id, 0, col_id);
-        };
+
         ParsProxy<Traits> parsVect(width, states, pr->partitionData[model]->parsVect);
         ParsProxy<Traits> parsVectUppass(width, states, pr->partitionData[model]->parsVectUppass);
         ParsProxy<Traits> parsVectUppassLocal(width, states, pr->partitionData[model]->parsVectUppassLocal);
 
         for (int w = 0; w < width; w += INTS_PER_VECTOR) {
-            std::size_t posNm = init(Nm->number, w);
-            std::size_t posNs = init(Ns->number, w);
-            std::size_t posNx = init(Nx->number, w);
-            std::size_t posNz = init(Nz->number, w);
             /* STEP 2d: Recalculate Nm and its subtree
              * if old (global) uppass != old (global) downpass
              * (Because its new uppass is now its downpass) */
@@ -2693,30 +2682,16 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
 
                 /* Calculate new downpass (= new uppass) of the new root branch
                  * Ns-Nz */
-//                parsimonyNumber *rootDownpass = NULL;
-//                rax_posix_memalign((void **)&(rootDownpass), PLL_BYTE_ALIGNMENT,
-//                                   (size_t)INTS_PER_VECTOR * states *
-//                                       sizeof(parsimonyNumber));
-
                 ParsWrapper<Traits, 2> rootDownpass(states);
 
                 INT_TYPE isUnionDownpass = downpassCalculate<Traits>(
                     rootDownpass,
                     parsVect[Ns->number][w],
-                    parsVect[Nz->number][w], states);
+                    parsVect[Nz->number][w]);
 
                 /* Update scoreMainSubtree */
                 // scoreMainSubtree += __builtin_popcount(isUnionDownpass);
-                {
-                    unsigned int counts[INTS_PER_VECTOR]
-                        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-                    VECTOR_STORE((CAST)counts, isUnionDownpass);
-
-                    for (int ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                        scoreMainSubtree += __builtin_popcount(counts[ptr]);
-                    }
-                }
+                scoreMainSubtree += vectorPopcount(isUnionDownpass);
 
                 /* STEP 2c: If old uppass of Nx != new downpass (new uppass) of
                  * root branch Ns-Nz, do dfsRecalculateUppass on Ns */
@@ -2800,7 +2775,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     INT_TYPE isUnionDownpass = downpassCalculate<Traits>(
                         uDownpass,
                         v1Downpass,
-                        v2Downpass, states);
+                        v2Downpass);
                     /* Update score difference when recalculate downpass */
                     // cout << "scoreMainSubtree BEGIN = " <<
                     // scoreMainSubtree
@@ -2810,25 +2785,17 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     //             ->scoreIncrease[width * u->number + w]
                     //      << '\n';
 
-                    for (int ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                        scoreMainSubtree -=
-                            pr->partitionData[model]
-                                ->scoreIncrease[width * u->number + w + ptr];
-                    }
+//                    for (int ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
+//                        scoreMainSubtree -=
+//                            pr->partitionData[model]
+//                                ->scoreIncrease[width * u->number + w + ptr];
+//                    }
+                    scoreMainSubtree -= pr->partitionData[model]->scoreIncrease[(width / INTS_PER_VECTOR) * u->number + (w / INTS_PER_VECTOR)];
 
                     // cout << "Score increase: "
                     //      << __builtin_popcount(isUnionDownpass) << '\n';
                     // scoreMainSubtree += __builtin_popcount(isUnionDownpass);
-                    {
-                        unsigned int counts[INTS_PER_VECTOR]
-                            __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-                        VECTOR_STORE((CAST)counts, isUnionDownpass);
-
-                        for (int ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                            scoreMainSubtree += __builtin_popcount(counts[ptr]);
-                        }
-                    }
+                    scoreMainSubtree += vectorPopcount(isUnionDownpass);
 
                     // cout v< "scoreMainSubtree AFTER = " <<
                     // scoreMainSubtree
@@ -2898,32 +2865,24 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     INT_TYPE isUnionDownpassRoot = downpassCalculate<Traits>(
                         rootDownpass,
                         uDownpass,
-                        parsVect[u->back->number][w], states);
+                        parsVect[u->back->number][w]);
 
                     if (rootDownpassChanged == true) {
                         // cout << "rootDownpassChanged\n";
                         /* Update scoreMainSubtree */
                         /* Subtract the old root downpass cost */
 
-                        for (int ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                            scoreMainSubtree -=
-                                pr->partitionData[model]->scoreIncrease
-                                    [width * (2 * tr->mxtips - 1) + w + ptr];
-                        }
+//                        for (int ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
+//                            scoreMainSubtree -=
+//                                pr->partitionData[model]->scoreIncrease
+//                                    [width * (2 * tr->mxtips - 1) + w + ptr];
+//                        }
+                        scoreMainSubtree -= pr->partitionData[model]->scoreIncrease[(width / INTS_PER_VECTOR) * (2 * tr->mxtips - 1) + (w / INTS_PER_VECTOR)];
+
                         /* Add the new increased cost */
                         // scoreMainSubtree +=
                         //     __builtin_popcount(isUnionDownpassRoot);
-                        {
-                            unsigned int counts[INTS_PER_VECTOR]
-                                __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-                            VECTOR_STORE((CAST)counts, isUnionDownpassRoot);
-
-                            for (int ptr = 0; ptr < INTS_PER_VECTOR; ++ptr) {
-                                scoreMainSubtree +=
-                                    __builtin_popcount(counts[ptr]);
-                            }
-                        }
+                        scoreMainSubtree += vectorPopcount(isUnionDownpassRoot);
                         dfsRecalculateUppassLocal<Traits>(
                             u->back, rootDownpass,
                             pr->partitionData[model], pr, w, tr->mxtips);
@@ -2969,8 +2928,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                             v1Downpass,
                             parsVect[v2->number][w],
                             parsVectUppassLocal[v->number][w],
-                            pUpVec,
-                            states
+                            pUpVec
                         );
                     } else {
                         uppassInnerNodeCalculate<Traits>(
@@ -2978,8 +2936,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                             parsVect[v1->number][w],
                             parsVect[v2->number][w],
                             parsVectUppassLocal[v->number][w],
-                            pUpVec,
-                            states
+                            pUpVec
                         );
                     }
                     // delete[] vDownpass;
@@ -3503,9 +3460,6 @@ static void applyMove(pllInstance *tr, partitionList *pr) {
                         pInfo *prModel = pr->partitionData[model];
                         int states = pr->partitionData[model]->states,
                             width = pr->partitionData[model]->parsimonyLength;
-                        auto init = [width, states](std::size_t node_id, std::size_t col_id = 0) -> std::size_t {
-                            return table_index(width, states, node_id, 0, col_id);
-                        };
                         ParsProxy<Traits> parsVectUppassLocal(width, states, prModel->parsVectUppassLocal);
                         ParsProxy<Traits> parsVectUppass(width, states, prModel->parsVectUppass);
 
@@ -3689,7 +3643,7 @@ int pllOptimizeTbrUppass(pllInstance *tr, partitionList *pr, int mintrav,
             }
         }
     } while (randomMP < startMP);
-    // cout << "CNT = " << cnt << '\n';
+//    cout << "CNT = " << cnt << '\n';
     tr->start = tr->nodep[1];
     // cout << "End pllOptimizeTbrUppass\n";
     return startMP;
