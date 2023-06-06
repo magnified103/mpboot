@@ -1771,7 +1771,7 @@ unsigned NxsCharactersBlock::HandleTokenState(
 	if (respectingCase)
 		cit = find(ci_begin, ci_end, t);
 	else
-		cit = find_if (ci_begin, ci_end, bind2nd(NxsStringEqual(), t));
+		cit = find_if (ci_begin, ci_end, bind(NxsStringEqual(), placeholders::_1, t));
 
 	if (cit == ci_end)
 		{
