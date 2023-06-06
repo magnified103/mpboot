@@ -1215,7 +1215,6 @@ unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
                                            int i1Number, int i2Number) {
     unsigned int score = scoreTwoSubtrees;
 
-    INT_TYPE allOne = SET_ALL_BITS_ONE;
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         size_t k, states = pr->partitionData[model]->states,
                   width = pr->partitionData[model]->parsimonyLength, i;
@@ -1230,16 +1229,17 @@ unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
 
             // cout << "width: " << width << '\n';
             for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                INT_TYPE t_N = SET_ALL_BITS_ZERO;
+                INT_TYPE t_N = SET_ALL_BITS_ONE;
 
                 for (int k = 0; k < states; ++k) {
                     INT_TYPE t_A =
                         VECTOR_BIT_AND(VECTOR_LOAD((CAST)i1States[i][k]),
                                        VECTOR_LOAD((CAST)i2States[i][k]));
-                    t_N = VECTOR_BIT_OR(t_N, t_A);
+                    /**
+                     * Note: ~(a0 | a1 | ... | an) = (~a0) & (~a1) & ... & (~an)
+                     */
+                    t_N = VECTOR_AND_NOT(t_A, t_N);
                 }
-
-                t_N = VECTOR_AND_NOT(t_N, allOne);
 
                 // score += vectorPopcount(t_N);
 
@@ -1272,7 +1272,6 @@ unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr,
     size_t pNumber = p->number, p1Number = p->back->number, qNumber = q->number,
            q1Number = q->back->number;
 
-    INT_TYPE allOne = SET_ALL_BITS_ONE;
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         size_t k, states = pr->partitionData[model]->states,
                   width = pr->partitionData[model]->parsimonyLength, i;
@@ -1290,7 +1289,7 @@ unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr,
 
             // cout << "width: " << width << '\n';
             for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                INT_TYPE t_N = SET_ALL_BITS_ZERO;
+                INT_TYPE t_N = SET_ALL_BITS_ONE;
 
                 for (int k = 0; k < states; ++k) {
                     INT_TYPE t_A = VECTOR_BIT_AND(
@@ -1298,10 +1297,11 @@ unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr,
                                       VECTOR_LOAD((CAST)p1States[i][k])),
                         VECTOR_BIT_OR(VECTOR_LOAD((CAST)qStates[i][k]),
                                       VECTOR_LOAD((CAST)q1States[i][k])));
-                    t_N = VECTOR_BIT_OR(t_N, t_A);
+                    /**
+                     * Note: ~(a0 | a1 | ... | an) = (~a0) & (~a1) & ... & (~an)
+                     */
+                    t_N = VECTOR_AND_NOT(t_A, t_N);
                 }
-
-                t_N = VECTOR_AND_NOT(t_N, allOne);
 
                 // score += vectorPopcount(t_N);
 
@@ -1333,7 +1333,6 @@ unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr,
     unsigned int score = scoreTwoSubtrees;
     size_t pNumber = p->number, uNumber = u->number, vNumber = u->back->number;
 
-    INT_TYPE allOne = SET_ALL_BITS_ONE;
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         size_t k, states = pr->partitionData[model]->states,
                   width = pr->partitionData[model]->parsimonyLength, i;
@@ -1350,17 +1349,18 @@ unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr,
 
             // cout << "width: " << width << '\n';
             for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                INT_TYPE t_N = SET_ALL_BITS_ZERO;
+                INT_TYPE t_N = SET_ALL_BITS_ONE;
 
                 for (int k = 0; k < states; ++k) {
                     INT_TYPE t_A = VECTOR_BIT_AND(
                         VECTOR_LOAD((CAST)pStates[i][k]),
                         VECTOR_BIT_OR(VECTOR_LOAD((CAST)uStates[i][k]),
                                       VECTOR_LOAD((CAST)vStates[i][k])));
-                    t_N = VECTOR_BIT_OR(t_N, t_A);
+                    /**
+                     * Note: ~(a0 | a1 | ... | an) = (~a0) & (~a1) & ... & (~an)
+                     */
+                    t_N = VECTOR_AND_NOT(t_A, t_N);
                 }
-
-                t_N = VECTOR_AND_NOT(t_N, allOne);
 
                 // score += vectorPopcount(t_N);
                 alignas(PLL_BYTE_ALIGNMENT) unsigned long counts[LONG_INTS_PER_VECTOR];
@@ -1424,23 +1424,32 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
 
                     INT_TYPE x, u_k[32], p_k[32];
                     for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                        x = SET_ALL_BITS_ZERO;
+                        x = SET_ALL_BITS_ONE;
                         for (k = 0; k < states; ++k) {
                             u_k[k] = VECTOR_LOAD((CAST)u[i][k]);
                             p_k[k] = VECTOR_LOAD((CAST)p[i][k]);
-                            x = VECTOR_BIT_OR(
-                                x,
-                                VECTOR_BIT_AND(
-                                    VECTOR_AND_NOT(
-                                        VECTOR_BIT_AND(u_k[k], p_k[k]), allOne),
-                                    p_k[k]));
+                            /**
+                             *   x | {[ ~(u & p) ] & p}
+                             * = x | {[ (~u) | (~p) ] & p}
+                             * = x | { [(~u) & p] | [(~p) & p] }
+                             * = x | { (~u) & p }
+                             * ANDNOT optimization
+                             */
+                            x = VECTOR_AND_NOT(VECTOR_AND_NOT(u_k[k], p_k[k]), x);
                             // x |= (~(u[k][i] & p[k][i]) & p[k][i]);
                         }
-                        x = VECTOR_AND_NOT(x, allOne);
                         for (k = 0; k < states; ++k) {
+                            /**
+                             *   u ^ [(u ^ p) & x]
+                             * = [u + (u + p) * x] mod 2
+                             * = (u + u * x + p * x) mod 2
+                             * = [(x + 1) * u + x * p] mod 2
+                             * = [(~x) & u] ^ (x & p)
+                             * => eliminate chain dependencies
+                             */
                             u_k[k] = VECTOR_BIT_XOR(
-                                u_k[k], VECTOR_BIT_AND(
-                                            VECTOR_BIT_XOR(u_k[k], p_k[k]), x));
+                                        VECTOR_AND_NOT(x, u_k[k]),
+                                        VECTOR_BIT_AND(x, p_k[k]));
                             VECTOR_STORE((CAST)(uUppass[i][k]), u_k[k]);
                             // u[k][i] ^= ((u[k][i] ^ p[k][i]) & x);
                         }
