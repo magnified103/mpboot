@@ -1,1 +1,13 @@
 
+[submodule "extern/zlib"]
+	path = extern/zlib
+	url = https://github.com/madler/zlib.git
+[submodule "extern/eigen"]
+	path = extern/eigen
+	url = https://gitlab.com/libeigen/eigen.git
+[submodule "extern/highway"]
+	path = extern/highway
+	url = https://github.com/google/highway.git
+[submodule "extern/vectorclass/vectorclass"]
+	path = extern/vectorclass/vectorclass
+	url = https://github.com/vectorclass/version1.git

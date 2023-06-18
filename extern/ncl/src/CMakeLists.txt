@@ -1,0 +1,21 @@
+add_library(ncl
+        nxsassumptionsblock.cpp
+        nxsblock.cpp
+        nxscharactersblock.cpp
+        nxsdatablock.cpp
+        nxsdiscretedatum.cpp
+        nxsdiscretematrix.cpp
+        nxsdistancedatum.cpp
+        nxsdistancesblock.cpp
+        nxsemptyblock.cpp
+        nxsexception.cpp
+        nxsreader.cpp
+        nxssetreader.cpp
+        nxsstring.cpp
+        nxstaxablock.cpp
+        nxstoken.cpp
+        nxstreesblock.cpp
+        )
+
+target_include_directories(ncl PRIVATE ${PROJECT_SOURCE_DIR}/include/ncl)
+target_include_directories(ncl INTERFACE ${PROJECT_SOURCE_DIR}/include)
