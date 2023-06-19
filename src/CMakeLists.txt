@@ -123,7 +123,7 @@ set_target_properties(mpboot PROPERTIES OUTPUT_NAME "mpboot${EXE_SUFFIX}")
 target_include_directories(mpboot PRIVATE "${PROJECT_SOURCE_DIR}/extern/eigen")
 
 ## zlib 1.2.13
-add_subdirectory("${PROJECT_SOURCE_DIR}/extern/zlib" "${PROJECT_BINARY_DIR}/extern/zlib")
+target_include_directories(mpboot PRIVATE ${zlib_SOURCE_DIR} ${zlib_BINARY_DIR})
 target_link_libraries(mpboot PRIVATE zlib)
 
 ## vectorclass version 1

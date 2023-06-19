@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.14)
 
 ## =================================================================================================
 ## Setup project
@@ -25,6 +25,7 @@ set(iqtree_VERSION_PATCH 1)
 ## Configuration
 ## =================================================================================================
 include(config/options)
+include(config/dependencies)
 
 ## =================================================================================================
 ## Main executable
