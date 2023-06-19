@@ -48,7 +48,7 @@
 #define USHORT_PER_VECTOR 32
 #define INTS_PER_VECTOR 16
 #define LONG_INTS_PER_VECTOR 8
-//#define LONG_INTS_PER_VECTOR (64/sizeof(long))
+// #define LONG_INTS_PER_VECTOR (64/sizeof(long))
 #define INT_TYPE __m512i
 #define CAST double *
 #define SET_ALL_BITS_ONE _mm512_set1_epi32(0xFFFFFFFF)
@@ -71,7 +71,7 @@
 #define USHORT_PER_VECTOR 16
 #define INTS_PER_VECTOR 8
 #define LONG_INTS_PER_VECTOR 4
-//#define LONG_INTS_PER_VECTOR (32/sizeof(long))
+// #define LONG_INTS_PER_VECTOR (32/sizeof(long))
 #define INT_TYPE __m256d
 #define CAST double *
 #define SET_ALL_BITS_ONE                                                       \
@@ -98,11 +98,11 @@
 #ifdef __i386__
 #define ULINT_SIZE 32
 #define LONG_INTS_PER_VECTOR 4
-//#define LONG_INTS_PER_VECTOR (16/sizeof(long))
+// #define LONG_INTS_PER_VECTOR (16/sizeof(long))
 #else
 #define ULINT_SIZE 64
 #define LONG_INTS_PER_VECTOR 2
-//#define LONG_INTS_PER_VECTOR (16/sizeof(long))
+// #define LONG_INTS_PER_VECTOR (16/sizeof(long))
 #endif
 #define INT_TYPE __m128i
 #define CAST __m128i *
@@ -1239,10 +1239,10 @@ static int pllTestTBRMove(pllInstance *tr, partitionList *pr, nodeptr branch1,
     }
     unsigned int mp = INT_MAX;
     // if (dupTreeEval->keepOptimizeTree(tr->nodep[1]->back)) {
-        mp = evaluateParsimonyTBR(tr, pr, branch1, branch2, TBR_removeBranch,
-                                  perSiteScores);
-        tr->curRoot = TBR_removeBranch;
-        tr->curRootBack = TBR_removeBranch->back;
+    mp = evaluateParsimonyTBR(tr, pr, branch1, branch2, TBR_removeBranch,
+                              perSiteScores);
+    tr->curRoot = TBR_removeBranch;
+    tr->curRootBack = TBR_removeBranch->back;
     // }
 
     if (perSiteScores) {
@@ -1960,9 +1960,10 @@ int pllOptimizeTbrParsimony(pllInstance *tr, partitionList *pr, int mintrav,
         _updateInternalPllOnRatchet(tr, pr);
         _allocateParsimonyDataStructuresTBR(
             tr, pr, perSiteScores); // called once if not running ratchet
-    } else if (first_call || (iqtree && iqtree->on_opt_btree))
+    } else if (first_call || iqtree) {
         _allocateParsimonyDataStructuresTBR(
             tr, pr, perSiteScores); // called once if not running ratchet
+    }
 
     if (first_call) {
         first_call = false;

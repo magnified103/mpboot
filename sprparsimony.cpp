@@ -3143,7 +3143,7 @@ int pllOptimizeSprParsimony(pllInstance *tr, partitionList *pr, int mintrav,
         _updateInternalPllOnRatchet(tr, pr);
         _allocateParsimonyDataStructures(
             tr, pr, perSiteScores); // called once if not running ratchet
-    } else if (first_call || (iqtree && iqtree->on_opt_btree))
+    } else if (first_call || iqtree)
         _allocateParsimonyDataStructures(
             tr, pr, perSiteScores); // called once if not running ratchet
 

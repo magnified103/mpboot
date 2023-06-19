@@ -1971,7 +1971,7 @@ double IQTree::doTreeSearch() {
         }
         int nni_count = 0;
         int nni_steps = 0;
-        if (params->do_ant_colony == true) {
+        if (params->aco == true) {
             imd_tree = doAntColonySearch(nni_count, nni_steps);
         } else {
             imd_tree = doNNISearch(nni_count, nni_steps);
@@ -2010,7 +2010,7 @@ double IQTree::doTreeSearch() {
             int nni_count = 0;
             int nni_steps = 0;
             on_ratchet_hclimb2 = true;
-            if (params->do_ant_colony == true) {
+            if (params->aco == true) {
                 imd_tree = doAntColonySearch(nni_count, nni_steps);
             } else {
                 imd_tree = doNNISearch(nni_count, nni_steps);
@@ -2234,7 +2234,7 @@ double IQTree::doTreeSearch() {
 
     readTreeString(bestTreeString);
 
-    if (params->do_ant_colony) {
+    if (params->aco) {
         antColonyAlgo->printNumTypes();
     } else if (testNNI)
         outNNI.close();

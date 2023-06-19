@@ -592,7 +592,7 @@ void get2RandNumb(const int size, int &first, int &second) {
 void parseArg(int argc, char *argv[], Params &params) {
     int cnt;
     verbose_mode = VB_MIN;
-    params.do_ant_colony = false;
+    params.aco = false;
     params.dna5 = false;
     params.spr_test = false;
     params.spr_tbr = false;
@@ -899,8 +899,8 @@ void parseArg(int argc, char *argv[], Params &params) {
 
     for (cnt = 1; cnt < argc; cnt++) {
         try {
-            if (strcmp(argv[cnt], "-do_ant_colony") == 0) {
-                params.do_ant_colony = true;
+            if (strcmp(argv[cnt], "-aco") == 0) {
+                params.aco = true;
                 continue;
             }
             if (strcmp(argv[cnt], "-spr_tbr") == 0) {

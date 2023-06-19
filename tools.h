@@ -423,7 +423,7 @@ struct Params {
     /**
      * Use Ant Colony Optimization Algorithm or not?
      */
-    bool do_ant_colony;
+    bool aco;
 
     /**
      *  Whether to consider '-' in DNA data as the 5-th distinct character
