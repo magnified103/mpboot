@@ -109,6 +109,9 @@ endif()
 ## Static build
 #target_link_options(mpboot PRIVATE -static)
 
+## Undef NDEBUG, which enables assertions
+target_compile_options(mpboot PRIVATE -UNDEBUG)
+
 ## Configure executable suffix
 set_target_properties(mpboot PROPERTIES OUTPUT_NAME "mpboot${EXE_SUFFIX}")
 
