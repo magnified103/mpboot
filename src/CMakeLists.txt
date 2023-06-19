@@ -163,3 +163,4 @@ configure_file(
 		"${PROJECT_BINARY_DIR}/src/iqtree_config.h"
 )
 target_include_directories(mpboot PRIVATE "${PROJECT_BINARY_DIR}/src")
+target_compile_definitions(mpboot PRIVATE IQ_TREE)
