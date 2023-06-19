@@ -2200,7 +2200,8 @@ linkTaxa (pllInstance * pInst, pllNewickTree * nTree, int taxaExist)
       {
         if (taxaExist)
          {
-           assert (pllHashSearch (pInst->nameHash, nodeInfo->name, (void **) &child));
+           int ret = pllHashSearch (pInst->nameHash, nodeInfo->name, (void **) &child);
+           assert(ret);
          }
         else
          {
