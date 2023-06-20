@@ -131,8 +131,8 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/extern/vectorclass" "${PROJECT_BINARY_DI
 target_link_libraries(mpboot PRIVATE vectorclass)
 
 ## Highway 1.0.4
-#add_subdirectory("${PROJECT_SOURCE_DIR}/extern/highway" "${PROJECT_BINARY_DIR}/extern/highway")
-#target_link_libraries(mpboot PRIVATE hwy)
+add_subdirectory("${PROJECT_SOURCE_DIR}/extern/highway" "${PROJECT_BINARY_DIR}/extern/highway")
+target_link_libraries(mpboot PRIVATE hwy)
 
 ## pllrepo
 add_subdirectory(pllrepo/src)

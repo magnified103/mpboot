@@ -40,6 +40,11 @@
  * @file fastDNAparsimony.c
  */
 
+#include <hwy/highway.h>
+#include <hwy/aligned_allocator.h>
+
+namespace hn = hwy::HWY_NAMESPACE;
+
 #if defined(__MIC_NATIVE)
 
 #include <immintrin.h>
@@ -230,54 +235,48 @@ void initializeCostMatrix() {
 
 /* bit count for 128 bit SSE3 and 256 bit AVX registers */
 
-#if (defined(__SSE3) || defined(__AVX))
-static inline unsigned int vectorPopcount(INT_TYPE v) {
-    unsigned long counts[LONG_INTS_PER_VECTOR]
-        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+template <typename T = std::uint64_t>
+static inline unsigned int vectorPopcount(hn::Vec<hn::ScalableTag<std::uint32_t>> v) {
+    const hn::ScalableTag<T> d;
 
-    int i, sum = 0;
+    HWY_ALIGN T counts[hn::Lanes(d)];
+    hn::Store(hn::BitCast(d, v), d, counts);
 
-    VECTOR_STORE((CAST)counts, v);
-
-    for (i = 0; i < LONG_INTS_PER_VECTOR; ++i)
-        sum += __builtin_popcountl(counts[i]);
-
-    return ((unsigned int)sum);
+    unsigned int sum = 0;
+    for (std::size_t i = 0; i < hn::Lanes(d); i++) {
+        sum += __builtin_popcountll(counts[i]);
+    }
+    return sum;
 }
-#endif
 
 /********************************DNA FUNCTIONS
  * *****************************************************************/
 
 // Diep:
 // store per site score to nodeNumber
-#if (defined(__SSE3) || defined(__AVX))
+template <typename T = std::uint64_t>
 static inline void storePerSiteNodeScores(partitionList *pr, int model,
-                                          INT_TYPE v, unsigned int offset,
-                                          int nodeNumber) {
+                                          hn::Vec<hn::ScalableTag<std::uint32_t>> v,
+                                          unsigned int offset, int nodeNumber) {
+    const hn::ScalableTag<T> d;
 
-    unsigned long counts[LONG_INTS_PER_VECTOR]
-        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-    parsimonyNumber *buf;
-
-    int i, j;
-
-    VECTOR_STORE((CAST)counts, v);
+    HWY_ALIGN T counts[hn::Lanes(d)];
+    hn::Store(hn::BitCast(d, v), d, counts);
 
     int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
     int nodeStart = partialParsLength * nodeNumber;
     int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
-    for (i = 0; i < LONG_INTS_PER_VECTOR; ++i) {
-        buf = &(
-            pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
-        nodeStartPlusOffset += ULINT_SIZE;
+    for (std::size_t i = 0; i < hn::Lanes(d); ++i) {
+        parsimonyNumber *buf = &(pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
+        nodeStartPlusOffset += sizeof(T) * 8;
         //		buf =
         //&(pr->partitionData[model]->perSitePartialPars[nodeStart +
         // offset * PLL_PCF + i * ULINT_SIZE]); // Diep's 		buf =
         //&(pr->partitionData[model]->perSitePartialPars[nodeStart + offset *
         // PLL_PCF + i]); // Tomas's code
-        for (j = 0; j < ULINT_SIZE; ++j)
+        for (std::size_t j = 0; j < sizeof(T) * 8; ++j) {
             buf[j] += ((counts[i] >> j) & 1);
+        }
     }
 }
 
@@ -342,7 +341,6 @@ void resetPerSiteNodeScores(partitionList *pr, int pNumber) {
         memset(pBuf, 0, partialParsLength * sizeof(parsimonyNumber));
     }
 }
-#endif
 
 static int checkerPars(pllInstance *tr, nodeptr p) {
     int group = tr->constraintVector[p->number];
@@ -603,9 +601,7 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 #endif
         return;
     }
-
-    INT_TYPE
-    allOne = SET_ALL_BITS_ONE;
+    const hn::ScalableTag<parsimonyNumber> d;
 
     int model, *ti = tr->ti, count = ti[0], index;
 
@@ -626,8 +622,6 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
             size_t k, states = pr->partitionData[model]->states,
                       width = pr->partitionData[model]->parsimonyLength;
 
-            unsigned int i;
-
             switch (states) {
             case 2: {
                 parsimonyNumber *left[2], *right[2], *cur[2];
@@ -644,28 +638,25 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                               ->parsVect[(width * 2 * pNumber) + width * k]);
                 }
 
-                for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                    INT_TYPE
-                    s_r, s_l, v_N, l_A, l_C, v_A, v_C;
+                for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
+                    hn::Vec<decltype(d)> s_r, s_l, v_N, l_A, l_C, v_A, v_C;
 
-                    s_l = VECTOR_LOAD((CAST)(&left[0][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[0][i]));
-                    l_A = VECTOR_BIT_AND(s_l, s_r);
-                    v_A = VECTOR_BIT_OR(s_l, s_r);
+                    s_l = hn::Load(d, &left[0][i]);
+                    s_r = hn::Load(d, &right[0][i]);
+                    l_A = s_l & s_r;
+                    v_A = s_l | s_r;
 
-                    s_l = VECTOR_LOAD((CAST)(&left[1][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[1][i]));
-                    l_C = VECTOR_BIT_AND(s_l, s_r);
-                    v_C = VECTOR_BIT_OR(s_l, s_r);
+                    s_l = hn::Load(d, &left[1][i]);
+                    s_r = hn::Load(d, &right[1][i]);
+                    l_C = s_l & s_r;
+                    v_C = s_l | s_r;
 
-                    v_N = VECTOR_BIT_OR(l_A, l_C);
+                    v_N = l_A | l_C;
 
-                    VECTOR_STORE((CAST)(&cur[0][i]),
-                                 VECTOR_BIT_OR(l_A, VECTOR_AND_NOT(v_N, v_A)));
-                    VECTOR_STORE((CAST)(&cur[1][i]),
-                                 VECTOR_BIT_OR(l_C, VECTOR_AND_NOT(v_N, v_C)));
+                    hn::Store(l_A | hn::AndNot(v_N, v_A), d, &cur[0][i]);
+                    hn::Store(l_C | hn::AndNot(v_N, v_C), d, &cur[1][i]);
 
-                    v_N = VECTOR_AND_NOT(v_N, allOne);
+                    v_N = hn::Not(v_N);
 
                     totalScore += vectorPopcount(v_N);
                     if (perSiteScores)
@@ -687,43 +678,37 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                               ->parsVect[(width * 4 * pNumber) + width * k]);
                 }
 
-                for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                    INT_TYPE
-                    s_r, s_l, v_N, l_A, l_C, l_G, l_T, v_A, v_C, v_G, v_T;
+                for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
+                    hn::Vec<decltype(d)> s_r, s_l, v_N, l_A, l_C, l_G, l_T, v_A, v_C, v_G, v_T;
 
-                    s_l = VECTOR_LOAD((CAST)(&left[0][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[0][i]));
-                    l_A = VECTOR_BIT_AND(s_l, s_r);
-                    v_A = VECTOR_BIT_OR(s_l, s_r);
+                    s_l = hn::Load(d, &left[0][i]);
+                    s_r = hn::Load(d, &right[0][i]);
+                    l_A = s_l & s_r;
+                    v_A = s_l | s_r;
 
-                    s_l = VECTOR_LOAD((CAST)(&left[1][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[1][i]));
-                    l_C = VECTOR_BIT_AND(s_l, s_r);
-                    v_C = VECTOR_BIT_OR(s_l, s_r);
+                    s_l = hn::Load(d, &left[1][i]);
+                    s_r = hn::Load(d, &right[1][i]);
+                    l_C = s_l & s_r;
+                    v_C = s_l | s_r;
 
-                    s_l = VECTOR_LOAD((CAST)(&left[2][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[2][i]));
-                    l_G = VECTOR_BIT_AND(s_l, s_r);
-                    v_G = VECTOR_BIT_OR(s_l, s_r);
+                    s_l = hn::Load(d, &left[2][i]);
+                    s_r = hn::Load(d, &right[2][i]);
+                    l_G = s_l & s_r;
+                    v_G = s_l | s_r;
 
-                    s_l = VECTOR_LOAD((CAST)(&left[3][i]));
-                    s_r = VECTOR_LOAD((CAST)(&right[3][i]));
-                    l_T = VECTOR_BIT_AND(s_l, s_r);
-                    v_T = VECTOR_BIT_OR(s_l, s_r);
+                    s_l = hn::Load(d, &left[3][i]);
+                    s_r = hn::Load(d, &right[3][i]);
+                    l_T = s_l & s_r;
+                    v_T = s_l | s_r;
 
-                    v_N = VECTOR_BIT_OR(VECTOR_BIT_OR(l_A, l_C),
-                                        VECTOR_BIT_OR(l_G, l_T));
+                    v_N = (l_A | l_C) | (l_G | l_T);
 
-                    VECTOR_STORE((CAST)(&cur[0][i]),
-                                 VECTOR_BIT_OR(l_A, VECTOR_AND_NOT(v_N, v_A)));
-                    VECTOR_STORE((CAST)(&cur[1][i]),
-                                 VECTOR_BIT_OR(l_C, VECTOR_AND_NOT(v_N, v_C)));
-                    VECTOR_STORE((CAST)(&cur[2][i]),
-                                 VECTOR_BIT_OR(l_G, VECTOR_AND_NOT(v_N, v_G)));
-                    VECTOR_STORE((CAST)(&cur[3][i]),
-                                 VECTOR_BIT_OR(l_T, VECTOR_AND_NOT(v_N, v_T)));
+                    hn::Store(l_A | hn::AndNot(v_N, v_A), d, &cur[0][i]);
+                    hn::Store(l_C | hn::AndNot(v_N, v_C), d, &cur[1][i]);
+                    hn::Store(l_G | hn::AndNot(v_N, v_G), d, &cur[2][i]);
+                    hn::Store(l_T | hn::AndNot(v_N, v_T), d, &cur[3][i]);
 
-                    v_N = VECTOR_AND_NOT(v_N, allOne);
+                    v_N = hn::Not(v_N);
 
                     totalScore += vectorPopcount(v_N);
                     if (perSiteScores)
@@ -745,27 +730,22 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                               ->parsVect[(width * 20 * pNumber) + width * k]);
                 }
 
-                for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                    size_t j;
+                for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
+                    hn::Vec<decltype(d)> s_r, s_l, v_N = hn::Zero(d), l_A[20], v_A[20];
 
-                    INT_TYPE
-                    s_r, s_l, v_N = SET_ALL_BITS_ZERO, l_A[20], v_A[20];
+                    for (std::size_t j = 0; j < 20; j++) {
+                        s_l = hn::Load(d, &left[j][i]);
+                        s_r = hn::Load(d, &right[j][i]);
+                        l_A[j] = s_l & s_r;
+                        v_A[j] = s_l | s_r;
 
-                    for (j = 0; j < 20; j++) {
-                        s_l = VECTOR_LOAD((CAST)(&left[j][i]));
-                        s_r = VECTOR_LOAD((CAST)(&right[j][i]));
-                        l_A[j] = VECTOR_BIT_AND(s_l, s_r);
-                        v_A[j] = VECTOR_BIT_OR(s_l, s_r);
-
-                        v_N = VECTOR_BIT_OR(v_N, l_A[j]);
+                        v_N = v_N | l_A[j];
                     }
 
-                    for (j = 0; j < 20; j++)
-                        VECTOR_STORE(
-                            (CAST)(&cur[j][i]),
-                            VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
+                    for (std::size_t j = 0; j < 20; j++)
+                        hn::Store(l_A[j] | hn::AndNot(v_N, v_A[j]), d, &cur[j][i]);
 
-                    v_N = VECTOR_AND_NOT(v_N, allOne);
+                    v_N = hn::Not(v_N);
 
                     totalScore += vectorPopcount(v_N);
                     if (perSiteScores)
@@ -791,27 +771,22 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                             ->parsVect[(width * states * pNumber) + width * k]);
                 }
 
-                for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                    size_t j;
+                for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
+                    hn::Vec<decltype(d)> s_r, s_l, v_N = hn::Zero(d), l_A[32], v_A[32];
 
-                    INT_TYPE
-                    s_r, s_l, v_N = SET_ALL_BITS_ZERO, l_A[32], v_A[32];
+                    for (std::size_t j = 0; j < states; j++) {
+                        s_l = hn::Load(d, &left[j][i]);
+                        s_r = hn::Load(d, &right[j][i]);
+                        l_A[j] = s_l & s_r;
+                        v_A[j] = s_l | s_r;
 
-                    for (j = 0; j < states; j++) {
-                        s_l = VECTOR_LOAD((CAST)(&left[j][i]));
-                        s_r = VECTOR_LOAD((CAST)(&right[j][i]));
-                        l_A[j] = VECTOR_BIT_AND(s_l, s_r);
-                        v_A[j] = VECTOR_BIT_OR(s_l, s_r);
-
-                        v_N = VECTOR_BIT_OR(v_N, l_A[j]);
+                        v_N = v_N | l_A[j];
                     }
 
-                    for (j = 0; j < states; j++)
-                        VECTOR_STORE(
-                            (CAST)(&cur[j][i]),
-                            VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
+                    for (std::size_t j = 0; j < states; j++)
+                        hn::Store(l_A[j] | hn::AndNot(v_N, v_A[j]), d, &cur[j][i]);
 
-                    v_N = VECTOR_AND_NOT(v_N, allOne);
+                    v_N = hn::Not(v_N);
 
                     totalScore += vectorPopcount(v_N);
                     if (perSiteScores)
@@ -995,8 +970,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 #endif
     }
 
-    INT_TYPE
-    allOne = SET_ALL_BITS_ONE;
+    const hn::ScalableTag<parsimonyNumber> d;
 
     size_t pNumber = (size_t)tr->ti[1], qNumber = (size_t)tr->ti[2];
 
@@ -1015,29 +989,27 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
     }
 
     for (model = 0; model < pr->numberOfPartitions; ++model) {
-        size_t k, states = pr->partitionData[model]->states,
-                  width = pr->partitionData[model]->parsimonyLength, i;
+        size_t states = pr->partitionData[model]->states,
+                width = pr->partitionData[model]->parsimonyLength;
         // cout << "Num states = " << states << '\n';
         switch (states) {
         case 2: {
             parsimonyNumber *left[2], *right[2];
 
-            for (k = 0; k < 2; ++k) {
+            for (std::size_t k = 0; k < 2; ++k) {
                 left[k] = &(pr->partitionData[model]
                                 ->parsVect[(width * 2 * qNumber) + width * k]);
                 right[k] = &(pr->partitionData[model]
                                  ->parsVect[(width * 2 * pNumber) + width * k]);
             }
 
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                INT_TYPE
-                l_A = VECTOR_BIT_AND(VECTOR_LOAD((CAST)(&left[0][i])),
-                                     VECTOR_LOAD((CAST)(&right[0][i]))),
-                l_C = VECTOR_BIT_AND(VECTOR_LOAD((CAST)(&left[1][i])),
-                                     VECTOR_LOAD((CAST)(&right[1][i]))),
-                v_N = VECTOR_BIT_OR(l_A, l_C);
+            for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
+                hn::Vec<decltype(d)>
+                l_A = hn::Load(d, &left[0][i]) & hn::Load(d, &right[0][i]),
+                l_C = hn::Load(d, &left[1][i]) & hn::Load(d, &right[1][i]),
+                v_N = l_A | l_C;
 
-                v_N = VECTOR_AND_NOT(v_N, allOne);
+                v_N = hn::Not(v_N);
 
                 sum += vectorPopcount(v_N);
                 if (perSiteScores)
@@ -1051,27 +1023,22 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
         case 4: {
             parsimonyNumber *left[4], *right[4];
 
-            for (k = 0; k < 4; ++k) {
+            for (std::size_t k = 0; k < 4; ++k) {
                 left[k] = &(pr->partitionData[model]
                                 ->parsVect[(width * 4 * qNumber) + width * k]);
                 right[k] = &(pr->partitionData[model]
                                  ->parsVect[(width * 4 * pNumber) + width * k]);
             }
 
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                INT_TYPE
-                l_A = VECTOR_BIT_AND(VECTOR_LOAD((CAST)(&left[0][i])),
-                                     VECTOR_LOAD((CAST)(&right[0][i]))),
-                l_C = VECTOR_BIT_AND(VECTOR_LOAD((CAST)(&left[1][i])),
-                                     VECTOR_LOAD((CAST)(&right[1][i]))),
-                l_G = VECTOR_BIT_AND(VECTOR_LOAD((CAST)(&left[2][i])),
-                                     VECTOR_LOAD((CAST)(&right[2][i]))),
-                l_T = VECTOR_BIT_AND(VECTOR_LOAD((CAST)(&left[3][i])),
-                                     VECTOR_LOAD((CAST)(&right[3][i]))),
-                v_N = VECTOR_BIT_OR(VECTOR_BIT_OR(l_A, l_C),
-                                    VECTOR_BIT_OR(l_G, l_T));
+            for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
+                hn::Vec<decltype(d)>
+                l_A = hn::Load(d, &left[0][i]) & hn::Load(d, &right[0][i]),
+                l_C = hn::Load(d, &left[1][i]) & hn::Load(d, &right[1][i]),
+                l_G = hn::Load(d, &left[2][i]) & hn::Load(d, &right[2][i]),
+                l_T = hn::Load(d, &left[3][i]) & hn::Load(d, &right[3][i]),
+                v_N = (l_A | l_C) | (l_G | l_T);
 
-                v_N = VECTOR_AND_NOT(v_N, allOne);
+                v_N = hn::Not(v_N);
 
                 sum += vectorPopcount(v_N);
                 if (perSiteScores)
@@ -1084,7 +1051,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
         case 20: {
             parsimonyNumber *left[20], *right[20];
 
-            for (k = 0; k < 20; ++k) {
+            for (std::size_t k = 0; k < 20; ++k) {
                 left[k] = &(pr->partitionData[model]
                                 ->parsVect[(width * 20 * qNumber) + width * k]);
                 right[k] =
@@ -1092,19 +1059,15 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                           ->parsVect[(width * 20 * pNumber) + width * k]);
             }
 
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                int j;
+            for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
+                hn::Vec<decltype(d)> l_A, v_N = hn::Zero(d);
 
-                INT_TYPE
-                l_A, v_N = SET_ALL_BITS_ZERO;
-
-                for (j = 0; j < 20; j++) {
-                    l_A = VECTOR_BIT_AND(VECTOR_LOAD((CAST)(&left[j][i])),
-                                         VECTOR_LOAD((CAST)(&right[j][i])));
-                    v_N = VECTOR_BIT_OR(l_A, v_N);
+                for (std::size_t j = 0; j < 20; j++) {
+                    l_A = (hn::Load(d, &left[j][i]) & hn::Load(d, &right[j][i]));
+                    v_N = l_A | v_N;
                 }
 
-                v_N = VECTOR_AND_NOT(v_N, allOne);
+                v_N = hn::Not(v_N);
 
                 sum += vectorPopcount(v_N);
                 if (perSiteScores)
@@ -1119,7 +1082,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 
             assert(states <= 32);
 
-            for (k = 0; k < states; ++k) {
+            for (std::size_t k = 0; k < states; ++k) {
                 left[k] =
                     &(pr->partitionData[model]
                           ->parsVect[(width * states * qNumber) + width * k]);
@@ -1128,19 +1091,15 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                           ->parsVect[(width * states * pNumber) + width * k]);
             }
 
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                size_t j;
+            for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
+                hn::Vec<decltype(d)> l_A, v_N = hn::Zero(d);
 
-                INT_TYPE
-                l_A, v_N = SET_ALL_BITS_ZERO;
-
-                for (j = 0; j < states; j++) {
-                    l_A = VECTOR_BIT_AND(VECTOR_LOAD((CAST)(&left[j][i])),
-                                         VECTOR_LOAD((CAST)(&right[j][i])));
-                    v_N = VECTOR_BIT_OR(l_A, v_N);
+                for (std::size_t j = 0; j < states; j++) {
+                    l_A = hn::Load(d, &left[j][i]) & hn::Load(d, &right[j][i]);
+                    v_N = l_A | v_N;
                 }
 
-                v_N = VECTOR_AND_NOT(v_N, allOne);
+                v_N = hn::Not(v_N);
 
                 sum += vectorPopcount(v_N);
                 if (perSiteScores)
