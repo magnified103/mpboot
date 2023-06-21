@@ -18,7 +18,7 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 #include "iqtree.h"
-#include "helper.h"
+#include "aco.h"
 #include "mexttree.h"
 #include "model/modelgtr.h"
 #include "model/rategamma.h"
@@ -43,7 +43,7 @@ int pllCostNstates;                       // Diep: For weighted version
 parsimonyNumber *vectorCostMatrix = NULL; // BQM: vectorized cost matrix
 int pllRepsSegments;
 int *pllSegmentUpper;
-AntColonyAlgo *antColonyAlgo;
+ACOAlgo *aco;
 
 IQTree::IQTree() : PhyloTree() { init(); }
 
@@ -84,7 +84,7 @@ void IQTree::init() {
     segment_upper = NULL;
     original_sample = NULL;
 
-    antColonyAlgo = new AntColonyAlgo();
+    aco = new ACOAlgo();
 }
 
 IQTree::IQTree(Alignment *aln) : PhyloTree(aln) { init(); }
@@ -480,7 +480,7 @@ IQTree::~IQTree() {
 
     for (vector<double *>::reverse_iterator it = treels_ptnlh.rbegin();
          it != treels_ptnlh.rend(); it++)
-        delete[](*it);
+        delete[] (*it);
     treels_ptnlh.clear();
     for (vector<SplitGraph *>::reverse_iterator it2 = boot_splits.rbegin();
          it2 != boot_splits.rend(); it2++)
@@ -1819,6 +1819,9 @@ double IQTree::doTreeSearch() {
         }
 
         Alignment *saved_aln = aln;
+        aco->curNode = ACOAlgo::ROOT;
+        aco->registerTime();
+        int algoType = aco->moveNextNode();
 
         /*--------------------------------------------------------------------------
          * PARSIMONY RATCHET-LIKE IDEA
@@ -1826,7 +1829,8 @@ double IQTree::doTreeSearch() {
         //		long tmp_num_ratchet_trees = treels_logl.size();
         //		long tmp_num_ratchet_bootcands = treels.size();
         if (params->ratchet_iter >= 0) {
-            if (params->ratchet_iter == ratchet_iter_count) {
+            if ((params->aco && algoType == ACOAlgo::RATCHET) ||
+                (!params->aco && params->ratchet_iter == ratchet_iter_count)) {
                 //				string candidateTree =
                 // candidateTrees.getRandCandVecTree(); // Diep: to pick from
                 // vector-stored candidates
@@ -1883,11 +1887,23 @@ double IQTree::doTreeSearch() {
                     // from vector-stored candidates
                     string candidateTree = candidateTrees.getRandCandTree();
                     readTreeString(candidateTree);
-                    if (params->iqp) {
-                        doIQP();
+                    if (params->aco == true) {
+                        if (algoType == ACOAlgo::IQP) {
+                            doIQP();
+                        } else {
+                            assert(algoType == ACOAlgo::RANDOM_NNI);
+                            doRandomNNIs(
+                                numNNI); // Diep: This doesn't work well
+                                         // with sorted parsimony. Why?
+                        }
                     } else {
-                        doRandomNNIs(numNNI); // Diep: This doesn't work well
-                                              // with sorted parsimony. Why?
+                        if (params->iqp) {
+                            doIQP();
+                        } else {
+                            doRandomNNIs(
+                                numNNI); // Diep: This doesn't work well
+                                         // with sorted parsimony. Why?
+                        }
                     }
                 } else {
                     doIQP();
@@ -1906,7 +1922,6 @@ double IQTree::doTreeSearch() {
                         pllTreeCounter[perturb_tree_topo]++;
                     }
                 }
-
                 if (params->maximum_parsimony && params->spr_parsimony &&
                     (params->snni ||
                      params->pll)) { // SPR for mpars
@@ -2010,11 +2025,7 @@ double IQTree::doTreeSearch() {
             int nni_count = 0;
             int nni_steps = 0;
             on_ratchet_hclimb2 = true;
-            if (params->aco == true) {
-                imd_tree = doAntColonySearch(nni_count, nni_steps);
-            } else {
-                imd_tree = doNNISearch(nni_count, nni_steps);
-            }
+            imd_tree = doNNISearch(nni_count, nni_steps);
             // update current score
             initializeAllPartialLh();
             clearAllPartialLH();
@@ -2234,9 +2245,7 @@ double IQTree::doTreeSearch() {
 
     readTreeString(bestTreeString);
 
-    if (params->aco) {
-        antColonyAlgo->printNumTypes();
-    } else if (testNNI)
+    if (testNNI)
         outNNI.close();
     if (params->write_intermediate_trees)
         out_treels.close();
@@ -2320,77 +2329,70 @@ string IQTree::doAntColonySearch(int &nniCount, int &nniSteps) {
             treeString = getTreeString();
         } else {
 
-            int moveType = antColonyAlgo->getMoveType();
+            int treeOper = aco->moveNextNode();
             int newScore = 0;
-            if (0 && on_ratchet_hclimb1 && moveType == 0) {
-                cout << "NNI\n";
-                newScore = optimizeNNI(nniCount, nniSteps);
-                treeString = getTreeString();
+            string treeString1 = getTreeString();
+            size_t index = 0;
+            while (true) {
+                /* Locate the substring to replace. */
+                index = treeString1.find(":nan", index);
+                if (index == std::string::npos)
+                    break;
+
+                /* Make the replacement. */
+                treeString1.replace(index, 4, ":0");
+
+                /* Advance index forward so the next iteration doesn't pick
+                 * it up as well. */
+                index += 4;
+            }
+
+            int max_spr_rad = params->spr_maxtrav;
+            if (on_opt_btree && params->opt_btree_nni)
+                params->spr_maxtrav = 1;
+
+            pllNewickTree *startTree =
+                pllNewickParseString(treeString1.c_str());
+            assert(startTree != NULL);
+            pllTreeInitTopologyNewick(pllInst, startTree, PLL_FALSE);
+
+            if (treeOper == ACOAlgo::NNI) {
+                pllOptimizeSprParsimony(pllInst, pllPartitions, 1, 1, this);
+            } else if (treeOper == ACOAlgo::SPR) {
+                pllOptimizeSprParsimony(pllInst, pllPartitions,
+                                        params->spr_mintrav, max_spr_rad, this);
             } else {
-                string treeString1 = getTreeString();
-                size_t index = 0;
-                while (true) {
-                    /* Locate the substring to replace. */
-                    index = treeString1.find(":nan", index);
-                    if (index == std::string::npos)
-                        break;
+                pllOptimizeTbrParsimony(pllInst, pllPartitions,
+                                        params->tbr_mintrav,
+                                        params->tbr_maxtrav, this);
+            }
 
-                    /* Make the replacement. */
-                    treeString1.replace(index, 4, ":0");
+            pllNewickParseDestroy(&startTree);
 
-                    /* Advance index forward so the next iteration doesn't pick
-                     * it up as well. */
-                    index += 4;
-                }
+            pllTreeToNewick(pllInst->tree_string, pllInst, pllPartitions,
+                            pllInst->start->back, PLL_TRUE, PLL_TRUE, 0, 0, 0,
+                            PLL_SUMMARIZE_LH, 0, 0);
+            treeString = string(pllInst->tree_string);
+            if (treeString == treeString1)
+                outError("Tree string stays the same after SPR.");
+            readTreeString(treeString);
+            initializeAllPartialPars();
+            clearAllPartialLH();
+            newScore = -computeParsimony();
 
-                int max_spr_rad = params->spr_maxtrav;
-                if (on_opt_btree && params->opt_btree_nni)
-                    params->spr_maxtrav = 1;
-
-                pllNewickTree *startTree =
-                    pllNewickParseString(treeString1.c_str());
-                assert(startTree != NULL);
-                pllTreeInitTopologyNewick(pllInst, startTree, PLL_FALSE);
-
-                if (moveType == 0) {
-                    pllOptimizeSprParsimony(pllInst, pllPartitions, 1, 1, this);
-                } else if (moveType == 1) {
-                    pllOptimizeSprParsimony(pllInst, pllPartitions,
-                                            params->spr_mintrav, max_spr_rad,
-                                            this);
-                } else {
-                    pllOptimizeTbrParsimony(pllInst, pllPartitions,
-                                            params->tbr_mintrav,
-                                            params->tbr_maxtrav, this);
-                }
-
-                pllNewickParseDestroy(&startTree);
-
-                pllTreeToNewick(pllInst->tree_string, pllInst, pllPartitions,
-                                pllInst->start->back, PLL_TRUE, PLL_TRUE, 0, 0,
-                                0, PLL_SUMMARIZE_LH, 0, 0);
-                treeString = string(pllInst->tree_string);
-                if (treeString == treeString1)
-                    outError("Tree string stays the same after SPR.");
-                readTreeString(treeString);
-                initializeAllPartialPars();
-                clearAllPartialLH();
-                newScore = -computeParsimony();
-
-                // deallocation will occur once at the end of
-                // runTreeReconstruction() if not running ratchet oct 23: in
-                // non-ratchet iteration, free is not triggered
-                if ((((params->ratchet_iter >= 0 && (!on_ratchet_hclimb2)) ||
-                      on_opt_btree) &&
-                     (!params->hclimb1_nni))) {
-                    //			if(((params->ratchet_iter >= 0) &&
-                    // (!params->hclimb1_nni))) {
-                    _pllFreeParsimonyDataStructures(pllInst, pllPartitions);
-                }
+            // deallocation will occur once at the end of
+            // runTreeReconstruction() if not running ratchet oct 23: in
+            // non-ratchet iteration, free is not triggered
+            if ((((params->ratchet_iter >= 0 && (!on_ratchet_hclimb2)) ||
+                  on_opt_btree) &&
+                 (!params->hclimb1_nni))) {
+                //			if(((params->ratchet_iter >= 0) &&
+                // (!params->hclimb1_nni))) {
+                _pllFreeParsimonyDataStructures(pllInst, pllPartitions);
             }
             // cout << "Cur score: " << curScore << '\n';
+            aco->updatePheromoneDelta(newScore - curScore);
             // cout << "New score: " << newScore << '\n';
-            antColonyAlgo->update(moveType, (newScore - curScore));
             curScore = newScore;
         }
     } else if (params->pll) {
@@ -3294,7 +3296,7 @@ void IQTree::optimizeBootTrees() {
             clearAllPartialLH();
 
             //			// tmp, to-be-removed
-            //#############################################
+            // #############################################
             // stringstream ostr1; 			printTree(ostr1,
             // WT_SORT_TAXA);
             // tree = ostr1.str(); 			outb << tree << endl;
@@ -3309,7 +3311,7 @@ void IQTree::optimizeBootTrees() {
             //			out << curScore << endl;
 
             //			// tmp, to-be-removed
-            //#############################################
+            // #############################################
             // ostr1.str(""); 			printTree(ostr1, WT_SORT_TAXA);
             // tree = ostr1.str(); 			outa
             //<< tree << endl;
@@ -3976,9 +3978,9 @@ void IQTree::saveCurrentTree(double cur_logl) {
             } else {
                 // TODO: The following parallel is not very efficient, should
                 // wrap the above loop
-                //#ifdef _OPENMP
-                //#pragma omp parallel for reduction(+: rell)
-                //#endif
+                // #ifdef _OPENMP
+                // #pragma omp parallel for reduction(+: rell)
+                // #endif
                 //            if (sse == LK_NORMAL || sse == LK_EIGEN) {
                 //				if (true) {
                 //					BootValType *boot_sample

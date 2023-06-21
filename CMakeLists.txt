@@ -329,6 +329,7 @@ add_subdirectory(model)
 # the main executable
 ##################################################################
 add_executable(mpboot
+aco.cpp
 alignment.cpp
 alignmentpairwise.cpp
 circularnetwork.cpp

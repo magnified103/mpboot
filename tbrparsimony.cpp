@@ -7,7 +7,6 @@
 #include <sprparsimony.h>
 #include <tbrparsimony.h>
 
-#include "helper.h"
 #include "nnisearch.h"
 #include "parstree.h"
 #include <string>
