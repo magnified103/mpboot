@@ -239,7 +239,7 @@ void initializeCostMatrix() {
 /* bit count for 128 bit SSE3 and 256 bit AVX registers */
 
 template <typename T = std::uint64_t>
-static inline unsigned int vectorPopcount(hn::Vec<hn::ScalableTag<std::uint32_t>> v) {
+static inline unsigned int vectorPopcount(hn::Vec<hn::ScalableTag<parsimonyNumber>> v) {
     constexpr hn::ScalableTag<T> d;
 
     HWY_ALIGN T counts[hn::Lanes(d)];
@@ -260,9 +260,9 @@ static constexpr std::array<T, sizeof...(Ints)> maskShift(std::integer_sequence<
     return std::array<T, sizeof...(Ints)>{(1ULL << Ints)...};
 }
 
-template <class T, std::size_t N, typename IntSeq = std::make_integer_sequence<T, N>>
+template <class T, std::size_t N>
 static constexpr std::array<T, N> maskShiftIota() {
-    return maskShift<T>(IntSeq{});
+    return maskShift(std::make_integer_sequence<T, N>{});
 }
 
 // Diep:
@@ -311,10 +311,11 @@ static inline void storePerSiteNodeScores(partitionList *pr, int model,
 // Diep:
 // Add site scores in q and r to p
 // q and r are children of p
-template <class VectorClass>
-void addPerSiteSubtreeScoresSIMD(partitionList *pr, int pNumber, int qNumber,
+template <typename T = parsimonyNumber>
+static inline void addPerSiteSubtreeScores(partitionList *pr, int pNumber, int qNumber,
                                  int rNumber) {
-    assert(VectorClass::size() == INTS_PER_VECTOR);
+    constexpr hn::ScalableTag<T> d;
+    static_assert(hn::Lanes(d) == INTS_PER_VECTOR);
     parsimonyNumber *pBuf, *qBuf, *rBuf;
     for (int i = 0; i < pr->numberOfPartitions; ++i) {
         int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
@@ -324,38 +325,14 @@ void addPerSiteSubtreeScoresSIMD(partitionList *pr, int pNumber, int qNumber,
                      ->perSitePartialPars[partialParsLength * qNumber]);
         rBuf = &(pr->partitionData[i]
                      ->perSitePartialPars[partialParsLength * rNumber]);
-        for (int k = 0; k < partialParsLength; k += VectorClass::size()) {
-            VectorClass *pBufVC = (VectorClass *)&pBuf[k];
-            VectorClass *qBufVC = (VectorClass *)&qBuf[k];
-            VectorClass *rBufVC = (VectorClass *)&rBuf[k];
-            *pBufVC += *qBufVC + *rBufVC;
+        for (std::size_t k = 0; k < partialParsLength; k += hn::Lanes(d)) {
+            auto pBufVec = hn::Load(d, &pBuf[k]);
+            auto qBufVec = hn::Load(d, &qBuf[k]);
+            auto rBufVec = hn::Load(d, &rBuf[k]);
+            pBufVec += qBufVec + rBufVec;
+            hn::Store(pBufVec, d, &pBuf[k]);
         }
     }
-}
-
-// Diep:
-// Add site scores in q and r to p
-// q and r are children of p
-void addPerSiteSubtreeScores(partitionList *pr, int pNumber, int qNumber,
-                             int rNumber) {
-    //	parsimonyNumber * pBuf, * qBuf, *rBuf;
-    //	for(int i = 0; i < pr->numberOfPartitions; ++i){
-    //		int partialParsLength = pr->partitionData[i]->parsimonyLength *
-    // PLL_PCF; 		pBuf =
-    // &(pr->partitionData[i]->perSitePartialPars[partialParsLength
-    //* pNumber]); 		qBuf =
-    //&(pr->partitionData[i]->perSitePartialPars[partialParsLength * qNumber]);
-    //		rBuf =
-    //&(pr->partitionData[i]->perSitePartialPars[partialParsLength
-    //* rNumber]); 		for(int k = 0; k < partialParsLength; ++k)
-    // pBuf[k] += qBuf[k] + rBuf[k];
-    //	}
-
-#ifdef __AVX
-    addPerSiteSubtreeScoresSIMD<Vec8ui>(pr, pNumber, qNumber, rNumber);
-#else
-    addPerSiteSubtreeScoresSIMD<Vec4ui>(pr, pNumber, qNumber, rNumber);
-#endif
 }
 
 // Diep:
@@ -454,15 +431,14 @@ static void computeTraversalInfoParsimony(nodeptr p, int *ti, int *counter,
     *counter = *counter + 4;
 }
 
-#if (defined(__SSE3) || defined(__AVX))
-
 /**
  * Diep: Sankoff weighted parsimony
  * BQM: highly optimized vectorized version
  */
-template <class VectorClass, class Numeric, const size_t states>
+template <class Numeric, const size_t states>
 void newviewSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
                                               partitionList *pr) {
+    constexpr hn::ScalableTag<Numeric> d;
 
     //    assert(VectorClass::size() == USHORT_PER_VECTOR);
 
@@ -476,7 +452,8 @@ void newviewSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
         tr->parsimonyScore[pNumber] = 0;
         for (model = 0; model < pr->numberOfPartitions; ++model) {
             size_t patterns = pr->partitionData[model]->parsimonyLength;
-            assert(patterns % VectorClass::size() == 0);
+//            assert(patterns % VectorClass::size() == 0);
+            assert(patterns % hn::Lanes(d) == 0);
             size_t i;
 
             Numeric *left =
@@ -507,28 +484,43 @@ void newviewSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
 
             */
 
-            VectorClass total_score = 0;
+//            VectorClass total_score = 0;
+            auto total_score = hn::Zero(d);
 
-            for (i = 0; i < patterns; i += VectorClass::size()) {
-                VectorClass cur_contrib = USHRT_MAX;
-                size_t i_states = i * states;
-                VectorClass *leftPtn = (VectorClass *)&left[i_states];
-                VectorClass *rightPtn = (VectorClass *)&right[i_states];
-                VectorClass *curPtn = (VectorClass *)&cur[i_states];
+            for (i = 0; i < patterns; i += hn::Lanes(d)) {
+//                VectorClass cur_contrib = USHRT_MAX;
+                auto cur_contrib = hn::Set(d, USHRT_MAX);
+                std::size_t i_states = i * states;
+//                VectorClass *leftPtn = (VectorClass *)&left[i_states];
+//                VectorClass *rightPtn = (VectorClass *)&right[i_states];
+//                VectorClass *curPtn = (VectorClass *)&cur[i_states];
+                auto leftPtr = &left[i_states];
+                auto rightPtr = &right[i_states];
+                auto curPtr = &cur[i_states];
                 Numeric *costPtn = (Numeric *)vectorCostMatrix;
-                VectorClass value;
+//                VectorClass value;
+                auto value = hn::Undefined(d);
                 for (z = 0; z < states; z++) {
-                    VectorClass left_contrib = leftPtn[0] + costPtn[0];
-                    VectorClass right_contrib = rightPtn[0] + costPtn[0];
+//                    VectorClass left_contrib = leftPtn[0] + costPtn[0];
+                    auto left_contrib = hn::Load(d, &leftPtr[0]) + hn::Set(d, costPtn[0]);
+//                    VectorClass right_contrib = rightPtn[0] + costPtn[0];
+                    auto right_contrib = hn::Load(d, &rightPtr[0]) + hn::Set(d, costPtn[0]);
                     for (x = 1; x < states; x++) {
-                        value = leftPtn[x] + costPtn[x];
-                        left_contrib = min(left_contrib, value);
-                        value = rightPtn[x] + costPtn[x];
-                        right_contrib = min(right_contrib, value);
+//                        value = leftPtn[x] + costPtn[x];
+                        value = hn::Load(d, &leftPtr[x]) + hn::Set(d, costPtn[x]);
+//                        left_contrib = min(left_contrib, value);
+                        left_contrib = hn::Min(left_contrib, value);
+//                        value = rightPtn[x] + costPtn[x];
+                        value = hn::Load(d, &rightPtr[x]) + hn::Set(d, costPtn[x]);
+//                        right_contrib = min(right_contrib, value);
+                        right_contrib = hn::Min(right_contrib, value);
                     }
                     costPtn += states;
-                    cur_contrib = min(cur_contrib, (curPtn[z] = left_contrib +
-                                                                right_contrib));
+//                    cur_contrib = min(cur_contrib, (curPtn[z] = left_contrib +
+//                                                                right_contrib));
+                    value = left_contrib + right_contrib;
+                    hn::Store(value, d, &curPtr[z]);
+                    cur_contrib = hn::Min(cur_contrib, value);
                 }
 
                 // tr->parsimonyScore[pNumber] += cur_contrib *
@@ -539,7 +531,8 @@ void newviewSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
                 // slow total_score += cur_contrib *
                 // VectorClass().load_a(&pr->partitionData[model]->informativePtnWgt[i]);
             }
-            tr->parsimonyScore[pNumber] += horizontal_add(total_score);
+//            tr->parsimonyScore[pNumber] += horizontal_add(total_score);
+            tr->parsimonyScore[pNumber] += hn::GetLane(hn::SumOfLanes(d, total_score));
         }
     }
 }
@@ -549,84 +542,33 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
     if (pllCostMatrix) {
 //        _newviewSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
 //        return;
-#ifdef __AVX
         if (globalParam->sankoff_short_int) {
             // using unsigned short
             switch (pr->partitionData[0]->states) {
-            case 4:
-                newviewSankoffParsimonyIterativeFastSIMD<
-                    Vec16us, parsimonyNumberShort, 4>(tr, pr);
-                break;
-            case 5:
-                newviewSankoffParsimonyIterativeFastSIMD<
-                    Vec16us, parsimonyNumberShort, 5>(tr, pr);
-                break;
-            case 20:
-                newviewSankoffParsimonyIterativeFastSIMD<
-                    Vec16us, parsimonyNumberShort, 20>(tr, pr);
-                break;
-            default:
-                cerr << "Unsupported" << endl;
-                exit(EXIT_FAILURE);
+                case 4:
+                    newviewSankoffParsimonyIterativeFastSIMD<parsimonyNumberShort, 4>(tr, pr);
+                    break;
+                case 20:
+                    newviewSankoffParsimonyIterativeFastSIMD<parsimonyNumberShort, 20>(tr, pr);
+                    break;
+                default:
+                    cerr << "Unsupported" << endl;
+                    exit(EXIT_FAILURE);
             }
         } else {
             // using unsigned int
             switch (pr->partitionData[0]->states) {
-            case 4:
-                newviewSankoffParsimonyIterativeFastSIMD<Vec8ui,
-                                                         parsimonyNumber, 4>(
-                    tr, pr);
-                break;
-            case 5:
-                newviewSankoffParsimonyIterativeFastSIMD<Vec8ui,
-                                                         parsimonyNumber, 5>(
-                    tr, pr);
-                break;
-            case 20:
-                newviewSankoffParsimonyIterativeFastSIMD<Vec8ui,
-                                                         parsimonyNumber, 20>(
-                    tr, pr);
-                break;
-            default:
-                cerr << "Unsupported" << endl;
-                exit(EXIT_FAILURE);
+                case 4:
+                    newviewSankoffParsimonyIterativeFastSIMD<parsimonyNumber, 4>(tr, pr);
+                    break;
+                case 20:
+                    newviewSankoffParsimonyIterativeFastSIMD<parsimonyNumber, 20>(tr, pr);
+                    break;
+                default:
+                    cerr << "Unsupported" << endl;
+                    exit(EXIT_FAILURE);
             }
         }
-#else // SSE code
-        if (globalParam->sankoff_short_int) {
-            // using unsigned short
-            switch (pr->partitionData[0]->states) {
-            case 4:
-                newviewSankoffParsimonyIterativeFastSIMD<
-                    Vec8us, parsimonyNumberShort, 4>(tr, pr);
-                break;
-            case 20:
-                newviewSankoffParsimonyIterativeFastSIMD<
-                    Vec8us, parsimonyNumberShort, 20>(tr, pr);
-                break;
-            default:
-                cerr << "Unsupported" << endl;
-                exit(EXIT_FAILURE);
-            }
-        } else {
-            // using unsigned int
-            switch (pr->partitionData[0]->states) {
-            case 4:
-                newviewSankoffParsimonyIterativeFastSIMD<Vec4ui,
-                                                         parsimonyNumber, 4>(
-                    tr, pr);
-                break;
-            case 20:
-                newviewSankoffParsimonyIterativeFastSIMD<Vec4ui,
-                                                         parsimonyNumber, 20>(
-                    tr, pr);
-                break;
-            default:
-                cerr << "Unsupported" << endl;
-                exit(EXIT_FAILURE);
-            }
-        }
-#endif
         return;
     }
     constexpr hn::ScalableTag<parsimonyNumber> d;
@@ -833,11 +775,11 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
     }
 }
 
-template <class VectorClass, class Numeric, const size_t states,
-          const bool BY_PATTERN>
+template <class Numeric, const size_t states, const bool BY_PATTERN>
 parsimonyNumber evaluateSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
                                                           partitionList *pr,
                                                           int perSiteScores) {
+    constexpr hn::ScalableTag<Numeric> d;
     size_t pNumber = (size_t)tr->ti[1];
     size_t qNumber = (size_t)tr->ti[2];
 
@@ -863,25 +805,34 @@ parsimonyNumber evaluateSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
             (Numeric *)pr->partitionData[model]->informativePtnScore;
 
         for (seg = 0; seg < pllRepsSegments; seg++) {
-            VectorClass sum(0);
+            auto sum = hn::Zero(d);
+//            VectorClass sum(0);
             size_t lower = (seg == 0) ? 0 : pllSegmentUpper[seg - 1];
             size_t upper = pllSegmentUpper[seg];
-            for (i = lower; i < upper; i += VectorClass::size()) {
+            for (i = lower; i < upper; i += hn::Lanes(d)) {
 
                 size_t i_states = i * states;
-                VectorClass *leftPtn = (VectorClass *)&left[i_states];
-                VectorClass *rightPtn = (VectorClass *)&right[i_states];
-                VectorClass best_score = USHRT_MAX;
+//                VectorClass *leftPtn = (VectorClass *)&left[i_states];
+//                VectorClass *rightPtn = (VectorClass *)&right[i_states];
+//                VectorClass best_score = USHRT_MAX;
+                auto leftPtr = &left[i_states];
+                auto rightPtr = &right[i_states];
+                auto best_score = hn::Set(d, USHRT_MAX);
                 Numeric *costRow = (Numeric *)vectorCostMatrix;
 
                 for (x = 0; x < states; x++) {
-                    VectorClass this_best_score = costRow[0] + rightPtn[0];
+//                    VectorClass this_best_score = costRow[0] + rightPtn[0];
+                    auto this_best_score = hn::Set(d, costRow[0]) + hn::Load(d, &rightPtr[0]);
                     for (y = 1; y < states; y++) {
-                        VectorClass value = costRow[y] + rightPtn[y];
-                        this_best_score = min(this_best_score, value);
+//                        VectorClass value = costRow[y] + rightPtn[y];
+                        auto value = hn::Set(d, costRow[y]) + hn::Load(d, &rightPtr[y]);
+//                        this_best_score = min(this_best_score, value);
+                        this_best_score = hn::Min(this_best_score, value);
                     }
-                    this_best_score += leftPtn[x];
-                    best_score = min(best_score, this_best_score);
+//                    this_best_score += leftPtn[x];
+                    this_best_score += hn::Load(d, &leftPtr[x]);
+//                    best_score = min(best_score, this_best_score);
+                    best_score = hn::Min(best_score, this_best_score);
                     costRow += states;
                 }
 
@@ -890,7 +841,8 @@ parsimonyNumber evaluateSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
                 // (because aliaswgt is for all patterns, not just informative
                 // pattern)
                 if (perSiteScores) {
-                    best_score.store_a(&ptnScore[i]);
+//                    best_score.store_a(&ptnScore[i]);
+                    hn::Store(best_score, d, &ptnScore[i]);
                 } else {
                     // TODO without having to store per site score AND finished
                     // a block of patterns then use the lower-bound to stop
@@ -899,16 +851,18 @@ parsimonyNumber evaluateSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
                     //     return current_score + lower_bound_remaining
                 }
 
-                if (BY_PATTERN)
-                    sum += best_score * VectorClass().load_a(&ptnWgt[i]);
-                else
+                if (BY_PATTERN) {
+//                    sum += best_score * VectorClass().load_a(&ptnWgt[i]);
+                    sum += best_score * hn::Load(d, &ptnWgt[i]);
+                } else {
                     sum += best_score;
-
+                }
                 // if(sum >= bestScore)
                 // 		return sum;
             }
 
-            total_sum += horizontal_add(sum);
+//            total_sum += horizontal_add(sum);
+            total_sum += hn::GetLane(hn::SumOfLanes(d, sum));
 
             // Diep: IMPORTANT! since the pllRemainderLowerBounds is computed
             // for full ntaxa the following must be disabled during stepwise
@@ -931,71 +885,29 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                                              int perSiteScores) {
     if (pllCostMatrix) {
 //        return _evaluateSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
-#ifdef __AVX
         if (globalParam->sankoff_short_int) {
             switch (pr->partitionData[0]->states) {
-            case 4:
-                return evaluateSankoffParsimonyIterativeFastSIMD<
-                    Vec16us, parsimonyNumberShort, 4, true>(tr, pr,
-                                                            perSiteScores);
-            case 5:
-                return evaluateSankoffParsimonyIterativeFastSIMD<
-                    Vec16us, parsimonyNumberShort, 5, true>(tr, pr,
-                                                            perSiteScores);
-            case 20:
-                return evaluateSankoffParsimonyIterativeFastSIMD<
-                    Vec16us, parsimonyNumberShort, 20, true>(tr, pr,
-                                                             perSiteScores);
-            default:
-                cerr << "Unsupported" << endl;
-                exit(EXIT_FAILURE);
+                case 4:
+                    return evaluateSankoffParsimonyIterativeFastSIMD<parsimonyNumberShort, 4, true>(tr, pr,
+                                                                   perSiteScores);
+                case 20:
+                    return evaluateSankoffParsimonyIterativeFastSIMD<parsimonyNumberShort, 20, true>(tr, pr,
+                                                                    perSiteScores);
+                default:
+                    cerr << "Unsupported" << endl;
+                    exit(EXIT_FAILURE);
             }
         } else {
             switch (pr->partitionData[0]->states) {
-            case 4:
-                return evaluateSankoffParsimonyIterativeFastSIMD<
-                    Vec8ui, parsimonyNumber, 4, true>(tr, pr, perSiteScores);
-            case 5:
-                return evaluateSankoffParsimonyIterativeFastSIMD<
-                    Vec16us, parsimonyNumberShort, 5, true>(tr, pr,
-                                                            perSiteScores);
-            case 20:
-                return evaluateSankoffParsimonyIterativeFastSIMD<
-                    Vec8ui, parsimonyNumber, 20, true>(tr, pr, perSiteScores);
-            default:
-                cerr << "Unsupported" << endl;
-                exit(EXIT_FAILURE);
+                case 4:
+                    return evaluateSankoffParsimonyIterativeFastSIMD<parsimonyNumber, 4, true>(tr, pr, perSiteScores);
+                case 20:
+                    return evaluateSankoffParsimonyIterativeFastSIMD<parsimonyNumber, 20, true>(tr, pr, perSiteScores);
+                default:
+                    cerr << "Unsupported" << endl;
+                    exit(EXIT_FAILURE);
             }
         }
-#else // SSE
-        if (globalParam->sankoff_short_int) {
-            switch (pr->partitionData[0]->states) {
-            case 4:
-                return evaluateSankoffParsimonyIterativeFastSIMD<
-                    Vec8us, parsimonyNumberShort, 4, true>(tr, pr,
-                                                           perSiteScores);
-            case 20:
-                return evaluateSankoffParsimonyIterativeFastSIMD<
-                    Vec8us, parsimonyNumberShort, 20, true>(tr, pr,
-                                                            perSiteScores);
-            default:
-                cerr << "Unsupported" << endl;
-                exit(EXIT_FAILURE);
-            }
-        } else {
-            switch (pr->partitionData[0]->states) {
-            case 4:
-                return evaluateSankoffParsimonyIterativeFastSIMD<
-                    Vec4ui, parsimonyNumber, 4, true>(tr, pr, perSiteScores);
-            case 20:
-                return evaluateSankoffParsimonyIterativeFastSIMD<
-                    Vec4ui, parsimonyNumber, 20, true>(tr, pr, perSiteScores);
-            default:
-                cerr << "Unsupported" << endl;
-                exit(EXIT_FAILURE);
-            }
-        }
-#endif
     }
 
     constexpr hn::ScalableTag<parsimonyNumber> d;
@@ -1143,7 +1055,6 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
     return sum;
 }
 
-#else
 /**
  * Diep: Sankoff weighted parsimony
  * The unvectorized version
@@ -1315,183 +1226,6 @@ void _newviewSankoffParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
     //	cout << "... DONE" << endl;
 }
 
-void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
-                                    int perSiteScores) {
-    if (pllCostMatrix)
-        return _newviewSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
-    int model, *ti = tr->ti, count = ti[0], index;
-    for (index = 4; index < count; index += 4) {
-        unsigned int totalScore = 0;
-
-        size_t pNumber = (size_t)ti[index], qNumber = (size_t)ti[index + 1],
-               rNumber = (size_t)ti[index + 2];
-
-        for (model = 0; model < pr->numberOfPartitions; ++model) {
-            size_t k, states = pr->partitionData[model]->states,
-                      width = pr->partitionData[model]->parsimonyLength;
-
-            unsigned int i;
-
-            switch (states) {
-            case 2: {
-                parsimonyNumber *left[2], *right[2], *cur[2];
-
-                parsimonyNumber o_A, o_C, t_A, t_C, t_N;
-
-                for (k = 0; k < 2; ++k) {
-                    left[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 2 * qNumber) + width * k]);
-                    right[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 2 * rNumber) + width * k]);
-                    cur[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 2 * pNumber) + width * k]);
-                }
-
-                for (i = 0; i < width; ++i) {
-                    t_A = left[0][i] & right[0][i];
-                    t_C = left[1][i] & right[1][i];
-
-                    o_A = left[0][i] | right[0][i];
-                    o_C = left[1][i] | right[1][i];
-
-                    t_N = ~(t_A | t_C);
-
-                    cur[0][i] = t_A | (t_N & o_A);
-                    cur[1][i] = t_C | (t_N & o_C);
-
-                    totalScore += ((unsigned int)__builtin_popcount(t_N));
-                }
-            } break;
-            case 4: {
-                parsimonyNumber *left[4], *right[4], *cur[4];
-
-                for (k = 0; k < 4; ++k) {
-                    left[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 4 * qNumber) + width * k]);
-                    right[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 4 * rNumber) + width * k]);
-                    cur[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 4 * pNumber) + width * k]);
-                }
-
-                parsimonyNumber o_A, o_C, o_G, o_T, t_A, t_C, t_G, t_T, t_N;
-                /*
-                left[0][i]  = 1100
-                right[0][i] = 0101
-                t_A         = 0100
-                o_A         = 1101
-                t_N         = 1010
-                cur[0][i]   = 0100 | (1010 & 1101) = 1100
-
-                left[0][i] = 1101010101..0101
-                */
-                for (i = 0; i < width; ++i) {
-                    t_A = left[0][i] & right[0][i];
-                    t_C = left[1][i] & right[1][i];
-                    t_G = left[2][i] & right[2][i];
-                    t_T = left[3][i] & right[3][i];
-
-                    o_A = left[0][i] | right[0][i];
-                    o_C = left[1][i] | right[1][i];
-                    o_G = left[2][i] | right[2][i];
-                    o_T = left[3][i] | right[3][i];
-
-                    t_N = ~(t_A | t_C | t_G | t_T);
-
-                    cur[0][i] = t_A | (t_N & o_A);
-                    cur[1][i] = t_C | (t_N & o_C);
-                    cur[2][i] = t_G | (t_N & o_G);
-                    cur[3][i] = t_T | (t_N & o_T);
-
-                    totalScore += ((unsigned int)__builtin_popcount(t_N));
-                }
-            } break;
-            case 20: {
-                parsimonyNumber *left[20], *right[20], *cur[20];
-
-                parsimonyNumber o_A[20], t_A[20], t_N;
-
-                for (k = 0; k < 20; ++k) {
-                    left[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 20 * qNumber) + width * k]);
-                    right[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 20 * rNumber) + width * k]);
-                    cur[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 20 * pNumber) + width * k]);
-                }
-
-                for (i = 0; i < width; ++i) {
-                    size_t k;
-
-                    t_N = 0;
-
-                    for (k = 0; k < 20; ++k) {
-                        t_A[k] = left[k][i] & right[k][i];
-                        o_A[k] = left[k][i] | right[k][i];
-                        t_N = t_N | t_A[k];
-                    }
-
-                    t_N = ~t_N;
-
-                    for (k = 0; k < 20; ++k)
-                        cur[k][i] = t_A[k] | (t_N & o_A[k]);
-
-                    totalScore += ((unsigned int)__builtin_popcount(t_N));
-                }
-            } break;
-            default: {
-                parsimonyNumber *left[32], *right[32], *cur[32];
-
-                parsimonyNumber o_A[32], t_A[32], t_N;
-
-                assert(states <= 32);
-
-                for (k = 0; k < states; ++k) {
-                    left[k] = &(
-                        pr->partitionData[model]
-                            ->parsVect[(width * states * qNumber) + width * k]);
-                    right[k] = &(
-                        pr->partitionData[model]
-                            ->parsVect[(width * states * rNumber) + width * k]);
-                    cur[k] = &(
-                        pr->partitionData[model]
-                            ->parsVect[(width * states * pNumber) + width * k]);
-                }
-
-                for (i = 0; i < width; ++i) {
-                    t_N = 0;
-
-                    for (k = 0; k < states; ++k) {
-                        t_A[k] = left[k][i] & right[k][i];
-                        o_A[k] = left[k][i] | right[k][i];
-                        t_N = t_N | t_A[k];
-                    }
-
-                    t_N = ~t_N;
-
-                    for (k = 0; k < states; ++k)
-                        cur[k][i] = t_A[k] | (t_N & o_A[k]);
-
-                    totalScore += ((unsigned int)__builtin_popcount(t_N));
-                }
-            }
-            }
-        }
-
-        tr->parsimonyScore[pNumber] = totalScore + tr->parsimonyScore[rNumber] +
-                                      tr->parsimonyScore[qNumber];
-    }
-}
-
 unsigned int _evaluateSankoffParsimonyIterativeFast(pllInstance *tr,
                                                     partitionList *pr,
                                                     int perSiteScores) {
@@ -1626,139 +1360,6 @@ unsigned int _evaluateSankoffParsimonyIterativeFast(pllInstance *tr,
 
     return sum;
 }
-
-unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
-                                             int perSiteScores) {
-    // cout << "evaluateParsimonyIterativeFast\n";
-    if (pllCostMatrix)
-        return _evaluateSankoffParsimonyIterativeFast(tr, pr, perSiteScores);
-    // cout << "Don't go to CostMatrix\n";
-    size_t pNumber = (size_t)tr->ti[1], qNumber = (size_t)tr->ti[2];
-
-    int model;
-
-    unsigned int bestScore = tr->bestParsimony, sum;
-
-    if (tr->ti[0] > 4)
-        _newviewParsimonyIterativeFast(tr, pr, perSiteScores);
-
-    sum = tr->parsimonyScore[pNumber] + tr->parsimonyScore[qNumber];
-
-    for (model = 0; model < pr->numberOfPartitions; ++model) {
-        size_t k, states = pr->partitionData[model]->states,
-                  width = pr->partitionData[model]->parsimonyLength, i;
-
-        switch (states) {
-        case 2: {
-            parsimonyNumber t_A, t_C, t_N, *left[2], *right[2];
-
-            for (k = 0; k < 2; ++k) {
-                left[k] = &(pr->partitionData[model]
-                                ->parsVect[(width * 2 * qNumber) + width * k]);
-                right[k] = &(pr->partitionData[model]
-                                 ->parsVect[(width * 2 * pNumber) + width * k]);
-            }
-
-            for (i = 0; i < width; ++i) {
-                t_A = left[0][i] & right[0][i];
-                t_C = left[1][i] & right[1][i];
-
-                t_N = ~(t_A | t_C);
-
-                sum += ((unsigned int)__builtin_popcount(t_N));
-
-                //                 if(sum >= bestScore)
-                //                   return sum;
-            }
-        } break;
-        case 4: {
-            parsimonyNumber t_A, t_C, t_G, t_T, t_N, *left[4], *right[4];
-
-            for (k = 0; k < 4; ++k) {
-                left[k] = &(pr->partitionData[model]
-                                ->parsVect[(width * 4 * qNumber) + width * k]);
-                right[k] = &(pr->partitionData[model]
-                                 ->parsVect[(width * 4 * pNumber) + width * k]);
-            }
-
-            for (i = 0; i < width; ++i) {
-                t_A = left[0][i] & right[0][i];
-                t_C = left[1][i] & right[1][i];
-                t_G = left[2][i] & right[2][i];
-                t_T = left[3][i] & right[3][i];
-
-                t_N = ~(t_A | t_C | t_G | t_T);
-
-                sum += ((unsigned int)__builtin_popcount(t_N));
-
-                //                 if(sum >= bestScore)
-                //                   return sum;
-            }
-        } break;
-        case 20: {
-            parsimonyNumber t_A, t_N, *left[20], *right[20];
-
-            for (k = 0; k < 20; ++k) {
-                left[k] = &(pr->partitionData[model]
-                                ->parsVect[(width * 20 * qNumber) + width * k]);
-                right[k] =
-                    &(pr->partitionData[model]
-                          ->parsVect[(width * 20 * pNumber) + width * k]);
-            }
-
-            for (i = 0; i < width; ++i) {
-                t_N = 0;
-
-                for (k = 0; k < 20; ++k) {
-                    t_A = left[k][i] & right[k][i];
-                    t_N = t_N | t_A;
-                }
-
-                t_N = ~t_N;
-
-                sum += ((unsigned int)__builtin_popcount(t_N));
-
-                //                  if(sum >= bestScore)
-                //                    return sum;
-            }
-        } break;
-        default: {
-            parsimonyNumber t_A, t_N, *left[32], *right[32];
-
-            assert(states <= 32);
-
-            for (k = 0; k < states; ++k) {
-                left[k] =
-                    &(pr->partitionData[model]
-                          ->parsVect[(width * states * qNumber) + width * k]);
-                right[k] =
-                    &(pr->partitionData[model]
-                          ->parsVect[(width * states * pNumber) + width * k]);
-            }
-
-            for (i = 0; i < width; ++i) {
-                t_N = 0;
-
-                for (k = 0; k < states; ++k) {
-                    t_A = left[k][i] & right[k][i];
-                    t_N = t_N | t_A;
-                }
-
-                t_N = ~t_N;
-
-                sum += ((unsigned int)__builtin_popcount(t_N));
-
-                //                 if(sum >= bestScore)
-                //                   return sum;
-            }
-        }
-        }
-    }
-
-    return sum;
-}
-
-#endif
 
 unsigned int _evaluateParsimony(pllInstance *tr, partitionList *pr, nodeptr p,
                                 pllBoolean full, int perSiteScores) {
