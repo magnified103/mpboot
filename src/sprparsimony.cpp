@@ -4,13 +4,6 @@
  *  Created on: Nov 6, 2014
  *      Author: diep
  */
-#include "sprparsimony.h"
-#include "parstree.h"
-#include "tools.h"
-#include <algorithm>
-#include <bitset>
-// #include <chrono>
-#include <string>
 /**
  * PLL (version 1.0.0) a software library for phylogenetic inference
  * Copyright (C) 2013 Tomas Flouri and Alexandros Stamatakis
@@ -40,8 +33,18 @@
  * @file fastDNAparsimony.c
  */
 
+#include <algorithm>
+#include <array>
+// #include <chrono>
+#include <string>
+#include <utility>
+
 #include <hwy/highway.h>
 #include <hwy/aligned_allocator.h>
+
+#include "sprparsimony.h"
+#include "parstree.h"
+#include "tools.h"
 
 namespace hn = hwy::HWY_NAMESPACE;
 
@@ -237,7 +240,7 @@ void initializeCostMatrix() {
 
 template <typename T = std::uint64_t>
 static inline unsigned int vectorPopcount(hn::Vec<hn::ScalableTag<std::uint32_t>> v) {
-    const hn::ScalableTag<T> d;
+    constexpr hn::ScalableTag<T> d;
 
     HWY_ALIGN T counts[hn::Lanes(d)];
     hn::Store(hn::BitCast(d, v), d, counts);
@@ -252,13 +255,23 @@ static inline unsigned int vectorPopcount(hn::Vec<hn::ScalableTag<std::uint32_t>
 /********************************DNA FUNCTIONS
  * *****************************************************************/
 
+template <class T, T... Ints>
+static constexpr std::array<T, sizeof...(Ints)> maskShift(std::integer_sequence<T, Ints...>) {
+    return std::array<T, sizeof...(Ints)>{(1ULL << Ints)...};
+}
+
+template <class T, std::size_t N, typename IntSeq = std::make_integer_sequence<T, N>>
+static constexpr std::array<T, N> maskShiftIota() {
+    return maskShift<T>(IntSeq{});
+}
+
 // Diep:
 // store per site score to nodeNumber
-template <typename T = std::uint64_t>
+template <typename T = parsimonyNumber>
 static inline void storePerSiteNodeScores(partitionList *pr, int model,
-                                          hn::Vec<hn::ScalableTag<std::uint32_t>> v,
+                                          hn::Vec<hn::ScalableTag<parsimonyNumber>> v,
                                           unsigned int offset, int nodeNumber) {
-    const hn::ScalableTag<T> d;
+    constexpr hn::ScalableTag<T> d;
 
     HWY_ALIGN T counts[hn::Lanes(d)];
     hn::Store(hn::BitCast(d, v), d, counts);
@@ -274,9 +287,24 @@ static inline void storePerSiteNodeScores(partitionList *pr, int model,
         // offset * PLL_PCF + i * ULINT_SIZE]); // Diep's 		buf =
         //&(pr->partitionData[model]->perSitePartialPars[nodeStart + offset *
         // PLL_PCF + i]); // Tomas's code
+#if HWY_TARGET == HWY_SCALAR
         for (std::size_t j = 0; j < sizeof(T) * 8; ++j) {
             buf[j] += ((counts[i] >> j) & 1);
         }
+#else
+        static_assert(sizeof(T) * 8 % hn::Lanes(d) == 0, "Lanes(d) must divides 8T");
+
+        HWY_ALIGN constexpr std::array<T, hn::Lanes(d)> mask_data = maskShiftIota<T, hn::Lanes(d)>();
+        auto mask = hn::Load(d, mask_data.data());
+        auto w = hn::Set(d, counts[i]);
+        for (std::size_t j = 0; j < sizeof(T) * 8; j += hn::Lanes(d)) {
+            auto result = ((w & mask) == mask);
+            // buf[j] = buf[j] + 1 = buf[j] - (0xFFFFFFFF)
+            // buf[j] = buf[j] + 0 = buf[j] - (0x00000000)
+            hn::Store(hn::Load(d, &buf[j]) - hn::VecFromMask(d, result), d, &buf[j]);
+            w = hn::ShiftRight<hn::Lanes(d)>(w);
+        }
+#endif
     }
 }
 
@@ -601,7 +629,7 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 #endif
         return;
     }
-    const hn::ScalableTag<parsimonyNumber> d;
+    constexpr hn::ScalableTag<parsimonyNumber> d;
 
     int model, *ti = tr->ti, count = ti[0], index;
 
@@ -970,7 +998,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 #endif
     }
 
-    const hn::ScalableTag<parsimonyNumber> d;
+    constexpr hn::ScalableTag<parsimonyNumber> d;
 
     size_t pNumber = (size_t)tr->ti[1], qNumber = (size_t)tr->ti[2];
 
