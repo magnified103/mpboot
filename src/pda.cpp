@@ -67,7 +67,7 @@
 #include <stdlib.h>
 #include "sprparsimony.h"
 #include "tbrparsimony.h"
-#include "vectorclass/vectorclass.h"
+#include "instrset.h"
 
 #ifdef _OPENMP
 	#include <omp.h>
@@ -2246,6 +2246,12 @@ int main(int argc, char *argv[])
 #endif
 
 	cout << "Host:    " << hostname << " (";
+#if defined(__aarch64__) || defined(_M_ARM64)
+    switch (instrset) {
+    case 6: cout << "NEON, "; break;
+    default: cout << "SVE, "; break;
+    }
+#else
 	switch (instrset) {
 	case 3: cout << "SSE3, "; break;
 	case 4: cout << "SSSE3, "; break;
@@ -2257,6 +2263,7 @@ int main(int argc, char *argv[])
 	}
 	if (has_fma3) cout << "FMA3, ";
 	if (has_fma4) cout << "FMA4, ";
+#endif
 #if defined __APPLE__ || defined __MACH__
 	cout << (int)(((getMemorySize()/1024.0)/1024)/1024) << " GB RAM)" << endl;
 #else

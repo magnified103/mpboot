@@ -62,6 +62,7 @@ add_executable(mpboot
 		tbrparsimony.cpp
 		uppass.cpp
 		test.cpp
+		instrset_detect.cpp
 		)
 
 ## =================================================================================================
