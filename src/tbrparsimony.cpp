@@ -3,16 +3,6 @@
  * NOTE: Use functions the same as in sprparsimony.cpp, so I have to declare it
  * static (globally can't have functions or variables with the same name)
  */
-#include <algorithm>
-#include <queue>
-#include <sprparsimony.h>
-#include <tbrparsimony.h>
-
-#include "helper.h"
-#include "nnisearch.h"
-#include "parstree.h"
-#include "tools.h"
-#include <string>
 /**
  * PLL (version 1.0.0) a software library for phylogenetic inference
  * Copyright (C) 2013 Tomas Flouri and Alexandros Stamatakis
@@ -41,90 +31,24 @@
  *
  * @file fastDNAparsimony.c
  */
+#include <algorithm>
+#include <queue>
+#include <string>
 
-#if defined(__MIC_NATIVE)
+#include <hwy/highway.h>
+#include <hwy/aligned_allocator.h>
 
-#include <immintrin.h>
-
-#define VECTOR_SIZE 16
-#define USHORT_PER_VECTOR 32
-#define INTS_PER_VECTOR 16
-#define LONG_INTS_PER_VECTOR 8
-// #define LONG_INTS_PER_VECTOR (64/sizeof(long))
-#define INT_TYPE __m512i
-#define CAST double *
-#define SET_ALL_BITS_ONE _mm512_set1_epi32(0xFFFFFFFF)
-#define SET_ALL_BITS_ZERO _mm512_setzero_epi32()
-#define VECTOR_LOAD _mm512_load_epi32
-#define VECTOR_STORE _mm512_store_epi32
-#define VECTOR_BIT_AND _mm512_and_epi32
-#define VECTOR_BIT_OR _mm512_or_epi32
-#define VECTOR_AND_NOT _mm512_andnot_epi32
-
-#elif defined(__AVX)
-
-#include "vectorclass/vectorclass.h"
-#include <immintrin.h>
-#include <pmmintrin.h>
-#include <xmmintrin.h>
-
-#define VECTOR_SIZE 8
-#define ULINT_SIZE 64
-#define USHORT_PER_VECTOR 16
-#define INTS_PER_VECTOR 8
-#define LONG_INTS_PER_VECTOR 4
-// #define LONG_INTS_PER_VECTOR (32/sizeof(long))
-#define INT_TYPE __m256d
-#define CAST double *
-#define SET_ALL_BITS_ONE                                                       \
-    (__m256d) _mm256_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, \
-                               0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)
-#define SET_ALL_BITS_ZERO                                                      \
-    (__m256d) _mm256_set_epi32(0x00000000, 0x00000000, 0x00000000, 0x00000000, \
-                               0x00000000, 0x00000000, 0x00000000, 0x00000000)
-#define VECTOR_LOAD _mm256_load_pd
-#define VECTOR_BIT_AND _mm256_and_pd
-#define VECTOR_BIT_OR _mm256_or_pd
-#define VECTOR_STORE _mm256_store_pd
-#define VECTOR_AND_NOT _mm256_andnot_pd
-
-#elif (defined(__SSE3))
-
-#include "vectorclass/vectorclass.h"
-#include <pmmintrin.h>
-#include <xmmintrin.h>
-
-#define VECTOR_SIZE 4
-#define USHORT_PER_VECTOR 8
-#define INTS_PER_VECTOR 4
-#ifdef __i386__
-#define ULINT_SIZE 32
-#define LONG_INTS_PER_VECTOR 4
-// #define LONG_INTS_PER_VECTOR (16/sizeof(long))
-#else
-#define ULINT_SIZE 64
-#define LONG_INTS_PER_VECTOR 2
-// #define LONG_INTS_PER_VECTOR (16/sizeof(long))
-#endif
-#define INT_TYPE __m128i
-#define CAST __m128i *
-#define SET_ALL_BITS_ONE                                                       \
-    _mm_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)
-#define SET_ALL_BITS_ZERO                                                      \
-    _mm_set_epi32(0x00000000, 0x00000000, 0x00000000, 0x00000000)
-#define VECTOR_LOAD _mm_load_si128
-#define VECTOR_BIT_AND _mm_and_si128
-#define VECTOR_BIT_OR _mm_or_si128
-#define VECTOR_STORE _mm_store_si128
-#define VECTOR_AND_NOT _mm_andnot_si128
-
-#else
-// no vectorization
-#define VECTOR_SIZE 1
-#endif
+#include "helper.h"
+#include "nnisearch.h"
+#include "parstree.h"
+#include "sprparsimony.h"
+#include "tbrparsimony.h"
+#include "tools.h"
 
 #include "pllrepo/src/pll.h"
 #include "pllrepo/src/pllInternal.h"
+
+namespace hn = hwy::HWY_NAMESPACE;
 
 extern const unsigned int mask32[32];
 // /* vector-specific stuff */
@@ -222,109 +146,6 @@ static void initializeCostMatrix() {
 //  return ((unsigned int) __builtin_popcountl(i));
 //}
 
-/* bit count for 128 bit SSE3 and 256 bit AVX registers */
-
-#if (defined(__SSE3) || defined(__AVX))
-static inline unsigned int vectorPopcount(INT_TYPE v) {
-    unsigned long counts[LONG_INTS_PER_VECTOR]
-        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-
-    int i, sum = 0;
-
-    VECTOR_STORE((CAST)counts, v);
-
-    for (i = 0; i < LONG_INTS_PER_VECTOR; i++)
-        sum += __builtin_popcountl(counts[i]);
-
-    return ((unsigned int)sum);
-}
-#endif
-
-/********************************DNA FUNCTIONS
- * *****************************************************************/
-
-// Diep:
-// store per site score to nodeNumber
-#if (defined(__SSE3) || defined(__AVX))
-static inline void storePerSiteNodeScores(partitionList *pr, int model,
-                                          INT_TYPE v, unsigned int offset,
-                                          int nodeNumber) {
-
-    unsigned long counts[LONG_INTS_PER_VECTOR]
-        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-    parsimonyNumber *buf;
-
-    int i, j;
-
-    VECTOR_STORE((CAST)counts, v);
-
-    int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
-    int nodeStart = partialParsLength * nodeNumber;
-    int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
-    for (i = 0; i < LONG_INTS_PER_VECTOR; ++i) {
-        buf = &(
-            pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
-        nodeStartPlusOffset += ULINT_SIZE;
-        //		buf =
-        //&(pr->partitionData[model]->perSitePartialPars[nodeStart +
-        // offset * PLL_PCF + i * ULINT_SIZE]); // Diep's 		buf =
-        //&(pr->partitionData[model]->perSitePartialPars[nodeStart + offset *
-        // PLL_PCF + i]); // Tomas's code
-        for (j = 0; j < ULINT_SIZE; ++j)
-            buf[j] += ((counts[i] >> j) & 1);
-    }
-}
-
-// Diep:
-// Add site scores in q and r to p
-// q and r are children of p
-template <class VectorClass>
-void addPerSiteSubtreeScoresSIMD(partitionList *pr, int pNumber, int qNumber,
-                                 int rNumber) {
-    assert(VectorClass::size() == INTS_PER_VECTOR);
-    parsimonyNumber *pBuf, *qBuf, *rBuf;
-    for (int i = 0; i < pr->numberOfPartitions; i++) {
-        int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
-        pBuf = &(pr->partitionData[i]
-                     ->perSitePartialPars[partialParsLength * pNumber]);
-        qBuf = &(pr->partitionData[i]
-                     ->perSitePartialPars[partialParsLength * qNumber]);
-        rBuf = &(pr->partitionData[i]
-                     ->perSitePartialPars[partialParsLength * rNumber]);
-        for (int k = 0; k < partialParsLength; k += VectorClass::size()) {
-            VectorClass *pBufVC = (VectorClass *)&pBuf[k];
-            VectorClass *qBufVC = (VectorClass *)&qBuf[k];
-            VectorClass *rBufVC = (VectorClass *)&rBuf[k];
-            *pBufVC += *qBufVC + *rBufVC;
-        }
-    }
-}
-
-// Diep:
-// Add site scores in q and r to p
-// q and r are children of p
-static void addPerSiteSubtreeScores(partitionList *pr, int pNumber, int qNumber,
-                                    int rNumber) {
-    //	parsimonyNumber * pBuf, * qBuf, *rBuf;
-    //	for(int i = 0; i < pr->numberOfPartitions; i++){
-    //		int partialParsLength = pr->partitionData[i]->parsimonyLength *
-    // PLL_PCF; 		pBuf =
-    // &(pr->partitionData[i]->perSitePartialPars[partialParsLength
-    //* pNumber]); 		qBuf =
-    //&(pr->partitionData[i]->perSitePartialPars[partialParsLength * qNumber]);
-    //		rBuf =
-    //&(pr->partitionData[i]->perSitePartialPars[partialParsLength
-    //* rNumber]); 		for(int k = 0; k < partialParsLength; k++)
-    // pBuf[k] += qBuf[k] + rBuf[k];
-    //	}
-
-#ifdef __AVX
-    addPerSiteSubtreeScoresSIMD<Vec8ui>(pr, pNumber, qNumber, rNumber);
-#else
-    addPerSiteSubtreeScoresSIMD<Vec4ui>(pr, pNumber, qNumber, rNumber);
-#endif
-}
-
 // Diep:
 // Reset site scores of p
 static void resetPerSiteNodeScores(partitionList *pr, int pNumber) {
@@ -334,42 +155,6 @@ static void resetPerSiteNodeScores(partitionList *pr, int pNumber) {
         pBuf = &(pr->partitionData[i]
                      ->perSitePartialPars[partialParsLength * pNumber]);
         memset(pBuf, 0, partialParsLength * sizeof(parsimonyNumber));
-    }
-}
-#endif
-
-static int checkerPars(pllInstance *tr, nodeptr p) {
-    int group = tr->constraintVector[p->number];
-
-    if (isTip(p->number, tr->mxtips)) {
-        group = tr->constraintVector[p->number];
-        return group;
-    } else {
-        if (group != -9)
-            return group;
-
-        group = checkerPars(tr, p->next->back);
-        if (group != -9)
-            return group;
-
-        group = checkerPars(tr, p->next->next->back);
-        if (group != -9)
-            return group;
-
-        return -9;
-    }
-}
-
-static pllBoolean tipHomogeneityCheckerPars(pllInstance *tr, nodeptr p,
-                                            int grouping) {
-    if (isTip(p->number, tr->mxtips)) {
-        if (tr->constraintVector[p->number] != grouping)
-            return PLL_FALSE;
-        else
-            return PLL_TRUE;
-    } else {
-        return (tipHomogeneityCheckerPars(tr, p->next->back, grouping) &&
-                tipHomogeneityCheckerPars(tr, p->next->next->back, grouping));
     }
 }
 
@@ -558,9 +343,10 @@ static void determineUninformativeSites(pllInstance *tr, partitionList *pr,
 
     /* printf("Uninformative Patterns: %d\n", number); */
 }
-template <class Numeric, const int VECSIZE>
+template <class Numeric>
 static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
                                int *informative, int perSiteScores) {
+    constexpr hn::ScalableTag<Numeric> d;
     //	cout << "Begin compressSankoffDNA()" << endl;
     size_t totalNodes, i, model;
 
@@ -585,15 +371,12 @@ static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
         // number of informative site patterns
         compressedEntries = entries;
 
-#if (defined(__SSE3) || defined(__AVX))
-        if (compressedEntries % VECSIZE != 0)
+        if (compressedEntries % hn::Lanes(d) != 0) {
             compressedEntriesPadded =
-                compressedEntries + (VECSIZE - (compressedEntries % VECSIZE));
-        else
+                    compressedEntries + (hn::Lanes(d) - (compressedEntries % hn::Lanes(d)));
+        } else {
             compressedEntriesPadded = compressedEntries;
-#else
-        compressedEntriesPadded = compressedEntries;
-#endif
+        }
 
         // parsVect stores cost for each node by state at each pattern
         // for a certain node of DNA: ptn1_A, ptn2_A, ptn3_A,..., ptn1_C,
@@ -681,11 +464,11 @@ static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
 
                     for (k = 0; k < states; k++) {
                         if (value & mask32[k])
-                            tipVect[k * VECSIZE] =
+                            tipVect[k * hn::Lanes(d)] =
                                 0; // Diep: if the state is present,
                                    // corresponding value is set to zero
                         else
-                            tipVect[k * VECSIZE] = highest_cost;
+                            tipVect[k * hn::Lanes(d)] = highest_cost;
                         //					  compressedTips[k][informativeIndex]
                         //= compressedValues[k]; // Diep
                         // cout << "compressedValues[k]: " <<
@@ -697,8 +480,8 @@ static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
                     tipVect += 1; // process to the next site
 
                     // jump to the next block
-                    if (informativeIndex % VECSIZE == 0)
-                        tipVect += VECSIZE * (states - 1);
+                    if (informativeIndex % hn::Lanes(d) == 0)
+                        tipVect += hn::Lanes(d) * (states - 1);
                 }
             }
 
@@ -707,7 +490,7 @@ static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
                  index++) {
 
                 for (k = 0; k < states; k++) {
-                    tipVect[k * VECSIZE] = 0;
+                    tipVect[k * hn::Lanes(d)] = 0;
                 }
                 tipVect += 1;
             }
@@ -774,13 +557,12 @@ static void _updateInternalPllOnRatchet(pllInstance *tr, partitionList *pr) {
 }
 static void compressDNA(pllInstance *tr, partitionList *pr, int *informative,
                         int perSiteScores) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     if (pllCostMatrix != NULL) {
         if (globalParam->sankoff_short_int)
-            return compressSankoffDNA<parsimonyNumberShort, USHORT_PER_VECTOR>(
-                tr, pr, informative, perSiteScores);
+            return compressSankoffDNA<parsimonyNumberShort>(tr, pr, informative, perSiteScores);
         else
-            return compressSankoffDNA<parsimonyNumber, INTS_PER_VECTOR>(
-                tr, pr, informative, perSiteScores);
+            return compressSankoffDNA<parsimonyNumber>(tr, pr, informative, perSiteScores);
     }
 
     size_t totalNodes, i, model;
@@ -813,16 +595,11 @@ static void compressDNA(pllInstance *tr, partitionList *pr, int *informative,
         if (entries % PLL_PCF != 0)
             compressedEntries++;
 
-#if (defined(__SSE3) || defined(__AVX))
-        if (compressedEntries % INTS_PER_VECTOR != 0)
-            compressedEntriesPadded =
-                compressedEntries +
-                (INTS_PER_VECTOR - (compressedEntries % INTS_PER_VECTOR));
-        else
+        if (compressedEntries % hn::Lanes(d) != 0) {
+            compressedEntriesPadded = compressedEntries + (hn::Lanes(d) - (compressedEntries % hn::Lanes(d)));
+        } else {
             compressedEntriesPadded = compressedEntries;
-#else
-        compressedEntriesPadded = compressedEntries;
-#endif
+        }
 
         rax_posix_memalign((void **)&(pr->partitionData[model]->parsVect),
                            PLL_BYTE_ALIGNMENT,

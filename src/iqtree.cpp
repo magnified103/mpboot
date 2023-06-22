@@ -31,9 +31,12 @@
 #include "tbrparsimony.h"
 #include "timeutil.h"
 #include "uppass.h"
-#include "vectorclass/vectorclass.h"
-#include "vectorclass/vectormath_common.h"
 #include <numeric>
+
+#include <hwy/highway.h>
+#include <hwy/aligned_allocator.h>
+
+namespace hn = hwy::HWY_NAMESPACE;
 
 Params *globalParam;
 Alignment *globalAlignment;
@@ -3782,17 +3785,15 @@ void IQTree::saveCurrentTree(double cur_logl) {
     // if on_ratchet_hclimb1, update cur_logl
     if (params->maximum_parsimony && on_ratchet_hclimb1 &&
         reps_segments != -1) {
+        constexpr hn::ScalableTag<unsigned short> d;
         int ptn = 0, segment_id = 0, score = 0;
-        VectorClassUShort vc_score = 0;
+        auto vc_score = hn::Zero(d);
         // sum by segment to avoid data overflow
         for (; segment_id < reps_segments; segment_id++) {
-            for (; ptn < segment_upper[segment_id]; ptn += VCSIZE_USHORT)
-                vc_score =
-                    VectorClassUShort().load_a(&_pattern_pars[ptn]) *
-                        VectorClassUShort().load_a(&original_sample[ptn]) +
-                    vc_score;
-            score += horizontal_add(vc_score);
-            vc_score = 0;
+            for (; ptn < segment_upper[segment_id]; ptn += hn::Lanes(d))
+                vc_score += hn::Load(d, &_pattern_pars[ptn]) * hn::Load(d, &original_sample[ptn]);
+            score += hn::GetLane(hn::SumOfLanes(d, vc_score));
+            vc_score = hn::Zero(d);
         }
         cur_logl = -score;
     }
@@ -3949,21 +3950,17 @@ void IQTree::saveCurrentTree(double cur_logl) {
                     rell = -(double)res;
                 } else {
                     int ptn = 0, segment_id = 0, res = 0;
-                    VectorClassUShort vc_rell = 0;
+                    constexpr hn::ScalableTag<unsigned short> d;
+                    auto vc_rell = hn::Zero(d);
                     int max_nptn = nptn / 2;
                     for (; segment_id < reps_segments; segment_id++) {
-                        for (; ptn < segment_upper[segment_id];
-                             ptn += VCSIZE_USHORT) {
+                        for (; ptn < segment_upper[segment_id]; ptn += hn::Lanes(d)) {
                             if (params->do_first_rell && ptn >= max_nptn)
                                 break;
-                            vc_rell = VectorClassUShort().load_a(
-                                          &_pattern_pars[ptn]) *
-                                          VectorClassUShort().load_a(
-                                              &boot_sample[ptn]) +
-                                      vc_rell;
+                            vc_rell += hn::Load(d, &_pattern_pars[ptn]) * hn::Load(d, &boot_sample[ptn]);
                         }
-                        res += horizontal_add(vc_rell);
-                        vc_rell = 0;
+                        res += hn::GetLane(hn::SumOfLanes(d, vc_rell));
+                        vc_rell = hn::Zero(d);
 
                         if ((!skipped) && (reps_segments > 1) &&
                             (segment_id > reps_segments / 4) &&
@@ -4017,22 +4014,16 @@ void IQTree::saveCurrentTree(double cur_logl) {
                 // SSE optimized version of the above loop
                 BootValType *boot_sample = boot_samples[sample];
 #ifdef BOOT_VAL_FLOAT
-                VectorClassFloat vc_rell = 0.0;
-                int maxptn = nptn - VCSIZE_FLOAT;
-                for (ptn = 0; ptn < maxptn; ptn += VCSIZE_FLOAT)
-                    vc_rell = mul_add(
-                        VectorClassFloat().load_a(&pattern_lh[ptn]),
-                        VectorClassFloat().load_a(&boot_sample[ptn]), vc_rell);
+                constexpr hn::ScalableTag<float> d;
 #else
-                VectorClassMaster vc_rell = 0.0;
-                int maxptn = nptn - VCSIZE_MASTER;
-                for (ptn = 0; ptn < maxptn; ptn += VCSIZE_MASTER)
-                    vc_rell = mul_add(
-                        VectorClassMaster().load_a(&pattern_lh[ptn]),
-                        VectorClassMaster().load_a(&boot_sample[ptn]), vc_rell);
+                constexpr hn::ScalableTag<double> d;
 #endif
+                auto vc_rell = hn::Zero(d);
+                int maxptn = nptn - hn::Lanes(d);
+                for (ptn = 0; ptn < maxptn; ptn += hn::Lanes(d))
+                    vc_rell = hn::MulAdd(hn::Load(d, &pattern_lh[ptn]), hn::Load(d, &boot_sample[ptn]), vc_rell);
 
-                BootValType res = horizontal_add(vc_rell);
+                BootValType res = hn::GetLane(hn::SumOfLanes(d, vc_rell));
                 // add the remaining ptn
                 for (; ptn < nptn; ptn++)
                     res += pattern_lh[ptn] * boot_sample[ptn];

@@ -46,10 +46,12 @@
 #include "parstree.h"
 #include "tools.h"
 
-namespace hn = hwy::HWY_NAMESPACE;
-
+// TODO: fix these linker error
+// deliberately put this below as a workaround to linker error
 #include "pllrepo/src/pll.h"
 #include "pllrepo/src/pllInternal.h"
+
+namespace hn = hwy::HWY_NAMESPACE;
 
 static pllBoolean tipHomogeneityCheckerPars(pllInstance *tr, nodeptr p,
                                             int grouping);
