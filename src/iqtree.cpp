@@ -238,7 +238,7 @@ void IQTree::setParams(Params &params) {
             // Diep: For parsimony bootstrap
             boot_samples_pars.resize(params.gbo_replicates);
             boot_samples_pars_remain_bounds.resize(params.gbo_replicates, NULL);
-            nunit = getAlnNPattern() + VCSIZE_USHORT;
+            nunit = getAlnNPattern() + hn::Lanes(hn::ScalableTag<unsigned short>{});
 
             //			BootValTypePars *mem =
             // aligned_alloc<BootValTypePars>(nunit *
@@ -360,7 +360,7 @@ void IQTree::setParams(Params &params) {
         iter_best = false;
 
         if (params.ratchet_iter >= 0) {
-            size_t nunit = getAlnNPattern() + VCSIZE_USHORT;
+            size_t nunit = getAlnNPattern() + hn::Lanes(hn::ScalableTag<unsigned short>{});
             original_sample = aligned_alloc<BootValTypePars>(nunit);
             memset(original_sample, 0, nunit * sizeof(BootValTypePars));
             for (size_t i = 0; i < getAlnNPattern(); i++)
@@ -4431,7 +4431,7 @@ void IQTree::doSegmenting() {
 
     for (int i = 0; i < nptn; i++) {
         seg_sum += (aln)->at(i).ras_pars_score * (aln)->at(i).frequency;
-        if ((i + 1) % VCSIZE_USHORT == 0 && seg_sum > USHRT_MAX / 16) {
+        if ((i + 1) % hn::Lanes(hn::ScalableTag<unsigned short>{}) == 0 && seg_sum > USHRT_MAX / 16) {
             segment_upper[segment_no] = i + 1;
             segment_no++;
             seg_sum = 0;

@@ -6,8 +6,13 @@
  */
 
 #include <cstring>
+
+#include <hwy/highway.h>
+
 #include "parstree.h"
 #include "tools.h"
+
+namespace hn = hwy::HWY_NAMESPACE;
 
 ParsTree::ParsTree(): IQTree(){
     cost_matrix = NULL;
@@ -110,7 +115,8 @@ int ParsTree::computeParsimony(){
     assert(current_it_back);
 
     int nptn = aln->size();
-    if(_pattern_pars == NULL) _pattern_pars = aligned_alloc<BootValTypePars>(nptn + VCSIZE_USHORT);
+    if(_pattern_pars == NULL) _pattern_pars = aligned_alloc<BootValTypePars>(nptn
+                                                        + hn::Lanes(hn::ScalableTag<unsigned short>{}));
 
     return computeParsimonyBranch((PhyloNeighbor*) root->neighbors[0], (PhyloNode*) root);
 }
@@ -516,8 +522,10 @@ int ParsTree::computeParsimonyBranch(PhyloNeighbor *dad_branch, PhyloNode *dad, 
     }
 
     int nptn = aln->size();
-    if(!_pattern_pars) _pattern_pars = aligned_alloc<BootValTypePars>(nptn+VCSIZE_USHORT);
-    memset(_pattern_pars, 0, sizeof(BootValTypePars) * (nptn+VCSIZE_USHORT));
+    if(!_pattern_pars) _pattern_pars = aligned_alloc<BootValTypePars>(nptn +
+                                                        hn::Lanes(hn::ScalableTag<unsigned short>{}));
+    memset(_pattern_pars, 0, sizeof(BootValTypePars) * (nptn +
+                                                        hn::Lanes(hn::ScalableTag<unsigned short>{})));
 
     if ((dad_branch->partial_lh_computed & 2) == 0)
         computePartialParsimony(dad_branch, dad);

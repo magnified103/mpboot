@@ -104,29 +104,29 @@ inline void aligned_free(void *mem) {
 }
 
 
-#ifdef __AVX
-#define VectorClassMaster Vec4d
-#define VectorClassFloat Vec8f
-#define VectorClassInt Vec8i
-#define VectorClassUShort Vec16us
-#define VCSIZE_MASTER 4
-#define VCSIZE_FLOAT 8
-#define VCSIZE_INT 8
-#define VCSIZE_USHORT 16
-
-//#pragma message "Using AVX instructions"
-#else
-#define VectorClassMaster Vec2d
-#define VectorClassFloat Vec4f
-#define VectorClassInt Vec4i
-#define VectorClassUShort Vec8us
-#define VCSIZE_MASTER 2
-#define VCSIZE_FLOAT 4
-#define VCSIZE_INT 4
-#define VCSIZE_USHORT 8
-
-//#pragma message "Using SS3 instructions"
-#endif
+//#ifdef __AVX
+//#define VectorClassMaster Vec4d
+//#define VectorClassFloat Vec8f
+//#define VectorClassInt Vec8i
+//#define VectorClassUShort Vec16us
+//#define VCSIZE_MASTER 4
+//#define VCSIZE_FLOAT 8
+//#define VCSIZE_INT 8
+//#define VCSIZE_USHORT 16
+//
+////#pragma message "Using AVX instructions"
+//#else
+//#define VectorClassMaster Vec2d
+//#define VectorClassFloat Vec4f
+//#define VectorClassInt Vec4i
+//#define VectorClassUShort Vec8us
+//#define VCSIZE_MASTER 2
+//#define VCSIZE_FLOAT 4
+//#define VCSIZE_INT 4
+//#define VCSIZE_USHORT 8
+//
+////#pragma message "Using SS3 instructions"
+//#endif
 
 
 /**
@@ -552,7 +552,7 @@ public:
     void computePartialLikelihoodEigen(PhyloNeighbor *dad_branch, PhyloNode *dad = NULL);
 
 
-    template <class VectorClass, const int VCSIZE, const int nstates>
+    template <typename D, const int nstates>
     void computePartialLikelihoodEigenTipSSE(PhyloNeighbor *dad_branch, PhyloNode *dad = NULL);
 
     /**
@@ -581,7 +581,7 @@ public:
     template <const int nstates>
     double computeLikelihoodBranchEigen(PhyloNeighbor *dad_branch, PhyloNode *dad, double *pattern_lh = NULL);
 
-    template <class VectorClass, const int VCSIZE, const int nstates>
+    template <typename D, const int nstates>
     double computeLikelihoodBranchEigenTipSSE(PhyloNeighbor *dad_branch, PhyloNode *dad, double *pattern_lh = NULL);
 
 //    double computeLikelihoodBranchNaive(PhyloNeighbor *dad_branch, PhyloNode *dad, double *pattern_lh = NULL, double *pattern_rate = NULL);
@@ -742,7 +742,7 @@ public:
     template <const int nstates>
     double computeLikelihoodDervEigen(PhyloNeighbor *dad_branch, PhyloNode *dad, double &df, double &ddf);
 
-    template <class VectorClass, const int VCSIZE, const int nstates>
+    template <typename D, const int nstates>
     double computeLikelihoodDervEigenTipSSE(PhyloNeighbor *dad_branch, PhyloNode *dad, double &df, double &ddf);
 
     /**

@@ -9,13 +9,15 @@
 // Copyright: See COPYING file that comes with this distribution
 //
 //
+#include <algorithm>
+#include <limits>
+
+#include <hwy/highway.h>
 
 #include "phylotree.h"
 #include "bionj.h"
 //#include "rateheterogeneity.h"
 #include "alignmentpairwise.h"
-#include <algorithm>
-#include <limits>
 #include "timeutil.h"
 #include "nnisearch.h"
 #include "phylosupertree.h"
@@ -23,6 +25,8 @@
 #include "sprparsimony.h"
 //const static int BINARY_SCALE = floor(log2(1/SCALING_THRESHOLD));
 //const static double LOG_BINARY_SCALE = -(log(2) * BINARY_SCALE);
+
+namespace hn = hwy::HWY_NAMESPACE;
 
 /****************************************************************************
  SPRMoves class
@@ -1236,8 +1240,9 @@ int PhyloTree::computeParsimonyBranch(PhyloNeighbor *dad_branch, PhyloNode *dad,
     // }
 
     int nptn = aln->size();
-    if(!_pattern_pars) _pattern_pars = aligned_alloc<BootValTypePars>(nptn+VCSIZE_USHORT);
-    memset(_pattern_pars, 0, sizeof(BootValTypePars) * (nptn+VCSIZE_USHORT));
+    if(!_pattern_pars) _pattern_pars = aligned_alloc<BootValTypePars>(nptn
+                                                                      + hn::Lanes(hn::ScalableTag<unsigned short>{}));
+    memset(_pattern_pars, 0, sizeof(BootValTypePars) * (nptn + hn::Lanes(hn::ScalableTag<unsigned short>{})));
 
     if ((dad_branch->partial_lh_computed & 2) == 0)
         computePartialParsimony(dad_branch, dad);
@@ -1355,7 +1360,8 @@ int PhyloTree::computeParsimony() {
     assert(current_it_back);
 
     int nptn = aln->size();
-    if(_pattern_pars == NULL) _pattern_pars = aligned_alloc<BootValTypePars>(nptn + VCSIZE_USHORT);
+    if(_pattern_pars == NULL) _pattern_pars = aligned_alloc<BootValTypePars>(nptn
+                                                                    + hn::Lanes(hn::ScalableTag<unsigned short>{}));
     return computeParsimonyBranch((PhyloNeighbor*) root->neighbors[0], (PhyloNode*) root);
 }
 
