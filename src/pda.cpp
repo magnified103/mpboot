@@ -2217,9 +2217,11 @@ int main(int argc, char *argv[])
 
 	int instrset = instrset_detect();
 	if (instrset < 3) outError("Your CPU does not support SSE3!");
+#if defined __x86_64__
 	bool has_fma3 = hasFMA3();
 	bool has_fma4 = hasFMA4();
 	bool has_fma =  has_fma3 || has_fma4;
+#endif
 
 #ifdef __AVX
 	if (instrset < 7) {

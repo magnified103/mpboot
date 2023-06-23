@@ -101,7 +101,6 @@ static void initializeCostMatrix() {
     //        cout <<  " " << pllSegmentUpper[i];
     //    cout << endl;
 
-#if (defined(__SSE3) || defined(__AVX))
     assert(pllCostMatrix);
     if (!vectorCostMatrix) {
         rax_posix_memalign((void **)&(vectorCostMatrix), PLL_BYTE_ALIGNMENT,
@@ -124,9 +123,6 @@ static void initializeCostMatrix() {
                         pllCostMatrix[i * pllCostNstates + j];
         }
     }
-#else
-    vectorCostMatrix = NULL;
-#endif
 }
 
 // note: pllCostMatrix[i*pllCostNstates+j] = cost from i to j
@@ -174,11 +170,9 @@ static void computeTraversalInfoParsimonyTBR(nodeptr p, int *ti, int *counter,
     if (p->number <= maxTips) {
         return;
     }
-#if (defined(__SSE3) || defined(__AVX))
     if (perSiteScores && pllCostMatrix == NULL) {
         resetPerSiteNodeScores(iqtree->pllPartitions, p->number);
     }
-#endif
     recalculate[p->number] = false;
     if (!p->xPars)
         getxnodeLocal(p);
@@ -201,11 +195,9 @@ static void computeTraversalInfoParsimonyTBR(nodeptr p, int *ti, int *counter,
 static void computeTraversalInfoParsimony(nodeptr p, int *ti, int *counter,
                                           int maxTips, pllBoolean full,
                                           int perSiteScores) {
-#if (defined(__SSE3) || defined(__AVX))
     if (perSiteScores && pllCostMatrix == NULL) {
         resetPerSiteNodeScores(iqtree->pllPartitions, p->number);
     }
-#endif
 
     nodeptr q = p->next->back, r = p->next->next->back;
 
@@ -496,12 +488,7 @@ static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
             }
         }
 
-#if (defined(__SSE3) || defined(__AVX))
         pr->partitionData[model]->parsimonyLength = compressedEntriesPadded;
-#else
-        pr->partitionData[model]->parsimonyLength =
-            compressedEntries; // for unvectorized version
-#endif
         //	cout << "compressedEntries = " << compressedEntries << endl;
         //      rax_free(compressedTips);
         //      rax_free(compressedValues);
