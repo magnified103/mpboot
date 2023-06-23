@@ -449,6 +449,7 @@ void newviewSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
     }
 }
 
+template <typename Traits>
 void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                                     int perSiteScores) {
     if (pllCostMatrix) {
@@ -504,39 +505,28 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
             size_t k, states = pr->partitionData[model]->states,
                       width = pr->partitionData[model]->parsimonyLength;
 
+            ParsProxy<Traits> parsVect(width, states, pr->partitionData[model]->parsVect);
+            auto left = parsVect[qNumber], right=parsVect[rNumber], cur = parsVect[pNumber];
+
             switch (states) {
             case 2: {
-                parsimonyNumber *left[2], *right[2], *cur[2];
-
-                for (k = 0; k < 2; ++k) {
-                    left[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 2 * qNumber) + width * k]);
-                    right[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 2 * rNumber) + width * k]);
-                    cur[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 2 * pNumber) + width * k]);
-                }
-
                 for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
                     hn::Vec<decltype(d)> s_r, s_l, v_N, l_A, l_C, v_A, v_C;
 
-                    s_l = hn::Load(d, &left[0][i]);
-                    s_r = hn::Load(d, &right[0][i]);
+                    s_l = hn::Load(d, left[i][0]);
+                    s_r = hn::Load(d, right[i][0]);
                     l_A = s_l & s_r;
                     v_A = s_l | s_r;
 
-                    s_l = hn::Load(d, &left[1][i]);
-                    s_r = hn::Load(d, &right[1][i]);
+                    s_l = hn::Load(d, left[i][1]);
+                    s_r = hn::Load(d, right[i][1]);
                     l_C = s_l & s_r;
                     v_C = s_l | s_r;
 
                     v_N = l_A | l_C;
 
-                    hn::Store(l_A | hn::AndNot(v_N, v_A), d, &cur[0][i]);
-                    hn::Store(l_C | hn::AndNot(v_N, v_C), d, &cur[1][i]);
+                    hn::Store(l_A | hn::AndNot(v_N, v_A), d, cur[i][0]);
+                    hn::Store(l_C | hn::AndNot(v_N, v_C), d, cur[i][1]);
 
                     v_N = hn::Not(v_N);
 
@@ -546,49 +536,35 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                 }
             } break;
             case 4: {
-                parsimonyNumber *left[4], *right[4], *cur[4];
-
-                for (k = 0; k < 4; ++k) {
-                    left[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 4 * qNumber) + width * k]);
-                    right[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 4 * rNumber) + width * k]);
-                    cur[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 4 * pNumber) + width * k]);
-                }
-
                 for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
                     hn::Vec<decltype(d)> s_r, s_l, v_N, l_A, l_C, l_G, l_T, v_A, v_C, v_G, v_T;
 
-                    s_l = hn::Load(d, &left[0][i]);
-                    s_r = hn::Load(d, &right[0][i]);
+                    s_l = hn::Load(d, left[i][0]);
+                    s_r = hn::Load(d, right[i][0]);
                     l_A = s_l & s_r;
                     v_A = s_l | s_r;
 
-                    s_l = hn::Load(d, &left[1][i]);
-                    s_r = hn::Load(d, &right[1][i]);
+                    s_l = hn::Load(d, left[i][1]);
+                    s_r = hn::Load(d, right[i][1]);
                     l_C = s_l & s_r;
                     v_C = s_l | s_r;
 
-                    s_l = hn::Load(d, &left[2][i]);
-                    s_r = hn::Load(d, &right[2][i]);
+                    s_l = hn::Load(d, left[i][2]);
+                    s_r = hn::Load(d, right[i][2]);
                     l_G = s_l & s_r;
                     v_G = s_l | s_r;
 
-                    s_l = hn::Load(d, &left[3][i]);
-                    s_r = hn::Load(d, &right[3][i]);
+                    s_l = hn::Load(d, left[i][3]);
+                    s_r = hn::Load(d, right[i][3]);
                     l_T = s_l & s_r;
                     v_T = s_l | s_r;
 
                     v_N = (l_A | l_C) | (l_G | l_T);
 
-                    hn::Store(l_A | hn::AndNot(v_N, v_A), d, &cur[0][i]);
-                    hn::Store(l_C | hn::AndNot(v_N, v_C), d, &cur[1][i]);
-                    hn::Store(l_G | hn::AndNot(v_N, v_G), d, &cur[2][i]);
-                    hn::Store(l_T | hn::AndNot(v_N, v_T), d, &cur[3][i]);
+                    hn::Store(l_A | hn::AndNot(v_N, v_A), d, cur[i][0]);
+                    hn::Store(l_C | hn::AndNot(v_N, v_C), d, cur[i][1]);
+                    hn::Store(l_G | hn::AndNot(v_N, v_G), d, cur[i][2]);
+                    hn::Store(l_T | hn::AndNot(v_N, v_T), d, cur[i][3]);
 
                     v_N = hn::Not(v_N);
 
@@ -598,26 +574,12 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                 }
             } break;
             case 20: {
-                parsimonyNumber *left[20], *right[20], *cur[20];
-
-                for (k = 0; k < 20; ++k) {
-                    left[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 20 * qNumber) + width * k]);
-                    right[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 20 * rNumber) + width * k]);
-                    cur[k] =
-                        &(pr->partitionData[model]
-                              ->parsVect[(width * 20 * pNumber) + width * k]);
-                }
-
                 for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
                     hn::Vec<decltype(d)> s_r, s_l, v_N = hn::Zero(d), l_A[20], v_A[20];
 
                     for (std::size_t j = 0; j < 20; j++) {
-                        s_l = hn::Load(d, &left[j][i]);
-                        s_r = hn::Load(d, &right[j][i]);
+                        s_l = hn::Load(d, left[i][j]);
+                        s_r = hn::Load(d, right[i][j]);
                         l_A[j] = s_l & s_r;
                         v_A[j] = s_l | s_r;
 
@@ -625,7 +587,7 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                     }
 
                     for (std::size_t j = 0; j < 20; j++)
-                        hn::Store(l_A[j] | hn::AndNot(v_N, v_A[j]), d, &cur[j][i]);
+                        hn::Store(l_A[j] | hn::AndNot(v_N, v_A[j]), d, cur[i][j]);
 
                     v_N = hn::Not(v_N);
 
@@ -634,31 +596,13 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                         storePerSiteNodeScores(pr, model, v_N, i, pNumber);
                 }
             } break;
-            default:
-
-            {
-                parsimonyNumber *left[32], *right[32], *cur[32];
-
-                assert(states <= 32);
-
-                for (k = 0; k < states; ++k) {
-                    left[k] = &(
-                        pr->partitionData[model]
-                            ->parsVect[(width * states * qNumber) + width * k]);
-                    right[k] = &(
-                        pr->partitionData[model]
-                            ->parsVect[(width * states * rNumber) + width * k]);
-                    cur[k] = &(
-                        pr->partitionData[model]
-                            ->parsVect[(width * states * pNumber) + width * k]);
-                }
-
+            default: {
                 for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
                     hn::Vec<decltype(d)> s_r, s_l, v_N = hn::Zero(d), l_A[32], v_A[32];
 
                     for (std::size_t j = 0; j < states; j++) {
-                        s_l = hn::Load(d, &left[j][i]);
-                        s_r = hn::Load(d, &right[j][i]);
+                        s_l = hn::Load(d, left[i][j]);
+                        s_r = hn::Load(d, right[i][j]);
                         l_A[j] = s_l & s_r;
                         v_A[j] = s_l | s_r;
 
@@ -666,7 +610,7 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                     }
 
                     for (std::size_t j = 0; j < states; j++)
-                        hn::Store(l_A[j] | hn::AndNot(v_N, v_A[j]), d, &cur[j][i]);
+                        hn::Store(l_A[j] | hn::AndNot(v_N, v_A[j]), d, cur[i][j]);
 
                     v_N = hn::Not(v_N);
 
@@ -674,7 +618,7 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                     if (perSiteScores)
                         storePerSiteNodeScores(pr, model, v_N, i, pNumber);
                 }
-            }
+            } break;
             }
         }
 
@@ -793,6 +737,7 @@ parsimonyNumber evaluateSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
     return total_sum;
 }
 
+template <typename Traits>
 unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                                              int perSiteScores) {
     if (pllCostMatrix) {
@@ -844,21 +789,16 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
         size_t states = pr->partitionData[model]->states,
                 width = pr->partitionData[model]->parsimonyLength;
         // cout << "Num states = " << states << '\n';
+
+        ParsProxy<Traits> parsVect(width, states, pr->partitionData[model]->parsVect);
+        auto left = parsVect[qNumber], right = parsVect[pNumber];
+
         switch (states) {
         case 2: {
-            parsimonyNumber *left[2], *right[2];
-
-            for (std::size_t k = 0; k < 2; ++k) {
-                left[k] = &(pr->partitionData[model]
-                                ->parsVect[(width * 2 * qNumber) + width * k]);
-                right[k] = &(pr->partitionData[model]
-                                 ->parsVect[(width * 2 * pNumber) + width * k]);
-            }
-
             for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
                 hn::Vec<decltype(d)>
-                l_A = hn::Load(d, &left[0][i]) & hn::Load(d, &right[0][i]),
-                l_C = hn::Load(d, &left[1][i]) & hn::Load(d, &right[1][i]),
+                l_A = hn::Load(d, left[i][0]) & hn::Load(d, right[i][0]),
+                l_C = hn::Load(d, left[i][1]) & hn::Load(d, right[i][1]),
                 v_N = l_A | l_C;
 
                 v_N = hn::Not(v_N);
@@ -873,21 +813,12 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
             }
         } break;
         case 4: {
-            parsimonyNumber *left[4], *right[4];
-
-            for (std::size_t k = 0; k < 4; ++k) {
-                left[k] = &(pr->partitionData[model]
-                                ->parsVect[(width * 4 * qNumber) + width * k]);
-                right[k] = &(pr->partitionData[model]
-                                 ->parsVect[(width * 4 * pNumber) + width * k]);
-            }
-
             for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
                 hn::Vec<decltype(d)>
-                l_A = hn::Load(d, &left[0][i]) & hn::Load(d, &right[0][i]),
-                l_C = hn::Load(d, &left[1][i]) & hn::Load(d, &right[1][i]),
-                l_G = hn::Load(d, &left[2][i]) & hn::Load(d, &right[2][i]),
-                l_T = hn::Load(d, &left[3][i]) & hn::Load(d, &right[3][i]),
+                l_A = hn::Load(d, left[i][0]) & hn::Load(d, right[i][0]),
+                l_C = hn::Load(d, left[i][1]) & hn::Load(d, right[i][1]),
+                l_G = hn::Load(d, left[i][2]) & hn::Load(d, right[i][2]),
+                l_T = hn::Load(d, left[i][3]) & hn::Load(d, right[i][3]),
                 v_N = (l_A | l_C) | (l_G | l_T);
 
                 v_N = hn::Not(v_N);
@@ -901,21 +832,11 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
             }
         } break;
         case 20: {
-            parsimonyNumber *left[20], *right[20];
-
-            for (std::size_t k = 0; k < 20; ++k) {
-                left[k] = &(pr->partitionData[model]
-                                ->parsVect[(width * 20 * qNumber) + width * k]);
-                right[k] =
-                    &(pr->partitionData[model]
-                          ->parsVect[(width * 20 * pNumber) + width * k]);
-            }
-
             for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
                 hn::Vec<decltype(d)> l_A, v_N = hn::Zero(d);
 
                 for (std::size_t j = 0; j < 20; j++) {
-                    l_A = (hn::Load(d, &left[j][i]) & hn::Load(d, &right[j][i]));
+                    l_A = (hn::Load(d, left[i][j]) & hn::Load(d, right[i][j]));
                     v_N = l_A | v_N;
                 }
 
@@ -930,24 +851,11 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
             }
         } break;
         default: {
-            parsimonyNumber *left[32], *right[32];
-
-            assert(states <= 32);
-
-            for (std::size_t k = 0; k < states; ++k) {
-                left[k] =
-                    &(pr->partitionData[model]
-                          ->parsVect[(width * states * qNumber) + width * k]);
-                right[k] =
-                    &(pr->partitionData[model]
-                          ->parsVect[(width * states * pNumber) + width * k]);
-            }
-
             for (std::size_t i = 0; i < width; i += hn::Lanes(d)) {
                 hn::Vec<decltype(d)> l_A, v_N = hn::Zero(d);
 
                 for (std::size_t j = 0; j < states; j++) {
-                    l_A = hn::Load(d, &left[j][i]) & hn::Load(d, &right[j][i]);
+                    l_A = hn::Load(d, left[i][j]) & hn::Load(d, right[i][j]);
                     v_N = l_A | v_N;
                 }
 
@@ -2361,6 +2269,9 @@ static void compressDNA(pllInstance *tr, partitionList *pr, int *informative,
 
         rax_free(compressedTips);
         rax_free(compressedValues);
+
+        // table transform
+        table_transform(pr->partitionData[model]->parsVect, totalNodes, states, compressedEntriesPadded);
     }
 
     rax_posix_memalign((void **)&(tr->parsimonyScore), PLL_BYTE_ALIGNMENT,

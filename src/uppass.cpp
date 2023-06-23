@@ -90,49 +90,6 @@ static bool first_call =
     true; // is this the first call to pllOptimizeSprParsimony
 static bool doing_stepwise_addition = false; // is the stepwise addition on
 
-using DefaultParsProxyTraits = ParsProxyTraits<parsimonyNumber, hn::Lanes(hn::ScalableTag<unsigned int>{}), std::align_val_t{PLL_BYTE_ALIGNMENT}>;
-
-constexpr std::size_t BLOCK_SIZE = hn::Lanes(hn::ScalableTag<unsigned int>{});
-
-inline constexpr std::size_t table_index(std::size_t width, std::size_t states, std::size_t node_id,
-                                         std::size_t state_id, std::size_t col_id) {
-    return states * width * node_id + states * (col_id / BLOCK_SIZE) * BLOCK_SIZE + BLOCK_SIZE * state_id + (col_id % BLOCK_SIZE);
-}
-
-inline constexpr std::size_t table_index_divisible(std::size_t width, std::size_t states, std::size_t node_id,
-                                                   std::size_t state_id, std::size_t col_id) {
-    return states * width * node_id + states * col_id + BLOCK_SIZE * state_id;
-}
-
-inline constexpr std::size_t next_column_block(std::size_t states, std::size_t pos) {
-    return pos + BLOCK_SIZE * states;
-}
-
-inline constexpr std::size_t next_column_simd(std::size_t states, std::size_t pos) {
-    return next_column_block(states, pos);
-}
-
-inline constexpr std::size_t next_state(std::size_t pos, std::size_t step = 1) {
-    return pos + BLOCK_SIZE * step;
-}
-
-/**
- * Tranform the table schema from (node x state x column) to the designated representation
- * @tparam T
- * @param table
- */
-template <typename T>
-inline void table_transform(T* table, int nodes, int states, int width) {
-    std::vector<T> tmp(table, table + (nodes * states * width));
-    for (int node = 0; node < nodes; node++) {
-        for (int state = 0; state < states; state++) {
-            for (int col = 0; col < width; col++) {
-                table[table_index(width, states, node, state, col)] = tmp[node * states * width + state * width + col];
-            }
-        }
-    }
-}
-
 template <typename T = std::uint64_t>
 static inline unsigned int vectorPopcount(hn::Vec<hn::ScalableTag<parsimonyNumber>> v) {
     constexpr hn::ScalableTag<T> d;

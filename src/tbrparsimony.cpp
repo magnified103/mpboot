@@ -670,6 +670,9 @@ static void compressDNA(pllInstance *tr, partitionList *pr, int *informative,
 
         rax_free(compressedTips);
         rax_free(compressedValues);
+
+        // table transform
+        table_transform(pr->partitionData[model]->parsVect, totalNodes, states, compressedEntriesPadded);
     }
 
     rax_posix_memalign((void **)&(tr->parsimonyScore), PLL_BYTE_ALIGNMENT,

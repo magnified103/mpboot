@@ -9,6 +9,7 @@
 #define SPRPARSIMONY_H_
 
 #include "iqtree.h"
+#include "parsvect.h"
 #include "pllrepo/src/pll.h"
 
 void resetGlobalParamOnNewAln(); // Diep 2021-12-28: This serves analysis
@@ -79,6 +80,7 @@ template <class VectorClass, class Numeric, const size_t states>
 void newviewSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
                                               partitionList *pr);
 
+template <typename Traits = DefaultParsProxyTraits>
 void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                                     int perSiteScores);
 
@@ -88,6 +90,7 @@ parsimonyNumber evaluateSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
                                                           partitionList *pr,
                                                           int perSiteScores);
 
+template <typename Traits = DefaultParsProxyTraits>
 unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                                              int perSiteScores);
 /**
