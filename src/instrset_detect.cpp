@@ -13,7 +13,7 @@
 
 #include "instrset.h"
 
-
+#if defined(__x86_64__)
 // Define interface to xgetbv instruction
 static inline uint64_t xgetbv (int ctr) {
 #if (defined (_MSC_FULL_VER) && _MSC_FULL_VER >= 160040000) || (defined (__INTEL_COMPILER) && __INTEL_COMPILER >= 1200)
@@ -41,6 +41,7 @@ static inline uint64_t xgetbv (int ctr) {
 
 #endif
 }
+#endif
 
 /* find supported instruction set
     return value:
@@ -65,7 +66,7 @@ int instrset_detect(void) {
     iset = 0;                                              // default value
 #if defined(__aarch64__) || defined(_M_ARM64)
     iset = 6;                                              // arm64 neon
-#else
+#elif defined(__x86_64__)
     int abcd[4] = {0,0,0,0};                               // cpuid results
     cpuid(abcd, 0);                                        // call cpuid function 0
     if (abcd[0] == 0) return iset;                         // no further cpuid function supported
@@ -106,6 +107,7 @@ int instrset_detect(void) {
     return iset;
 }
 
+#if defined(__x86_64__)
 // detect if CPU supports the FMA3 instruction set
 bool hasFMA3(void) {
     if (instrset_detect() < 7) return false;               // must have AVX
@@ -169,13 +171,12 @@ bool hasAVX512FP16(void) {
     cpuid(abcd, 7);                                        // call cpuid function 1
     return ((abcd[3] & (1 << 23)) != 0);                   // edx bit 23 indicates AVX512_FP16
 }
+#endif
 
+#if defined(__aarch64__) || defined(_M_ARM64)
 // detect if CPU supports the NEON instruction set
 bool hasNEON(void) {
     // NEON is supported on any ARMv8-A (or above) based platform
-#if defined(__aarch64__) || defined(_M_ARM64)
     return 1;
-#else
-    return 0;
-#endif
 }
+#endif

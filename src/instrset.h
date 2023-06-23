@@ -102,11 +102,13 @@
 #endif
 #endif
 
+#if defined(__x86_64__)
 // Header files for non-vector intrinsic functions including _BitScanReverse(int), __cpuid(int[4],int), _xgetbv(int)
 #ifdef _MSC_VER                        // Microsoft compiler or compatible Intel compiler
 #include <intrin.h>
 #else
 #include <x86intrin.h>                 // Gcc or Clang compiler
+#endif
 #endif
 
 #include <stdint.h>                    // Define integer types with known size
@@ -133,6 +135,7 @@ int physicalProcessors(int * logical_processors = 0);
 *
 *****************************************************************************/
 
+#if defined(__x86_64__)
 // Define interface to cpuid instruction.
 // input:  functionnumber = leaf (eax), ecxleaf = subleaf(ecx)
 // output: output[0] = eax, output[1] = ebx, output[2] = ecx, output[3] = edx
@@ -161,6 +164,7 @@ static inline void cpuid(int output[4], int functionnumber, int ecxleaf = 0) {
     }
 #endif
 }
+#endif
 
 
 #endif // INSTRSET_H
