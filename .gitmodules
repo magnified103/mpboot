@@ -5,6 +5,3 @@
 [submodule "extern/highway"]
 	path = extern/highway
 	url = https://github.com/google/highway.git
-[submodule "extern/vectorclass/vectorclass"]
-	path = extern/vectorclass/vectorclass
-	url = https://github.com/vectorclass/version2.git

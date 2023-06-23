@@ -128,8 +128,8 @@ target_include_directories(mpboot PRIVATE ${zlib_SOURCE_DIR} ${zlib_BINARY_DIR})
 target_link_libraries(mpboot PRIVATE zlib)
 
 ## vectorclass version 1
-add_subdirectory("${PROJECT_SOURCE_DIR}/extern/vectorclass" "${PROJECT_BINARY_DIR}/extern/vectorclass")
-target_link_libraries(mpboot PRIVATE vectorclass)
+#add_subdirectory("${PROJECT_SOURCE_DIR}/extern/vectorclass" "${PROJECT_BINARY_DIR}/extern/vectorclass")
+#target_link_libraries(mpboot PRIVATE vectorclass)
 
 ## Highway 1.0.4
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/highway" "${PROJECT_BINARY_DIR}/extern/highway")
