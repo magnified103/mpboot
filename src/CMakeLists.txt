@@ -132,6 +132,8 @@ target_link_libraries(mpboot PRIVATE zlib)
 #target_link_libraries(mpboot PRIVATE vectorclass)
 
 ## Highway 1.0.4
+set(HWY_ENABLE_EXAMPLES OFF)
+set(HWY_ENABLE_TESTS OFF)
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/highway" "${PROJECT_BINARY_DIR}/extern/highway")
 target_link_libraries(mpboot PRIVATE hwy)
 
