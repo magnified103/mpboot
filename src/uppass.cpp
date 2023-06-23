@@ -4,13 +4,6 @@
  *  Created on: Apr 22, 2023
  *      Author: HynDuf
  */
-#include "uppass.h"
-#include "parstree.h"
-#include "tools.h"
-#include <algorithm>
-#include <bitset>
-// #include <chrono>
-#include <string>
 /**
  * PLL (version 1.0.0) a software library for phylogenetic inference
  * Copyright (C) 2013 Tomas Flouri and Alexandros Stamatakis
@@ -39,87 +32,100 @@
  *
  * @file fastDNAparsimony.c
  */
+#include <algorithm>
+#include <bitset>
+// #include <chrono>
+#include <string>
 
-#if defined(__MIC_NATIVE)
+#include <hwy/highway.h>
 
-#include <immintrin.h>
+#include "uppass.h"
+#include "parstree.h"
+#include "tools.h"
 
-#define VECTOR_SIZE 16
-#define USHORT_PER_VECTOR 32
-#define INTS_PER_VECTOR 16
-#define LONG_INTS_PER_VECTOR 8
-// #define LONG_INTS_PER_VECTOR (64/sizeof(long))
-#define INT_TYPE __m512i
-#define CAST double *
-#define SET_ALL_BITS_ONE _mm512_set1_epi32(0xFFFFFFFF)
-#define SET_ALL_BITS_ZERO _mm512_setzero_epi32()
-#define VECTOR_LOAD _mm512_load_epi32
-#define VECTOR_STORE _mm512_store_epi32
-#define VECTOR_BIT_AND _mm512_and_epi32
-#define VECTOR_BIT_OR _mm512_or_epi32
-#define VECTOR_AND_NOT _mm512_andnot_epi32
-#define VECTOR_BIT_XOR _mm512_xor_epi32
-
-#elif defined(__AVX)
-
-#include "vectorclass/vectorclass.h"
-#include <immintrin.h>
-#include <pmmintrin.h>
-#include <xmmintrin.h>
-
-#define VECTOR_SIZE 8
-#define ULINT_SIZE 64
-#define USHORT_PER_VECTOR 16
-#define INTS_PER_VECTOR 8
-#define LONG_INTS_PER_VECTOR 4
-// #define LONG_INTS_PER_VECTOR (32/sizeof(long))
-#define INT_TYPE __m256d
-#define CAST double *
-#define SET_ALL_BITS_ONE _mm256_castsi256_pd(_mm256_set1_epi32(0xffffffff))
-#define SET_ALL_BITS_ZERO _mm256_setzero_pd()
-#define VECTOR_LOAD _mm256_load_pd
-#define VECTOR_BIT_AND _mm256_and_pd
-#define VECTOR_BIT_OR _mm256_or_pd
-#define VECTOR_STORE _mm256_store_pd
-#define VECTOR_AND_NOT _mm256_andnot_pd
-#define VECTOR_BIT_XOR _mm256_xor_pd
-
-#elif (defined(__SSE3))
-
-#include "vectorclass/vectorclass.h"
-#include <pmmintrin.h>
-#include <xmmintrin.h>
-
-#define VECTOR_SIZE 4
-#define USHORT_PER_VECTOR 8
-#define INTS_PER_VECTOR 4
-#ifdef __i386__
-#define ULINT_SIZE 32
-#define LONG_INTS_PER_VECTOR 4
-// #define LONG_INTS_PER_VECTOR (16/sizeof(long))
-#else
-#define ULINT_SIZE 64
-#define LONG_INTS_PER_VECTOR 2
-// #define LONG_INTS_PER_VECTOR (16/sizeof(long))
-#endif
-#define INT_TYPE __m128i
-#define CAST __m128i *
-#define SET_ALL_BITS_ONE _mm_set1_epi32(0xffffffff)
-#define SET_ALL_BITS_ZERO _mm_setzero_si128()
-#define VECTOR_LOAD _mm_load_si128
-#define VECTOR_BIT_AND _mm_and_si128
-#define VECTOR_BIT_OR _mm_or_si128
-#define VECTOR_STORE _mm_store_si128
-#define VECTOR_AND_NOT _mm_andnot_si128
-#define VECTOR_BIT_XOR _mm_xor_si128
-
-#else
-// no vectorization
-#define VECTOR_SIZE 1
-#endif
-
+// TODO: fix this linker error
 #include "pllrepo/src/pll.h"
 #include "pllrepo/src/pllInternal.h"
+
+namespace hn = hwy::HWY_NAMESPACE;
+
+//#if defined(__MIC_NATIVE)
+//
+//#include <immintrin.h>
+//
+//#define VECTOR_SIZE 16
+//#define USHORT_PER_VECTOR 32
+//#define INTS_PER_VECTOR 16
+//#define LONG_INTS_PER_VECTOR 8
+//// #define LONG_INTS_PER_VECTOR (64/sizeof(long))
+//#define INT_TYPE __m512i
+//#define CAST double *
+//#define SET_ALL_BITS_ONE _mm512_set1_epi32(0xFFFFFFFF)
+//#define SET_ALL_BITS_ZERO _mm512_setzero_epi32()
+//#define VECTOR_LOAD _mm512_load_epi32
+//#define VECTOR_STORE _mm512_store_epi32
+//#define VECTOR_BIT_AND _mm512_and_epi32
+//#define VECTOR_BIT_OR _mm512_or_epi32
+//#define VECTOR_AND_NOT _mm512_andnot_epi32
+//#define VECTOR_BIT_XOR _mm512_xor_epi32
+//
+//#elif defined(__AVX)
+//
+//#include "vectorclass/vectorclass.h"
+//#include <immintrin.h>
+//#include <pmmintrin.h>
+//#include <xmmintrin.h>
+//
+//#define VECTOR_SIZE 8
+//#define ULINT_SIZE 64
+//#define USHORT_PER_VECTOR 16
+//#define INTS_PER_VECTOR 8
+//#define LONG_INTS_PER_VECTOR 4
+//// #define LONG_INTS_PER_VECTOR (32/sizeof(long))
+//#define INT_TYPE __m256d
+//#define CAST double *
+//#define SET_ALL_BITS_ONE _mm256_castsi256_pd(_mm256_set1_epi32(0xffffffff))
+//#define SET_ALL_BITS_ZERO _mm256_setzero_pd()
+//#define VECTOR_LOAD _mm256_load_pd
+//#define VECTOR_BIT_AND _mm256_and_pd
+//#define VECTOR_BIT_OR _mm256_or_pd
+//#define VECTOR_STORE _mm256_store_pd
+//#define VECTOR_AND_NOT _mm256_andnot_pd
+//#define VECTOR_BIT_XOR _mm256_xor_pd
+//
+//#elif (defined(__SSE3))
+//
+//#include "vectorclass/vectorclass.h"
+//#include <pmmintrin.h>
+//#include <xmmintrin.h>
+//
+//#define VECTOR_SIZE 4
+//#define USHORT_PER_VECTOR 8
+//#define INTS_PER_VECTOR 4
+//#ifdef __i386__
+//#define ULINT_SIZE 32
+//#define LONG_INTS_PER_VECTOR 4
+//// #define LONG_INTS_PER_VECTOR (16/sizeof(long))
+//#else
+//#define ULINT_SIZE 64
+//#define LONG_INTS_PER_VECTOR 2
+//// #define LONG_INTS_PER_VECTOR (16/sizeof(long))
+//#endif
+//#define INT_TYPE __m128i
+//#define CAST __m128i *
+//#define SET_ALL_BITS_ONE _mm_set1_epi32(0xffffffff)
+//#define SET_ALL_BITS_ZERO _mm_setzero_si128()
+//#define VECTOR_LOAD _mm_load_si128
+//#define VECTOR_BIT_AND _mm_and_si128
+//#define VECTOR_BIT_OR _mm_or_si128
+//#define VECTOR_STORE _mm_store_si128
+//#define VECTOR_AND_NOT _mm_andnot_si128
+//#define VECTOR_BIT_XOR _mm_xor_si128
+//
+//#else
+//// no vectorization
+//#define VECTOR_SIZE 1
+//#endif
 
 static pllBoolean tipHomogeneityCheckerPars(pllInstance *tr, nodeptr p,
                                             int grouping);
@@ -162,9 +168,9 @@ static bool first_call =
     true; // is this the first call to pllOptimizeSprParsimony
 static bool doing_stepwise_addition = false; // is the stepwise addition on
 
-using DefaultParsProxyTraits = ParsProxyTraits<parsimonyNumber, INTS_PER_VECTOR, std::align_val_t{PLL_BYTE_ALIGNMENT}>;
+using DefaultParsProxyTraits = ParsProxyTraits<parsimonyNumber, hn::Lanes(hn::ScalableTag<unsigned int>{}), std::align_val_t{PLL_BYTE_ALIGNMENT}>;
 
-constexpr std::size_t BLOCK_SIZE = INTS_PER_VECTOR;
+constexpr std::size_t BLOCK_SIZE = hn::Lanes(hn::ScalableTag<unsigned int>{});
 
 inline constexpr std::size_t table_index(std::size_t width, std::size_t states, std::size_t node_id,
                                          std::size_t state_id, std::size_t col_id) {
@@ -205,104 +211,101 @@ inline void table_transform(T* table, int nodes, int states, int width) {
     }
 }
 
-#if (defined(__SSE3) || defined(__AVX))
-static inline unsigned int vectorPopcount(INT_TYPE v) {
-    alignas(PLL_BYTE_ALIGNMENT) unsigned long counts[LONG_INTS_PER_VECTOR];
+template <typename T = std::uint64_t>
+static inline unsigned int vectorPopcount(hn::Vec<hn::ScalableTag<parsimonyNumber>> v) {
+    constexpr hn::ScalableTag<T> d;
+
+    HWY_ALIGN T counts[hn::Lanes(d)];
+    hn::Store(hn::BitCast(d, v), d, counts);
 
     unsigned int sum = 0;
-
-    VECTOR_STORE((CAST)counts, v);
-
-    for (auto count: counts) {
-        sum += __builtin_popcountll(count);
+    for (std::size_t i = 0; i < hn::Lanes(d); i++) {
+        sum += __builtin_popcountll(counts[i]);
     }
     return sum;
 }
-#endif
 
 /********************************DNA FUNCTIONS
  * *****************************************************************/
 
+template <class T, T... Ints>
+static constexpr std::array<T, sizeof...(Ints)> maskShift(std::integer_sequence<T, Ints...>) {
+    return std::array<T, sizeof...(Ints)>{(1ULL << Ints)...};
+}
+
+template <class T, std::size_t N>
+static constexpr std::array<T, N> maskShiftIota() {
+    return maskShift(std::make_integer_sequence<T, N>{});
+}
+
 // Diep:
 // store per site score to nodeNumber
-#if (defined(__SSE3) || defined(__AVX))
+template <typename T = parsimonyNumber>
 static inline void storePerSiteNodeScores(partitionList *pr, int model,
-                                          INT_TYPE v, unsigned int offset,
-                                          int nodeNumber) {
+                                          hn::Vec<hn::ScalableTag<parsimonyNumber>> v,
+                                          unsigned int offset, int nodeNumber) {
+    constexpr hn::ScalableTag<T> d;
 
-    unsigned long counts[LONG_INTS_PER_VECTOR]
-        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
-    parsimonyNumber *buf;
-
-    int i, j;
-
-    VECTOR_STORE((CAST)counts, v);
+    HWY_ALIGN T counts[hn::Lanes(d)];
+    hn::Store(hn::BitCast(d, v), d, counts);
 
     int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
     int nodeStart = partialParsLength * nodeNumber;
     int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
-    for (i = 0; i < LONG_INTS_PER_VECTOR; ++i) {
-        buf = &(
-            pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
-        nodeStartPlusOffset += ULINT_SIZE;
+    for (std::size_t i = 0; i < hn::Lanes(d); ++i) {
+        parsimonyNumber *buf = &(pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
+        nodeStartPlusOffset += sizeof(T) * 8;
         //		buf =
         //&(pr->partitionData[model]->perSitePartialPars[nodeStart +
         // offset * PLL_PCF + i * ULINT_SIZE]); // Diep's 		buf =
         //&(pr->partitionData[model]->perSitePartialPars[nodeStart + offset *
         // PLL_PCF + i]); // Tomas's code
-        for (j = 0; j < ULINT_SIZE; ++j)
+#if HWY_TARGET == HWY_SCALAR
+        for (std::size_t j = 0; j < sizeof(T) * 8; ++j) {
             buf[j] += ((counts[i] >> j) & 1);
+        }
+#else
+        static_assert(sizeof(T) * 8 % hn::Lanes(d) == 0, "Lanes(d) must divides 8T");
+
+        HWY_ALIGN constexpr std::array<T, hn::Lanes(d)> mask_data = maskShiftIota<T, hn::Lanes(d)>();
+        auto mask = hn::Load(d, mask_data.data());
+        auto w = hn::Set(d, counts[i]);
+        for (std::size_t j = 0; j < sizeof(T) * 8; j += hn::Lanes(d)) {
+            auto result = ((w & mask) == mask);
+            // buf[j] = buf[j] + 1 = buf[j] - (0xFFFFFFFF)
+            // buf[j] = buf[j] + 0 = buf[j] - (0x00000000)
+            hn::Store(hn::Load(d, &buf[j]) - hn::VecFromMask(d, result), d, &buf[j]);
+            w = hn::ShiftRight<hn::Lanes(d)>(w);
+        }
+#endif
     }
 }
 
 // Diep:
 // Add site scores in q and r to p
 // q and r are children of p
-template <class VectorClass>
-static void addPerSiteSubtreeScoresSIMD(partitionList *pr, int pNumber,
-                                        int qNumber, int rNumber) {
-    assert(VectorClass::size() == INTS_PER_VECTOR);
+template <typename T = parsimonyNumber>
+static inline void addPerSiteSubtreeScores(partitionList *pr, int pNumber, int qNumber,
+                                           int rNumber) {
+    constexpr hn::ScalableTag<T> d;
+//    static_assert(hn::Lanes(d) == INTS_PER_VECTOR);
     parsimonyNumber *pBuf, *qBuf, *rBuf;
     for (int i = 0; i < pr->numberOfPartitions; ++i) {
         int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
         pBuf = &(pr->partitionData[i]
-                     ->perSitePartialPars[partialParsLength * pNumber]);
+                ->perSitePartialPars[partialParsLength * pNumber]);
         qBuf = &(pr->partitionData[i]
-                     ->perSitePartialPars[partialParsLength * qNumber]);
+                ->perSitePartialPars[partialParsLength * qNumber]);
         rBuf = &(pr->partitionData[i]
-                     ->perSitePartialPars[partialParsLength * rNumber]);
-        for (int k = 0; k < partialParsLength; k += VectorClass::size()) {
-            VectorClass *pBufVC = (VectorClass *)&pBuf[k];
-            VectorClass *qBufVC = (VectorClass *)&qBuf[k];
-            VectorClass *rBufVC = (VectorClass *)&rBuf[k];
-            *pBufVC += *qBufVC + *rBufVC;
+                ->perSitePartialPars[partialParsLength * rNumber]);
+        for (std::size_t k = 0; k < partialParsLength; k += hn::Lanes(d)) {
+            auto pBufVec = hn::Load(d, &pBuf[k]);
+            auto qBufVec = hn::Load(d, &qBuf[k]);
+            auto rBufVec = hn::Load(d, &rBuf[k]);
+            pBufVec += qBufVec + rBufVec;
+            hn::Store(pBufVec, d, &pBuf[k]);
         }
     }
-}
-
-// Diep:
-// Add site scores in q and r to p
-// q and r are children of p
-static void addPerSiteSubtreeScores(partitionList *pr, int pNumber, int qNumber,
-                                    int rNumber) {
-    //	parsimonyNumber * pBuf, * qBuf, *rBuf;
-    //	for(int i = 0; i < pr->numberOfPartitions; ++i){
-    //		int partialParsLength = pr->partitionData[i]->parsimonyLength *
-    // PLL_PCF; 		pBuf =
-    // &(pr->partitionData[i]->perSitePartialPars[partialParsLength
-    //* pNumber]); 		qBuf =
-    //&(pr->partitionData[i]->perSitePartialPars[partialParsLength * qNumber]);
-    //		rBuf =
-    //&(pr->partitionData[i]->perSitePartialPars[partialParsLength
-    //* rNumber]); 		for(int k = 0; k < partialParsLength; ++k)
-    // pBuf[k] += qBuf[k] + rBuf[k];
-    //	}
-
-#ifdef __AVX
-    addPerSiteSubtreeScoresSIMD<Vec8ui>(pr, pNumber, qNumber, rNumber);
-#else
-    addPerSiteSubtreeScoresSIMD<Vec4ui>(pr, pNumber, qNumber, rNumber);
-#endif
 }
 
 // Diep:
@@ -316,7 +319,6 @@ static void resetPerSiteNodeScores(partitionList *pr, int pNumber) {
         memset(pBuf, 0, partialParsLength * sizeof(parsimonyNumber));
     }
 }
-#endif
 
 /*
  * Diep: copy new version from Tomas's code for site pars
@@ -394,9 +396,10 @@ static int pllSaveCurrentTreeSprParsimony(pllInstance *tr, partitionList *pr,
     return (int)(cur_search_pars);
 }
 
-template <class Numeric, const int VECSIZE>
+template <class Numeric>
 static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
                                int *informative, int perSiteScores) {
+    constexpr hn::ScalableTag<Numeric> d;
     //	cout << "Begin compressSankoffDNA()" << endl;
     size_t totalNodes, i, model;
 
@@ -421,15 +424,12 @@ static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
         // number of informative site patterns
         compressedEntries = entries;
 
-#if (defined(__SSE3) || defined(__AVX))
-        if (compressedEntries % VECSIZE != 0)
+        if (compressedEntries % hn::Lanes(d) != 0) {
             compressedEntriesPadded =
-                compressedEntries + (VECSIZE - (compressedEntries % VECSIZE));
-        else
+                    compressedEntries + (hn::Lanes(d) - (compressedEntries % hn::Lanes(d)));
+        } else {
             compressedEntriesPadded = compressedEntries;
-#else
-        compressedEntriesPadded = compressedEntries;
-#endif
+        }
 
         // parsVect stores cost for each node by state at each pattern
         // for a certain node of DNA: ptn1_A, ptn2_A, ptn3_A,..., ptn1_C,
@@ -517,11 +517,11 @@ static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
 
                     for (k = 0; k < states; ++k) {
                         if (value & mask32[k])
-                            tipVect[k * VECSIZE] =
+                            tipVect[k * hn::Lanes(d)] =
                                 0; // Diep: if the state is present,
                                    // corresponding value is set to zero
                         else
-                            tipVect[k * VECSIZE] = highest_cost;
+                            tipVect[k * hn::Lanes(d)] = highest_cost;
                         //					  compressedTips[k][informativeIndex]
                         //= compressedValues[k]; // Diep
                         // cout << "compressedValues[k]: " <<
@@ -533,8 +533,8 @@ static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
                     tipVect += 1; // process to the next site
 
                     // jump to the next block
-                    if (informativeIndex % VECSIZE == 0)
-                        tipVect += VECSIZE * (states - 1);
+                    if (informativeIndex % hn::Lanes(d) == 0)
+                        tipVect += hn::Lanes(d) * (states - 1);
                 }
             }
 
@@ -543,7 +543,7 @@ static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
                  index++) {
 
                 for (k = 0; k < states; ++k) {
-                    tipVect[k * VECSIZE] = 0;
+                    tipVect[k * hn::Lanes(d)] = 0;
                 }
                 tipVect += 1;
             }
@@ -602,14 +602,13 @@ static void compressSankoffDNA(pllInstance *tr, partitionList *pr,
  */
 static void compressDNAUppass(pllInstance *tr, partitionList *pr,
                               int *informative, int perSiteScores) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     // cout << "Begin compressDNAUppass\n";
     if (pllCostMatrix != NULL) {
         if (globalParam->sankoff_short_int)
-            return compressSankoffDNA<parsimonyNumberShort, USHORT_PER_VECTOR>(
-                tr, pr, informative, perSiteScores);
+            return compressSankoffDNA<parsimonyNumberShort>(tr, pr, informative, perSiteScores);
         else
-            return compressSankoffDNA<parsimonyNumber, INTS_PER_VECTOR>(
-                tr, pr, informative, perSiteScores);
+            return compressSankoffDNA<parsimonyNumber>(tr, pr, informative, perSiteScores);
     }
 
     size_t totalNodes, i, model;
@@ -644,16 +643,10 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
             compressedEntries++;
             // cout << "compressedEntries = " << compressedEntries << '\n';
             // assert(compressedEntries % 8 != 0);
-#if (defined(__SSE3) || defined(__AVX))
-        if (compressedEntries % INTS_PER_VECTOR != 0)
-            compressedEntriesPadded =
-                compressedEntries +
-                (INTS_PER_VECTOR - (compressedEntries % INTS_PER_VECTOR));
+        if (compressedEntries % hn::Lanes(d) != 0)
+            compressedEntriesPadded = compressedEntries + (hn::Lanes(d) - (compressedEntries % hn::Lanes(d)));
         else
             compressedEntriesPadded = compressedEntries;
-#else
-        compressedEntriesPadded = compressedEntries;
-#endif
 
         // cout << "parsVect\n";
         rax_posix_memalign((void **)&(pr->partitionData[model]->parsVect),
@@ -695,9 +688,9 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
         // cout << "scoreIncrease\n";
         rax_posix_memalign((void **)&(pr->partitionData[model]->scoreIncrease),
                            PLL_BYTE_ALIGNMENT,
-                           (size_t)(compressedEntriesPadded / INTS_PER_VECTOR) * totalNodes *
+                           (size_t)(compressedEntriesPadded / hn::Lanes(d)) * totalNodes *
                                sizeof(parsimonyNumber));
-        for (i = 0; i < (compressedEntriesPadded / INTS_PER_VECTOR) * totalNodes; ++i)
+        for (i = 0; i < (compressedEntriesPadded / hn::Lanes(d)) * totalNodes; ++i)
             pr->partitionData[model]->scoreIncrease[i] = 0;
 
         if (perSiteScores) {
@@ -1081,6 +1074,7 @@ void assignDownpassToUppass(partitionList *pr, size_t uNumber) {
 }
 
 void printUppass(pllInstance *tr, partitionList *pr, int u) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     cout << "Uppass of Vertex: " << u << '\n';
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         size_t k, states = pr->partitionData[model]->states,
@@ -1092,7 +1086,7 @@ void printUppass(pllInstance *tr, partitionList *pr, int u) {
             parsimonyNumber *uStates = &(pr->partitionData[model]->parsVectUppass[table_index(width, states, u, 0, 0)]);
 
             cout << "width: " << width << '\n';
-            for (int i = 0; i < width; i += INTS_PER_VECTOR) {
+            for (int i = 0; i < width; i += hn::Lanes(d)) {
 
                 for (int k = 0; k < states; ++k) {
                     if (k == 0) {
@@ -1124,12 +1118,10 @@ void printAllUppass(pllInstance *tr, partitionList *pr) {
 template <typename Traits = DefaultParsProxyTraits>
 void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
                                           int perSiteScores) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     if (pllCostMatrix) {
         assert(0);
     }
-
-    INT_TYPE
-    allOne = SET_ALL_BITS_ONE;
 
     int model, *ti = tr->ti, count = ti[0], index;
 
@@ -1154,7 +1146,7 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
                       width = pr->partitionData[model]->parsimonyLength;
 
             unsigned int *scoreInc =
-                &(pr->partitionData[model]->scoreIncrease[(width / INTS_PER_VECTOR) * pNumber]);
+                &(pr->partitionData[model]->scoreIncrease[(width / hn::Lanes(d)) * pNumber]);
             unsigned int i;
 
             ParsProxy<Traits> parsVect(width, states, pr->partitionData[model]->parsVect);
@@ -1165,31 +1157,29 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
 
                 auto left = parsVect[qNumber], right = parsVect[rNumber], cur = parsVect[pNumber];
 
-                for (i = 0; i < width; i += INTS_PER_VECTOR) {
+                for (i = 0; i < width; i += hn::Lanes(d)) {
                     size_t j;
 
-                    INT_TYPE
-                    s_r, s_l, v_N = SET_ALL_BITS_ZERO, l_A[32], v_A[32];
+                    hn::Vec<decltype(d)>
+                    s_r, s_l, v_N = hn::Zero(d), l_A[32], v_A[32];
 
                     for (j = 0; j < states; j++) {
-                        s_l = VECTOR_LOAD((CAST)left[i][j]);
-                        s_r = VECTOR_LOAD((CAST)right[i][j]);
-                        l_A[j] = VECTOR_BIT_AND(s_l, s_r);
-                        v_A[j] = VECTOR_BIT_OR(s_l, s_r);
+                        s_l = hn::Load(d, left[i][j]);
+                        s_r = hn::Load(d, right[i][j]);
+                        l_A[j] = s_l & s_r;
+                        v_A[j] = s_l | s_r;
 
-                        v_N = VECTOR_BIT_OR(v_N, l_A[j]);
+                        v_N = v_N | l_A[j];
                     }
 
                     for (j = 0; j < states; j++)
-                        VECTOR_STORE(
-                            (CAST)cur[i][j],
-                            VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
+                        hn::Store(l_A[j] | hn::AndNot(v_N, v_A[j]), d, cur[i][j]);
 
-                    v_N = VECTOR_AND_NOT(v_N, allOne);
+                    v_N = hn::Not(v_N);
 
                     unsigned int sum = vectorPopcount(v_N);
 
-                    scoreInc[i / INTS_PER_VECTOR] = sum;
+                    scoreInc[i / hn::Lanes(d)] = sum;
                     totalScore += sum;
 
                     if (perSiteScores)
@@ -1213,6 +1203,7 @@ void _newviewParsimonyIterativeFastUppass(pllInstance *tr, partitionList *pr,
 template <typename Traits = DefaultParsProxyTraits>
 unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
                                            int i1Number, int i2Number) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     unsigned int score = scoreTwoSubtrees;
 
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
@@ -1228,24 +1219,22 @@ unsigned int evaluateInsertParsimonyUppass(pllInstance *tr, partitionList *pr,
             auto i1States = branchVectUppass[i1Number], i2States = branchVectUppass[i2Number];
 
             // cout << "width: " << width << '\n';
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                INT_TYPE t_N = SET_ALL_BITS_ONE;
+            for (i = 0; i < width; i += hn::Lanes(d)) {
+                auto t_N = hn::Set(d, 0xffffffff);
 
                 for (int k = 0; k < states; ++k) {
-                    INT_TYPE t_A =
-                        VECTOR_BIT_AND(VECTOR_LOAD((CAST)i1States[i][k]),
-                                       VECTOR_LOAD((CAST)i2States[i][k]));
+                    auto t_A = hn::Load(d, i1States[i][k]) & hn::Load(d, i2States[i][k]);
                     /**
                      * Note: ~(a0 | a1 | ... | an) = (~a0) & (~a1) & ... & (~an)
                      */
-                    t_N = VECTOR_AND_NOT(t_A, t_N);
+                    t_N = hn::AndNot(t_A, t_N);
                 }
 
                 // score += vectorPopcount(t_N);
 
-                alignas(PLL_BYTE_ALIGNMENT) unsigned long counts[LONG_INTS_PER_VECTOR];
+                HWY_ALIGN std::uint64_t counts[hn::Lanes(d)];
 
-                VECTOR_STORE((CAST)counts, t_N);
+                hn::Store(hn::BitCast(hn::ScalableTag<std::uint64_t>{}, t_N), d, counts);
 
                 for (auto count : counts) {
                     score += __builtin_popcountll(count);
@@ -1268,6 +1257,7 @@ template <typename Traits = DefaultParsProxyTraits>
 unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr,
                                               partitionList *pr, nodeptr p,
                                               nodeptr q) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     unsigned int score = scoreTwoSubtrees;
     size_t pNumber = p->number, p1Number = p->back->number, qNumber = q->number,
            q1Number = q->back->number;
@@ -1288,26 +1278,23 @@ unsigned int evaluateInsertParsimonyUppassTBR(pllInstance *tr,
             auto q1States = parsVectUppassLocal[q1Number];
 
             // cout << "width: " << width << '\n';
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                INT_TYPE t_N = SET_ALL_BITS_ONE;
+            for (i = 0; i < width; i += hn::Lanes(d)) {
+                auto t_N = hn::Set(d, 0xffffffff);
 
                 for (int k = 0; k < states; ++k) {
-                    INT_TYPE t_A = VECTOR_BIT_AND(
-                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)pStates[i][k]),
-                                      VECTOR_LOAD((CAST)p1States[i][k])),
-                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)qStates[i][k]),
-                                      VECTOR_LOAD((CAST)q1States[i][k])));
+                    auto t_A = (( hn::Load(d, pStates[i][k]) | hn::Load(d, p1States[i][k]) )
+                             &  ( hn::Load(d, qStates[i][k]) | hn::Load(d, q1States[i][k]) ));
                     /**
                      * Note: ~(a0 | a1 | ... | an) = (~a0) & (~a1) & ... & (~an)
                      */
-                    t_N = VECTOR_AND_NOT(t_A, t_N);
+                    t_N = hn::AndNot(t_A, t_N);
                 }
 
                 // score += vectorPopcount(t_N);
 
-                alignas(PLL_BYTE_ALIGNMENT) unsigned long counts[LONG_INTS_PER_VECTOR];
+                HWY_ALIGN std::uint64_t counts[hn::Lanes(d)];
 
-                VECTOR_STORE((CAST)counts, t_N);
+                hn::Store(hn::BitCast(hn::ScalableTag<std::uint64_t>{}, t_N), d, counts);
 
                 for (auto count : counts) {
                     score += __builtin_popcountll(count);
@@ -1330,6 +1317,7 @@ template <typename Traits = DefaultParsProxyTraits>
 unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr,
                                               partitionList *pr, nodeptr p,
                                               nodeptr u) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     unsigned int score = scoreTwoSubtrees;
     size_t pNumber = p->number, uNumber = u->number, vNumber = u->back->number;
 
@@ -1348,24 +1336,21 @@ unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr,
             auto vStates = parsVectUppassLocal[vNumber];
 
             // cout << "width: " << width << '\n';
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                INT_TYPE t_N = SET_ALL_BITS_ONE;
+            for (i = 0; i < width; i += hn::Lanes(d)) {
+                auto t_N = hn::Set(d, 0xffffffff);
 
                 for (int k = 0; k < states; ++k) {
-                    INT_TYPE t_A = VECTOR_BIT_AND(
-                        VECTOR_LOAD((CAST)pStates[i][k]),
-                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)uStates[i][k]),
-                                      VECTOR_LOAD((CAST)vStates[i][k])));
+                    auto t_A = hn::Load(d, pStates[i][k]) & (hn::Load(d, uStates[i][k]) | hn::Load(d, vStates[i][k]));
                     /**
                      * Note: ~(a0 | a1 | ... | an) = (~a0) & (~a1) & ... & (~an)
                      */
-                    t_N = VECTOR_AND_NOT(t_A, t_N);
+                    t_N = hn::AndNot(t_A, t_N);
                 }
 
                 // score += vectorPopcount(t_N);
-                alignas(PLL_BYTE_ALIGNMENT) unsigned long counts[LONG_INTS_PER_VECTOR];
+                HWY_ALIGN std::uint64_t counts[hn::Lanes(d)];
 
-                VECTOR_STORE((CAST)counts, t_N);
+                hn::Store(hn::BitCast(hn::ScalableTag<std::uint64_t>{}, t_N), d, counts);
 
                 for (auto count : counts) {
                     score += __builtin_popcountll(count);
@@ -1387,12 +1372,11 @@ unsigned int evaluateInsertParsimonyUppassSPR(pllInstance *tr,
  */
 template <typename Traits = DefaultParsProxyTraits>
 void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     // auto t_start = std::chrono::high_resolution_clock::now();
     if (pllCostMatrix) {
         assert(0);
     }
-    INT_TYPE
-    allOne = SET_ALL_BITS_ONE;
     int model, *ti = tr->ti, count = ti[0], index;
     // assert(count % 4 == 0);
     for (index = count - 4; index > 0; index -= 4) {
@@ -1422,12 +1406,12 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
                     auto uUppass = parsVectUppass[uNumber];
                     auto p = parsVectUppass[pNumber];
 
-                    INT_TYPE x, u_k[32], p_k[32];
-                    for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                        x = SET_ALL_BITS_ONE;
+                    hn::Vec<decltype(d)> x, u_k[32], p_k[32];
+                    for (i = 0; i < width; i += hn::Lanes(d)) {
+                        x = hn::Set(d, 0xffffffff);
                         for (k = 0; k < states; ++k) {
-                            u_k[k] = VECTOR_LOAD((CAST)u[i][k]);
-                            p_k[k] = VECTOR_LOAD((CAST)p[i][k]);
+                            u_k[k] = hn::Load(d, u[i][k]);
+                            p_k[k] = hn::Load(d, p[i][k]);
                             /**
                              *   x | {[ ~(u & p) ] & p}
                              * = x | {[ (~u) | (~p) ] & p}
@@ -1435,7 +1419,7 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
                              * = x | { (~u) & p }
                              * ANDNOT optimization
                              */
-                            x = VECTOR_AND_NOT(VECTOR_AND_NOT(u_k[k], p_k[k]), x);
+                            x = hn::AndNot(hn::AndNot(u_k[k], p_k[k]), x);
                             // x |= (~(u[k][i] & p[k][i]) & p[k][i]);
                         }
                         for (k = 0; k < states; ++k) {
@@ -1447,10 +1431,8 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
                              * = [(~x) & u] ^ (x & p)
                              * => eliminate chain dependencies
                              */
-                            u_k[k] = VECTOR_BIT_XOR(
-                                        VECTOR_AND_NOT(x, u_k[k]),
-                                        VECTOR_BIT_AND(x, p_k[k]));
-                            VECTOR_STORE((CAST)(uUppass[i][k]), u_k[k]);
+                            u_k[k] = hn::AndNot(x, u_k[k]) ^ (x & p_k[k]);
+                            hn::Store(u_k[k], d, uUppass[i][k]);
                             // u[k][i] ^= ((u[k][i] ^ p[k][i]) & x);
                         }
                     }
@@ -1486,23 +1468,16 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
                     auto uUppass = parsVectUppass[uNumber];
                     auto p = parsVectUppass[pNumber];
 
-                    INT_TYPE x = SET_ALL_BITS_ZERO, y = SET_ALL_BITS_ZERO,
-                             u_k[32], p_k[32], v_1k[32], v_2k[32], u_up;
-                    for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                        x = SET_ALL_BITS_ZERO, y = SET_ALL_BITS_ZERO;
+                    hn::Vec<decltype(d)> x = hn::Zero(d), y = hn::Zero(d), u_k[32], p_k[32], v_1k[32], v_2k[32], u_up;
+                    for (i = 0; i < width; i += hn::Lanes(d)) {
+                        x = hn::Zero(d), y = hn::Zero(d);
                         for (k = 0; k < states; ++k) {
-                            u_k[k] = VECTOR_LOAD((CAST)u[i][k]);
-                            p_k[k] = VECTOR_LOAD((CAST)p[i][k]);
-                            v_1k[k] = VECTOR_LOAD((CAST)v_1[i][k]);
-                            v_2k[k] = VECTOR_LOAD((CAST)v_2[i][k]);
-                            x = VECTOR_BIT_OR(
-                                x,
-                                VECTOR_BIT_AND(
-                                    VECTOR_AND_NOT(
-                                        VECTOR_BIT_AND(u_k[k], p_k[k]), allOne),
-                                    p_k[k]));
-                            y = VECTOR_BIT_OR(y,
-                                              VECTOR_BIT_AND(v_1k[k], v_2k[k]));
+                            u_k[k]  = hn::Load(d, u[i][k]);
+                            p_k[k]  = hn::Load(d, p[i][k]);
+                            v_1k[k] = hn::Load(d, v_1[i][k]);
+                            v_2k[k] = hn::Load(d, v_2[i][k]);
+                            x       |= (hn::Not(u_k[k] & p_k[k]) & p_k[k]);
+                            y       |= (v_1k[k] & v_2k[k]);
 
                             // x |= (~(u[k][i] & p[k][i]) & p[k][i]);
                             // y |= (v_1[k][i] & v_2[k][i]);
@@ -1511,29 +1486,10 @@ void uppassStatesIterativeCalculate(pllInstance *tr, partitionList *pr) {
                             // is it possible to set u_up = u_k?
                             u_up = u_k[k];
 
-                            u_up = VECTOR_BIT_XOR(
-                                u_up,
-                                VECTOR_BIT_AND(VECTOR_BIT_XOR(u_up, p_k[k]),
-                                               VECTOR_AND_NOT(x, allOne)));
-                            u_up = VECTOR_BIT_XOR(
-                                u_up,
-                                VECTOR_BIT_AND(
-                                    VECTOR_BIT_XOR(u_up,
-                                                   VECTOR_BIT_OR(u_up, p_k[k])),
-                                    VECTOR_BIT_AND(x,
-                                                   VECTOR_AND_NOT(y, allOne))));
-                            u_up = VECTOR_BIT_XOR(
-                                u_up,
-                                VECTOR_BIT_AND(
-                                    VECTOR_BIT_XOR(
-                                        u_up,
-                                        VECTOR_BIT_OR(
-                                            u_up, VECTOR_BIT_AND(
-                                                      p_k[k],
-                                                      VECTOR_BIT_OR(v_1k[k],
-                                                                    v_2k[k])))),
-                                    VECTOR_BIT_AND(x, y)));
-                            VECTOR_STORE((CAST)uUppass[i][k], u_up);
+                            u_up = (u_up ^ ((u_up ^ p_k[k]) & hn::Not(x)));
+                            u_up = (u_up ^ ((u_up ^ (u_up | p_k[k])) & (x & hn::Not(y))));
+                            u_up = (u_up ^ ((u_up ^ (u_up | (p_k[k] & (v_1k[k] | v_2k[k])))) & (x & y)));
+                            hn::Store(u_up, d, uUppass[i][k]);
                             // uUppass[k][i] = u[k][i];
                             // uUppass[k][i] ^= ((uUppass[k][i] ^ p[k][i]) &
                             // (~x)); uUppass[k][i] ^=
@@ -1566,12 +1522,11 @@ template <typename Traits = DefaultParsProxyTraits>
 unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
                                                    partitionList *pr,
                                                    int perSiteScores) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     if (pllCostMatrix) {
         assert(0);
     }
     size_t pNumber = (size_t)tr->ti[1], qNumber = (size_t)tr->ti[2];
-
-    INT_TYPE allOne = SET_ALL_BITS_ONE;
 
     size_t temNumber = 2 * (size_t)tr->mxtips - 1;
     int model;
@@ -1594,8 +1549,7 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
         ParsProxy<Traits> parsVectUppass(width, states, pr->partitionData[model]->parsVectUppass);
 
         unsigned int *scoreInc =
-            &(pr->partitionData[model]
-                  ->scoreIncrease[(width / INTS_PER_VECTOR) * (2 * tr->mxtips - 1)]);
+            &(pr->partitionData[model]->scoreIncrease[(width / hn::Lanes(d)) * (2 * tr->mxtips - 1)]);
         switch (states) {
         default: {
             assert(states <= 32);
@@ -1604,30 +1558,28 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
             auto right = parsVect[pNumber];
             auto tem = parsVectUppass[temNumber];
 
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
-                INT_TYPE s_l, s_r, t_N = SET_ALL_BITS_ZERO, t_A[32], o_A[32];
+            for (i = 0; i < width; i += hn::Lanes(d)) {
+                hn::Vec<decltype(d)> s_l, s_r, t_N = hn::Zero(d), t_A[32], o_A[32];
 
                 for (k = 0; k < states; ++k) {
-                    s_l = VECTOR_LOAD((CAST)left[i][k]);
-                    s_r = VECTOR_LOAD((CAST)right[i][k]);
-                    t_A[k] = VECTOR_BIT_AND(s_l, s_r);
-                    o_A[k] = VECTOR_BIT_OR(s_l, s_r);
-                    t_N = VECTOR_BIT_OR(t_N, t_A[k]);
+                    s_l     = hn::Load(d, left[i][k]);
+                    s_r     = hn::Load(d, right[i][k]);
+                    t_A[k]  = s_l & s_r;
+                    o_A[k]  = s_l | s_r;
+                    t_N     = t_N | t_A[k];
                 }
 
-                t_N = VECTOR_AND_NOT(t_N, allOne);
+                t_N = hn::Not(t_N);
 
                 for (k = 0; k < states; ++k) {
-                    VECTOR_STORE(
-                        (CAST)tem[i][k],
-                        VECTOR_BIT_OR(t_A[k], VECTOR_BIT_AND(t_N, o_A[k])));
+                    hn::Store(t_A[k] | (t_N & o_A[k]), d, tem[i][k]);
                 }
                 // sum += vectorPopcount(t_N);
 
                 unsigned int s = vectorPopcount(t_N);
 
                 sum += s;
-                scoreInc[i / INTS_PER_VECTOR] = s;
+                scoreInc[i / hn::Lanes(d)] = s;
 
                 if (perSiteScores)
                     storePerSiteNodeScores(pr, model, t_N, i, pNumber);
@@ -1646,6 +1598,7 @@ unsigned int _evaluateParsimonyIterativeFastUppass(pllInstance *tr,
 template <typename Traits = DefaultParsProxyTraits>
 void traversePrepareInsertBranches(partitionList *pr, nodeptr u, int maxTips,
                                    int &count) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     size_t uNumber = u->number, u1Number = u->back->number;
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         size_t k, states = pr->partitionData[model]->states,
@@ -1662,12 +1615,9 @@ void traversePrepareInsertBranches(partitionList *pr, nodeptr u, int maxTips,
             auto branchStates = branchVectUppass[count];
 
 
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
+            for (i = 0; i < width; i += hn::Lanes(d)) {
                 for (int k = 0; k < states; ++k) {
-                    VECTOR_STORE(
-                        (CAST)branchStates[i][k],
-                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)uStates[i][k]),
-                                      VECTOR_LOAD((CAST)u1States[i][k])));
+                    hn::Store(hn::Load(d, uStates[i][k]) | hn::Load(d, u1States[i][k]), d, branchStates[i][k]);
                 }
             }
         }
@@ -1684,6 +1634,7 @@ void traversePrepareInsertBranches(partitionList *pr, nodeptr u, int maxTips,
 template <typename Traits = DefaultParsProxyTraits>
 void traversePrepareInsertBranches(partitionList *pr, nodeptr u, int maxtrav,
                                    int dist, int maxTips, int &count) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     size_t uNumber = u->number, u1Number = u->back->number;
     for (int model = 0; model < pr->numberOfPartitions; ++model) {
         size_t k, states = pr->partitionData[model]->states,
@@ -1709,12 +1660,9 @@ void traversePrepareInsertBranches(partitionList *pr, nodeptr u, int maxtrav,
             }
             branchStates = branchVectUppass[count];
 
-            for (i = 0; i < width; i += INTS_PER_VECTOR) {
+            for (i = 0; i < width; i += hn::Lanes(d)) {
                 for (int k = 0; k < states; ++k) {
-                    VECTOR_STORE(
-                        (CAST)branchStates[i][k],
-                        VECTOR_BIT_OR(VECTOR_LOAD((CAST)uStates[i][k]),
-                                      VECTOR_LOAD((CAST)u1States[i][k])));
+                    hn::Store(hn::Load(d, uStates[i][k]) | hn::Load(d, u1States[i][k]), d, branchStates[i][k]);
                 }
             }
         }
@@ -2337,9 +2285,10 @@ inline bool equalStatesCmp(ParsProxy<Traits, 2> uStatesVec,
 inline void setStatesVec(parsimonyNumber *uStatesVec,
                          parsimonyNumber *vStatesVec, int stepU, int stepV,
                          int &states) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     int posU = 0, posV = 0;
     for (int k = 0; k < states; ++k) {
-        for (int i = 0; i < INTS_PER_VECTOR; ++i) {
+        for (int i = 0; i < hn::Lanes(d); ++i) {
             uStatesVec[posU + i] = vStatesVec[posV + i];
         }
         posU += stepU;
@@ -2352,10 +2301,10 @@ inline void setStatesVec(parsimonyNumber *uStatesVec,
 template <typename Traits = DefaultParsProxyTraits>
 void uppassLeafNodeCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> uUpVec,
                              ParsProxy<Traits, 2> pUpVec) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     std::size_t states = uVec.states;
     assert(states == uVec.states && states == uUpVec.states && states == pUpVec.states);
     // cout << "Begin uppassLeafNodeCalculate\n";
-    INT_TYPE allOne = SET_ALL_BITS_ONE;
     switch (states) {
     default: {
         /**
@@ -2364,24 +2313,20 @@ void uppassLeafNodeCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> uUp
          */
         assert(states <= 32);
 
-        INT_TYPE x = SET_ALL_BITS_ZERO, u_k[32], p_k[32];
+        hn::Vec<decltype(d)> x = hn::Zero(d), u_k[32], p_k[32];
         // parsimonyNumber x = 0;
         for (int k = 0; k < states; ++k) {
-            u_k[k] = VECTOR_LOAD((CAST)uVec[k]);
-            p_k[k] = VECTOR_LOAD((CAST)pUpVec[k]);
-            x = VECTOR_BIT_OR(
-                x, VECTOR_BIT_AND(
-                       VECTOR_AND_NOT(VECTOR_BIT_AND(u_k[k], p_k[k]), allOne),
-                       p_k[k]));
+            u_k[k] = hn::Load(d, uVec[k]);
+            p_k[k] = hn::Load(d, pUpVec[k]);
+            x = (x | (hn::Not(u_k[k] & p_k[k]) & p_k[k]));
             // x |= (~(uVec[posU] & pUpVec[posPUp]) & pUpVec[posPUp]);
         }
-        x = VECTOR_AND_NOT(x, allOne);
+        x = hn::Not(x);
         // x = ~x;
         // posUUp = posPUp = 0;
         for (int k = 0; k < states; ++k) {
-            u_k[k] = VECTOR_BIT_XOR(
-                u_k[k], VECTOR_BIT_AND(VECTOR_BIT_XOR(u_k[k], p_k[k]), x));
-            VECTOR_STORE((CAST)uUpVec[k], u_k[k]);
+            u_k[k] = (u_k[k] ^ ((u_k[k] ^ p_k[k]) & x));
+            hn::Store(u_k[k], d, uUpVec[k]);
             // uUpVec[posUUp] = uVec[posU];
             // uUpVec[posUUp] ^= ((uUpVec[posUUp] ^ pUpVec[posPUp]) & x);
         }
@@ -2402,37 +2347,35 @@ void uppassLeafNodeCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> uUp
  * -> Number of bit 1 of t_N is the total cost of all the columns represented in
  * t_N.
  */
-template <typename Traits = DefaultParsProxyTraits>
-inline INT_TYPE downpassCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> v1Vec,
-                           ParsProxy<Traits, 2> v2Vec) {
+template <typename Traits = DefaultParsProxyTraits, typename D = hn::ScalableTag<parsimonyNumber>>
+inline hn::Vec<D> downpassCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> v1Vec, ParsProxy<Traits, 2> v2Vec) {
+    constexpr D d{};
     std::size_t states = uVec.states;
     assert(states == v1Vec.states && states == v2Vec.states);
     // cout << "Begin downpassCalculate\n";
-    INT_TYPE allOne = SET_ALL_BITS_ONE;
-    INT_TYPE t_N = SET_ALL_BITS_ZERO;
+    auto t_N = hn::Zero(d);
     // parsimonyNumber t_N = 0;
     switch (states) {
     /* TODO: Add case 2, 4, 20 */
     default: {
         assert(states <= 32);
-        INT_TYPE s_l, s_r, t_A[32], o_A[32];
+        hn::Vec<decltype(d)> s_l, s_r, t_A[32], o_A[32];
         // parsimonyNumber o_A[32], t_A[32];
         for (std::size_t k = 0; k < states; ++k) {
-            s_l = VECTOR_LOAD((CAST)v1Vec[k]);
-            s_r = VECTOR_LOAD((CAST)v2Vec[k]);
-            o_A[k] = VECTOR_BIT_OR(s_l, s_r);
-            t_A[k] = VECTOR_BIT_AND(s_l, s_r);
+            s_l    = hn::Load(d, v1Vec[k]);
+            s_r    = hn::Load(d, v2Vec[k]);
+            o_A[k] = s_l | s_r;
+            t_A[k] = s_l & s_r;
             // o_A[k] = v1Vec[posV1] | v2Vec[posV2];
             // t_A[k] = v1Vec[posV1] & v2Vec[posV2];
 
-            t_N = VECTOR_BIT_OR(t_N, t_A[k]);
+            t_N = t_N | t_A[k];
             // t_N |= t_A[k];
         }
-        t_N = VECTOR_AND_NOT(t_N, allOne);
+        t_N = hn::Not(t_N);
         // t_N = ~t_N;
         for (std::size_t k = 0; k < states; ++k) {
-            VECTOR_STORE((CAST)uVec[k],
-                         VECTOR_BIT_OR(t_A[k], VECTOR_BIT_AND(t_N, o_A[k])));
+            hn::Store(t_A[k] | (t_N & o_A[k]), d, uVec[k]);
             // uVec[posU] = t_A[k] | (t_N & o_A[k]);
         }
     }
@@ -2447,11 +2390,10 @@ template <typename Traits = DefaultParsProxyTraits>
 void uppassInnerNodeCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> v1Vec,
                               ParsProxy<Traits, 2> v2Vec, ParsProxy<Traits, 2> uUpVec,
                               ParsProxy<Traits, 2> pUpVec) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     std::size_t states = uVec.states;
     assert(states == v1Vec.states && states == v2Vec.states && states == uUpVec.states && states == pUpVec.states);
     // cout << "Begin uppassInnerNodeCalculate\n";
-    INT_TYPE
-    allOne = SET_ALL_BITS_ONE;
     switch (states) {
     default: {
         /**
@@ -2462,17 +2404,15 @@ void uppassInnerNodeCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> v1
          */
         // assert(states <= 32);
 
-        INT_TYPE x = SET_ALL_BITS_ZERO, y = SET_ALL_BITS_ZERO, u_k[32], p_k[32],
-                 v_1k[32], v_2k[32], u_up;
+        hn::Vec<decltype(d)> x = hn::Zero(d), y = hn::Zero(d), u_k[32], p_k[32], v_1k[32], v_2k[32], u_up;
         // parsimonyNumber x = 0, y = 0;
         for (std::size_t k = 0; k < states; ++k) {
-            u_k[k] = VECTOR_LOAD((CAST)uVec[k]);
-            p_k[k] = VECTOR_LOAD((CAST)pUpVec[k]);
-            v_1k[k] = VECTOR_LOAD((CAST)v1Vec[k]);
-            v_2k[k] = VECTOR_LOAD((CAST)v2Vec[k]);
-            x = VECTOR_BIT_OR(
-                x, VECTOR_AND_NOT(VECTOR_BIT_AND(u_k[k], p_k[k]), p_k[k]));
-            y = VECTOR_BIT_OR(y, VECTOR_BIT_AND(v_1k[k], v_2k[k]));
+            u_k[k]  = hn::Load(d, uVec[k]);
+            p_k[k]  = hn::Load(d, pUpVec[k]);
+            v_1k[k] = hn::Load(d, v1Vec[k]);
+            v_2k[k] = hn::Load(d, v2Vec[k]);
+            x       = (x | hn::AndNot(u_k[k] & p_k[k], p_k[k]));
+            y       = (y | (v_1k[k] & v_2k[k]));
             // x |= (~(uVec[posU] & pUpVec[posPUp]) & pUpVec[posPUp]);
             // y |= (v1Vec[posV1] & v2Vec[posV2]);
         }
@@ -2480,23 +2420,10 @@ void uppassInnerNodeCalculate(ParsProxy<Traits, 2> uVec, ParsProxy<Traits, 2> v1
         for (int k = 0; k < states; ++k) {
             u_up = u_k[k];
 
-            u_up = VECTOR_BIT_XOR(u_up,
-                                  VECTOR_BIT_AND(VECTOR_BIT_XOR(u_up, p_k[k]),
-                                                 VECTOR_AND_NOT(x, allOne)));
-            u_up = VECTOR_BIT_XOR(
-                u_up, VECTOR_BIT_AND(
-                          VECTOR_BIT_XOR(u_up, VECTOR_BIT_OR(u_up, p_k[k])),
-                          VECTOR_BIT_AND(x, VECTOR_AND_NOT(y, allOne))));
-            u_up = VECTOR_BIT_XOR(
-                u_up,
-                VECTOR_BIT_AND(
-                    VECTOR_BIT_XOR(
-                        u_up, VECTOR_BIT_OR(
-                                  u_up, VECTOR_BIT_AND(
-                                            p_k[k],
-                                            VECTOR_BIT_OR(v_1k[k], v_2k[k])))),
-                    VECTOR_BIT_AND(x, y)));
-            VECTOR_STORE((CAST)uUpVec[k], u_up);
+            u_up = (u_up ^ ((u_up ^ p_k[k]) & hn::Not(x)));
+            u_up = (u_up ^ ((u_up ^ (u_up | p_k[k])) & (x & hn::Not(y))));
+            u_up = (u_up ^ ((u_up ^ (u_up | (p_k[k] & (v_1k[k] | v_2k[k])))) & (x & y)));
+            hn::Store(u_up, d, uUpVec[k]);
             // uUpVec[posUUp] = uVec[posU];
             // uUpVec[posUUp] ^= ((uUpVec[posUUp] ^ pUpVec[posPUp]) & (~x));
             // uUpVec[posUUp] ^=
@@ -2594,6 +2521,7 @@ void dfsRecalculateUppass(nodeptr u, ParsProxy<Traits, 2> pUpVec, pInfo *prModel
 template <typename Traits = DefaultParsProxyTraits>
 unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                                           nodeptr Nm, nodeptr Nz, nodeptr Ns) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     // cout << "Begin recalculateDownpassAndUppass\n";
     // cout << "Nz = " << Nz->number << '\n';
     if (depth[Ns->number] < depth[Nz->number]) {
@@ -2630,7 +2558,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
         ParsProxy<Traits> parsVectUppass(width, states, pr->partitionData[model]->parsVectUppass);
         ParsProxy<Traits> parsVectUppassLocal(width, states, pr->partitionData[model]->parsVectUppassLocal);
 
-        for (int w = 0; w < width; w += INTS_PER_VECTOR) {
+        for (int w = 0; w < width; w += hn::Lanes(d)) {
             /* STEP 2d: Recalculate Nm and its subtree
              * if old (global) uppass != old (global) downpass
              * (Because its new uppass is now its downpass) */
@@ -2687,10 +2615,8 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                  * Ns-Nz */
                 ParsWrapper<Traits, 2> rootDownpass(states);
 
-                INT_TYPE isUnionDownpass = downpassCalculate<Traits>(
-                    rootDownpass,
-                    parsVect[Ns->number][w],
-                    parsVect[Nz->number][w]);
+                auto isUnionDownpass = downpassCalculate<Traits>(
+                        rootDownpass, parsVect[Ns->number][w], parsVect[Nz->number][w]);
 
                 /* Update scoreMainSubtree */
                 // scoreMainSubtree += __builtin_popcount(isUnionDownpass);
@@ -2775,10 +2701,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     uDownpass = ParsWrapper<Traits, 2>(states);
                     // uDownpass = new alignas(PLL_BYTE_ALIGNMENT)
                     //     parsimonyNumber[states * INTS_PER_VECTOR];
-                    INT_TYPE isUnionDownpass = downpassCalculate<Traits>(
-                        uDownpass,
-                        v1Downpass,
-                        v2Downpass);
+                    auto isUnionDownpass = downpassCalculate<Traits>(uDownpass, v1Downpass, v2Downpass);
                     /* Update score difference when recalculate downpass */
                     // cout << "scoreMainSubtree BEGIN = " <<
                     // scoreMainSubtree
@@ -2793,7 +2716,7 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
 //                            pr->partitionData[model]
 //                                ->scoreIncrease[width * u->number + w + ptr];
 //                    }
-                    scoreMainSubtree -= pr->partitionData[model]->scoreIncrease[(width / INTS_PER_VECTOR) * u->number + (w / INTS_PER_VECTOR)];
+                    scoreMainSubtree -= pr->partitionData[model]->scoreIncrease[(width / hn::Lanes(d)) * u->number + (w / hn::Lanes(d))];
 
                     // cout << "Score increase: "
                     //      << __builtin_popcount(isUnionDownpass) << '\n';
@@ -2865,10 +2788,8 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
                     // rootDownpass = new alignas(PLL_BYTE_ALIGNMENT)
                     //     parsimonyNumber[states * INTS_PER_VECTOR];
                     ParsProxy<Traits, 2> uDownpass = nodesRecalculated.back().vDownpass; // uDownpass
-                    INT_TYPE isUnionDownpassRoot = downpassCalculate<Traits>(
-                        rootDownpass,
-                        uDownpass,
-                        parsVect[u->back->number][w]);
+                    auto isUnionDownpassRoot = downpassCalculate<Traits>(
+                            rootDownpass, uDownpass, parsVect[u->back->number][w]);
 
                     if (rootDownpassChanged == true) {
                         // cout << "rootDownpassChanged\n";
@@ -2880,7 +2801,8 @@ unsigned int recalculateDownpassAndUppass(pllInstance *tr, partitionList *pr,
 //                                pr->partitionData[model]->scoreIncrease
 //                                    [width * (2 * tr->mxtips - 1) + w + ptr];
 //                        }
-                        scoreMainSubtree -= pr->partitionData[model]->scoreIncrease[(width / INTS_PER_VECTOR) * (2 * tr->mxtips - 1) + (w / INTS_PER_VECTOR)];
+                        scoreMainSubtree -= pr->partitionData[model]->scoreIncrease[
+                                (width / hn::Lanes(d)) * (2 * tr->mxtips - 1) + (w / hn::Lanes(d))];
 
                         /* Add the new increased cost */
                         // scoreMainSubtree +=
@@ -3405,6 +3327,7 @@ static void markRecalculatedNode(nodeptr u) {
 }
 template <typename Traits = DefaultParsProxyTraits>
 static void applyMove(pllInstance *tr, partitionList *pr) {
+    constexpr hn::ScalableTag<parsimonyNumber> d;
     recalculate[tr->start->number] = recalculate[tr->start->back->number] =
         true;
     // cout << "Old root: " << tr->start->number << " - "
@@ -3466,7 +3389,7 @@ static void applyMove(pllInstance *tr, partitionList *pr) {
                         ParsProxy<Traits> parsVectUppassLocal(width, states, prModel->parsVectUppassLocal);
                         ParsProxy<Traits> parsVectUppass(width, states, prModel->parsVectUppass);
 
-                        for (int w = 0; w < width; w += INTS_PER_VECTOR) {
+                        for (int w = 0; w < width; w += hn::Lanes(d)) {
                             /**
                              * NOTE: u                 is new parent of v
                              *       uppass[v->number] is old parent of v
