@@ -27,7 +27,7 @@ VerboseMode verbose_mode;
         WIN32 does not define gettimeofday() function.
         Here declare it extra for WIN32 only.
  */
-//#if defined(WIN32) && !defined(HAVE_GETTIMEOFDAY)
+// #if defined(WIN32) && !defined(HAVE_GETTIMEOFDAY)
 #if defined(WIN32)
 #include <sstream>
 #endif
@@ -41,9 +41,9 @@ VerboseMode verbose_mode;
 //    t->tv_sec = timebuffer.time;
 //    t->tv_usec = 1000 * timebuffer.millitm;
 //}
-//#else
-//#include <sys/time.h>
-//#endif
+// #else
+// #include <sys/time.h>
+// #endif
 
 /********************************************************
         Defining DoubleMatrix methods
@@ -593,6 +593,14 @@ void parseArg(int argc, char *argv[], Params &params) {
     int cnt;
     verbose_mode = VB_MIN;
     params.aco = false;
+    params.aco_update_iter = 20;
+    params.aco_evaporation_rate = 0.5;
+    params.aco_ratchet_prior = 0.3;
+    params.aco_iqp_prior = 0.3;
+    params.aco_random_nni_prior = 0.3;
+    params.aco_nni_prior = 0.3;
+    params.aco_spr_prior = 0.3;
+    params.aco_tbr_prior = 0.3;
     params.dna5 = false;
     params.spr_test = false;
     params.spr_tbr = false;
@@ -901,6 +909,71 @@ void parseArg(int argc, char *argv[], Params &params) {
         try {
             if (strcmp(argv[cnt], "-aco") == 0) {
                 params.aco = true;
+                params.iqp = true;
+                continue;
+            }
+            if (strcmp(argv[cnt], "-aco_update_iter") == 0) {
+                cnt++;
+                if (cnt >= argc) {
+                    throw "Use -aco_update_iter <double>";
+                }
+                params.aco_update_iter = convert_int(argv[cnt]);
+                continue;
+            }
+            if (strcmp(argv[cnt], "-aco_evaporation_rate") == 0) {
+                cnt++;
+                if (cnt >= argc) {
+                    throw "Use -aco_evaporation_rate <double>";
+                }
+                params.aco_evaporation_rate = convert_double(argv[cnt]);
+                continue;
+            }
+            if (strcmp(argv[cnt], "-aco_ratchet_prior") == 0) {
+                cnt++;
+                if (cnt >= argc) {
+                    throw "Use -aco_ratchet_prior <double>";
+                }
+                params.aco_ratchet_prior = convert_double(argv[cnt]);
+                continue;
+            }
+            if (strcmp(argv[cnt], "-aco_iqp_prior") == 0) {
+                cnt++;
+                if (cnt >= argc) {
+                    throw "Use -aco_iqp_prior <double>";
+                }
+                params.aco_iqp_prior = convert_double(argv[cnt]);
+                continue;
+            }
+            if (strcmp(argv[cnt], "-aco_random_nni_prior") == 0) {
+                cnt++;
+                if (cnt >= argc) {
+                    throw "Use -aco_random_nni_prior <double>";
+                }
+                params.aco_random_nni_prior = convert_double(argv[cnt]);
+                continue;
+            }
+            if (strcmp(argv[cnt], "-aco_nni_prior") == 0) {
+                cnt++;
+                if (cnt >= argc) {
+                    throw "Use -aco_nni_prior <double>";
+                }
+                params.aco_nni_prior = convert_double(argv[cnt]);
+                continue;
+            }
+            if (strcmp(argv[cnt], "-aco_spr_prior") == 0) {
+                cnt++;
+                if (cnt >= argc) {
+                    throw "Use -aco_spr_prior <double>";
+                }
+                params.aco_spr_prior = convert_double(argv[cnt]);
+                continue;
+            }
+            if (strcmp(argv[cnt], "-aco_tbr_prior") == 0) {
+                cnt++;
+                if (cnt >= argc) {
+                    throw "Use -aco_tbr_prior <double>";
+                }
+                params.aco_tbr_prior = convert_double(argv[cnt]);
                 continue;
             }
             if (strcmp(argv[cnt], "-spr_tbr") == 0) {

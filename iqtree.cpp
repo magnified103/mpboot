@@ -185,6 +185,7 @@ void IQTree::setParams(Params &params) {
     // tree.setIQPIterations(params.stop_condition, params.stop_confidence,
     // params.min_iterations, params.max_iterations);
 
+    aco->setUpParamsAndGraph(&params);
     stop_rule.initialize(params);
 
     // tree.setIQPAssessQuartet(params.iqp_assess_quartet);
@@ -1829,7 +1830,8 @@ double IQTree::doTreeSearch() {
         //		long tmp_num_ratchet_trees = treels_logl.size();
         //		long tmp_num_ratchet_bootcands = treels.size();
         if (params->ratchet_iter >= 0) {
-            if ((params->aco && algoType == ACOAlgo::RATCHET) ||
+            if ((params->aco &&
+                 aco->getNodeTag(algoType) == ACOAlgo::RATCHET) ||
                 (!params->aco && params->ratchet_iter == ratchet_iter_count)) {
                 //				string candidateTree =
                 // candidateTrees.getRandCandVecTree(); // Diep: to pick from
@@ -1888,10 +1890,11 @@ double IQTree::doTreeSearch() {
                     string candidateTree = candidateTrees.getRandCandTree();
                     readTreeString(candidateTree);
                     if (params->aco == true) {
-                        if (algoType == ACOAlgo::IQP) {
+                        if (aco->getNodeTag(algoType) == ACOAlgo::IQP) {
                             doIQP();
                         } else {
-                            assert(algoType == ACOAlgo::RANDOM_NNI);
+                            assert(aco->getNodeTag(algoType) ==
+                                   ACOAlgo::RANDOM_NNI);
                             doRandomNNIs(
                                 numNNI); // Diep: This doesn't work well
                                          // with sorted parsimony. Why?
@@ -2356,9 +2359,9 @@ string IQTree::doAntColonySearch(int &nniCount, int &nniSteps) {
             assert(startTree != NULL);
             pllTreeInitTopologyNewick(pllInst, startTree, PLL_FALSE);
 
-            if (treeOper == ACOAlgo::NNI) {
+            if (aco->getNodeTag(treeOper) == ACOAlgo::NNI) {
                 pllOptimizeSprParsimony(pllInst, pllPartitions, 1, 1, this);
-            } else if (treeOper == ACOAlgo::SPR) {
+            } else if (aco->getNodeTag(treeOper) == ACOAlgo::SPR) {
                 pllOptimizeSprParsimony(pllInst, pllPartitions,
                                         params->spr_mintrav, max_spr_rad, this);
             } else {
@@ -2391,7 +2394,7 @@ string IQTree::doAntColonySearch(int &nniCount, int &nniSteps) {
                 _pllFreeParsimonyDataStructures(pllInst, pllPartitions);
             }
             // cout << "Cur score: " << curScore << '\n';
-            aco->updatePheromoneDelta(newScore - curScore);
+            aco->updateNewPheromone(newScore - curScore);
             // cout << "New score: " << newScore << '\n';
             curScore = newScore;
         }

@@ -33,8 +33,8 @@
 #include <string>
 #include <vector>
 
-//#include <sys/time.h>
-//#include <time.h>
+// #include <sys/time.h>
+// #include <time.h>
 #include "msetsblock.h"
 #include "ncl/ncl.h"
 #include <math.h>
@@ -424,6 +424,17 @@ struct Params {
      * Use Ant Colony Optimization Algorithm or not?
      */
     bool aco;
+    /**
+     * Ant Colony Optimization Parameters
+     */
+    int aco_update_iter;
+    double aco_evaporation_rate;
+    double aco_ratchet_prior;
+    double aco_iqp_prior;
+    double aco_random_nni_prior;
+    double aco_nni_prior;
+    double aco_spr_prior;
+    double aco_tbr_prior;
 
     /**
      *  Whether to consider '-' in DNA data as the 5-th distinct character
@@ -439,14 +450,14 @@ struct Params {
      * Use TBR if SPR doesn't improve for a certain number of iterations
      */
     bool spr_tbr;
-    
+
     /**
      * Use SPR if TBR doesn't improve for a certain number of iterations
      */
     bool tbr_spr;
 
     /**
-     * Use SPR and TBR alternately, `tbr_alternate` iterations use TBR, 
+     * Use SPR and TBR alternately, `tbr_alternate` iterations use TBR,
      * then `spr_alternate` iterations use SPR and so on
      */
     int tbr_alternate;
@@ -484,14 +495,16 @@ struct Params {
     int tbr_insert_nni;
 
     /**
-     * Each insert branches has its own [mintrav, maxtrav] condition (Default is sum of the 2 is in [mintrav, maxtrav])
-     * Use pllComputeTBRVer1() and pllTraverseUpdateTBRVer1() instead.
+     * Each insert branches has its own [mintrav, maxtrav] condition (Default is
+     * sum of the 2 is in [mintrav, maxtrav]) Use pllComputeTBRVer1() and
+     * pllTraverseUpdateTBRVer1() instead.
      */
     int tbr_traverse_ver1;
 
     /**
-     * Update to better tree for each insertBranch1 and all insertBranch2 with that insertBranch1 (Version 2)
-     * Where as version 1 (Default) is update after evaluating every pair (insertBranch1, insertBranch2). 
+     * Update to better tree for each insertBranch1 and all insertBranch2 with
+     * that insertBranch1 (Version 2) Where as version 1 (Default) is update
+     * after evaluating every pair (insertBranch1, insertBranch2).
      */
     int tbr_restore_ver2;
 
@@ -633,7 +646,8 @@ struct Params {
     int unsuccess_iteration;
 
     /**
-     *  Number of unsuccessful RATCHET hill-climbing iterations to switch from SPR/TBR to TBR/SPR (spr_tbr or tbr_spr).
+     *  Number of unsuccessful RATCHET hill-climbing iterations to switch from
+     * SPR/TBR to TBR/SPR (spr_tbr or tbr_spr).
      */
     int unsuccess_iteration_hclimb;
 
@@ -1605,7 +1619,7 @@ struct Params {
     int ratchet_iter;         // # of iterations between two ratchet iterations
     int ratchet_wgt;          // weight to add to selected site during ratchet
     int ratchet_percent;      // 0-100; percent of informative sites to upweight
-                         // during ratchet
+                              // during ratchet
 
     bool compute_parsimony; // to compute parsimony of a user tree
     bool newick_to_tnt;   // to convert a tree in Newick format into TNT syntax
@@ -1741,14 +1755,14 @@ struct Params {
      */
     bool test_mode;
 
-	/*
-	 * Diep:
-	 * Use with -test_mode
+    /*
+     * Diep:
+     * Use with -test_mode
      * Remove duplicate sequence from the input alignment
      * (this is to create input aln to compare with mpboot1 because
      * mpboot1 does not properly support -keep_ident)
-	 */
-	bool remove_dup_seq;
+     */
+    bool remove_dup_seq;
 
 #ifdef _OPENMP
     int num_threads;
