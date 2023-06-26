@@ -203,7 +203,7 @@ static inline void storePerSiteNodeScores(partitionList *pr, int model,
         // PLL_PCF + i]); // Tomas's code
 #if HWY_TARGET == HWY_SCALAR
         for (std::size_t j = 0; j < sizeof(T) * 8; ++j) {
-            buf[j] += ((counts[i] >> j) & 1);
+            buf[j] = ((counts[i] >> j) & 1);
         }
 #else
         static_assert(sizeof(T) * 8 % hn::Lanes(d) == 0, "Lanes(d) must divides 8T");
@@ -213,9 +213,9 @@ static inline void storePerSiteNodeScores(partitionList *pr, int model,
         auto w = hn::Set(d, counts[i]);
         for (std::size_t j = 0; j < sizeof(T) * 8; j += hn::Lanes(d)) {
             auto result = ((w & mask) == mask);
-            // buf[j] = buf[j] + 1 = buf[j] - (0xFFFFFFFF)
-            // buf[j] = buf[j] + 0 = buf[j] - (0x00000000)
-            hn::Store(hn::Load(d, &buf[j]) - hn::VecFromMask(d, result), d, &buf[j]);
+            // buf[j] = 0 + 1 = 0 - (0xFFFFFFFF)
+            // buf[j] = 0 + 0 = 0 - (0x00000000)
+            hn::Store(hn::Zero(d) - hn::VecFromMask(d, result), d, &buf[j]);
             w = hn::ShiftRight<hn::Lanes(d)>(w);
         }
 #endif
