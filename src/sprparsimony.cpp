@@ -494,13 +494,6 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
         size_t pNumber = (size_t)ti[index], qNumber = (size_t)ti[index + 1],
                rNumber = (size_t)ti[index + 2];
 
-        if (perSiteScores) {
-            if (qNumber == tr->start->number)
-                resetPerSiteNodeScores(pr, qNumber);
-            if (rNumber == tr->start->number && rNumber != qNumber)
-                resetPerSiteNodeScores(pr, rNumber);
-        }
-
         for (model = 0; model < pr->numberOfPartitions; ++model) {
             size_t k, states = pr->partitionData[model]->states,
                       width = pr->partitionData[model]->parsimonyLength;
@@ -781,8 +774,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
     sum = tr->parsimonyScore[pNumber] + tr->parsimonyScore[qNumber];
 
     if (perSiteScores) {
-        resetPerSiteNodeScores(pr, tr->start->number);
-        addPerSiteSubtreeScores(pr, tr->start->number, pNumber, qNumber);
+        resetPerSiteNodeScores(pr, tr->perSitePartialParsRoot);
     }
 
     for (model = 0; model < pr->numberOfPartitions; ++model) {
@@ -804,9 +796,9 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                 v_N = hn::Not(v_N);
 
                 sum += vectorPopcount(v_N);
-                if (perSiteScores)
-                    storePerSiteNodeScores(pr, model, v_N, i,
-                                           tr->start->number);
+                if (perSiteScores) {
+                    storePerSiteNodeScores(pr, model, v_N, i, tr->perSitePartialParsRoot);
+                }
 
                 //                 if(sum >= bestScore)
                 //                   return sum;
@@ -824,9 +816,9 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                 v_N = hn::Not(v_N);
 
                 sum += vectorPopcount(v_N);
-                if (perSiteScores)
-                    storePerSiteNodeScores(pr, model, v_N, i,
-                                           tr->start->number);
+                if (perSiteScores) {
+                    storePerSiteNodeScores(pr, model, v_N, i, tr->perSitePartialParsRoot);
+                }
                 //                 if(sum >= bestScore)
                 //                   return sum;
             }
@@ -843,9 +835,9 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                 v_N = hn::Not(v_N);
 
                 sum += vectorPopcount(v_N);
-                if (perSiteScores)
-                    storePerSiteNodeScores(pr, model, v_N, i,
-                                           tr->start->number);
+                if (perSiteScores) {
+                    storePerSiteNodeScores(pr, model, v_N, i, tr->perSitePartialParsRoot);
+                }
                 //                  if(sum >= bestScore)
                 //                    return sum;
             }
@@ -862,14 +854,18 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                 v_N = hn::Not(v_N);
 
                 sum += vectorPopcount(v_N);
-                if (perSiteScores)
-                    storePerSiteNodeScores(pr, model, v_N, i,
-                                           tr->start->number);
+                if (perSiteScores) {
+                    storePerSiteNodeScores(pr, model, v_N, i, tr->perSitePartialParsRoot);
+                }
                 //                 if(sum >= bestScore)
                 //                   return sum;
             }
         }
         }
+    }
+
+    if (perSiteScores) {
+        addPerSiteSubtreeScores(pr, tr->perSitePartialParsRoot, pNumber, qNumber);
     }
 
     return sum;
@@ -2155,6 +2151,8 @@ static void compressDNA(pllInstance *tr, partitionList *pr, int *informative,
 
     totalNodes = 2 * (size_t)tr->mxtips;
 
+    tr->perSitePartialParsRoot = 0; /** The index where the per-site partial parsimony will be stored */
+
     for (model = 0; model < (size_t)pr->numberOfPartitions; ++model) {
         size_t k, states = (size_t)pr->partitionData[model]->states,
                   compressedEntries, compressedEntriesPadded, entries = 0,
@@ -2729,7 +2727,7 @@ void pllComputePatternParsimony(pllInstance *tr, partitionList *pr,
         int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
         parsimonyNumber *p =
             &(pr->partitionData[i]
-                  ->perSitePartialPars[partialParsLength * tr->start->number]);
+                  ->perSitePartialPars[partialParsLength * tr->perSitePartialParsRoot]);
 
         for (ptn = pr->partitionData[i]->lower;
              ptn < pr->partitionData[i]->upper; ptn++) {
@@ -2783,7 +2781,7 @@ void pllComputePatternParsimony(pllInstance *tr, partitionList *pr,
         int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
         parsimonyNumber *p =
             &(pr->partitionData[i]
-                  ->perSitePartialPars[partialParsLength * tr->start->number]);
+                  ->perSitePartialPars[partialParsLength * tr->perSitePartialParsRoot]);
 
         int upperIndex = pr->partitionData[i]->upper;
         if (globalParam->sort_alignment)

@@ -1282,6 +1282,9 @@ typedef struct {
                       tip contained in the tree we are operating on) */
     node *curRoot; /** For TBR recompute parsimony */
     node *curRootBack; /** For TBR recompute parsimony */
+
+    int perSitePartialParsRoot; /** Maintain the index where the per-site partial parsimony will be stored */
+
     int mxtips;        /**< Number of tips in the topology */
 
     int *constraintVector; /**< @todo What is this? */

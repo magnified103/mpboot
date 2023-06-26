@@ -556,6 +556,8 @@ static void compressDNA(pllInstance *tr, partitionList *pr, int *informative,
 
     totalNodes = 2 * (size_t)tr->mxtips;
 
+    tr->perSitePartialParsRoot = 0; /** The index where the per-site partial parsimony will be stored */
+
     for (model = 0; model < (size_t)pr->numberOfPartitions; model++) {
         size_t k, states = (size_t)pr->partitionData[model]->states,
                   compressedEntries, compressedEntriesPadded, entries = 0,
