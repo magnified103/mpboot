@@ -240,19 +240,19 @@ static inline void storePerSiteNodeScores(partitionList *pr, int model,
 
         HWY_ALIGN constexpr std::array<T, hn::Lanes(d_out)> mask_data = maskShiftIota<T, hn::Lanes(d_out)>();
         auto mask = hn::Load(d_out, mask_data.data());
-        auto w = hn::Set(d_out, buf[i]);
+        auto w_before = hn::Set(d_out, buf[i]);
+        auto w_after = hn::Set(d_out, counts[i]);
         for (std::size_t j = 0; j < sizeof(T) * 8; j += hn::Lanes(d_out)) {
-            auto result = ((w & mask) == mask);
-            hn::Store(hn::Load(d_out, &aggregatedBuf[j]) + hn::VecFromMask(d_out, result), d_out, &aggregatedBuf[j]);
-            w = hn::ShiftRight<hn::Lanes(d_out)>(w);
+            auto result_before = ((w_before & mask) == mask);
+            auto result_after = ((w_after & mask) == mask);
+            hn::Store(hn::Load(d_out, &aggregatedBuf[j])
+                      + hn::VecFromMask(d_out, result_before)
+                      - hn::VecFromMask(d_out, result_after),
+                      d_out, &aggregatedBuf[j]);
+            w_before = hn::ShiftRight<hn::Lanes(d_out)>(w_before);
+            w_after = hn::ShiftRight<hn::Lanes(d_out)>(w_after);
         }
         buf[i] = counts[i];
-        w = hn::Set(d_out, buf[i]);
-        for (std::size_t j = 0; j < sizeof(T) * 8; j += hn::Lanes(d_out)) {
-            auto result = ((w & mask) == mask);
-            hn::Store(hn::Load(d_out, &aggregatedBuf[j]) - hn::VecFromMask(d_out, result), d_out, &aggregatedBuf[j]);
-            w = hn::ShiftRight<hn::Lanes(d_out)>(w);
-        }
 #endif
     }
 }
