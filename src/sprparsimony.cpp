@@ -185,80 +185,88 @@ template <typename T = parsimonyNumber>
 static inline void storePerSiteNodeScores(partitionList *pr, int model,
                                           hn::Vec<hn::ScalableTag<parsimonyNumber>> v,
                                           unsigned int offset, int nodeNumber) {
-    constexpr hn::ScalableTag<T> d;
+    constexpr hn::ScalableTag<parsimonyNumber> d_in;
+    constexpr hn::ScalableTag<T> d_out;
 
-    HWY_ALIGN T counts[hn::Lanes(d)];
-    hn::Store(hn::BitCast(d, v), d, counts);
+    HWY_ALIGN parsimonyNumber counts[hn::Lanes(d_in)];
+    hn::Store(hn::BitCast(d_in, v), d_in, counts);
 
-    int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
-    int nodeStart = partialParsLength * nodeNumber;
-    int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
-    for (std::size_t i = 0; i < hn::Lanes(d); ++i) {
-        parsimonyNumber *buf = &(pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
-        nodeStartPlusOffset += sizeof(T) * 8;
-        //		buf =
-        //&(pr->partitionData[model]->perSitePartialPars[nodeStart +
-        // offset * PLL_PCF + i * ULINT_SIZE]); // Diep's 		buf =
-        //&(pr->partitionData[model]->perSitePartialPars[nodeStart + offset *
-        // PLL_PCF + i]); // Tomas's code
+    parsimonyNumber *buf = &(pr->partitionData[model]
+            ->perSitePartialPars[pr->partitionData[model]->parsimonyLength * nodeNumber + offset]);
+    std::size_t offsetOut = offset * sizeof(T) * 8;
+
+    for (std::size_t i = 0; i < hn::Lanes(d_in); ++i) {
+        parsimonyNumber *aggregatedBuf = &(pr->partitionData[model]->aggregatedPerSitePartialPars[offsetOut]);
+        offsetOut += sizeof(T) * 8;
+        /*
+         * magnified: despite the doubled amount of SIMD operations, the cache behaviour is so effective that the
+         * `aggregatedPerSitePartialPars` array actually fits in L1 cache
+         *
+         * This process could be separated into three distinct (but similar) phases:
+         * 1. Subtract buf[i] from aggregatedBuf
+         *
+         * 2. Assign buf[i] = counts[i]
+         *
+         * 3. Add buf[i] to aggregatedBuf
+         *
+         * Alternatively, the 1st and 3rd steps can be combined into one compact step:
+         * 1. Add (counts[i] - buf[i]) to aggregatedBuf
+         *
+         * 2. Assign buf[i] = counts[i]
+         *
+         * The following procedure describes the bit-extraction step used in the aforementioned process, assuming that
+         * the SIMD array has length of 4 32-bit integers (128 bits, which is equivalent to a SSE or NEON register):
+         *
+         * 1. Load buf[i] into SIMD array `w` (SIMD[0] = SIMD[1] = SIMD[2] = SIMD[3] = buf[i])
+         *
+         * 2. Create a mask SIMD `mask` (SIMD[0] = 1 << 0, SIMD[1] = 1 << 1, SIMD[2] = 1 << 2, SIMD[3] = 1 << 3)
+         *
+         * 3. Calculate `result = ((w & mask) == mask)`. This one extract the i-th bit of the i-th lane, and return
+         * 0xFFFFFFFF if that bit is set, 0x00000000 otherwise
+         *
+         * 4. Note that 0xFFFFFFFF = 2^32 - 1 is equivalent to (-1) under modulo 2^32. So subtract or add this value
+         * will either do increment or decrement to the final sum, respectively
+         */
 #if HWY_TARGET == HWY_SCALAR
         for (std::size_t j = 0; j < sizeof(T) * 8; ++j) {
-            buf[j] = ((counts[i] >> j) & 1);
+            aggregatedBuf[j] -= ((buf[i] >> j) & 1);
+        }
+        buf[i] = counts[i];
+        for (std::size_t j = 0; j < sizeof(T) * 8; ++j) {
+            aggregatedBuf[j] += ((buf[i] >> j) & 1);
         }
 #else
-        static_assert(sizeof(T) * 8 % hn::Lanes(d) == 0, "Lanes(d) must divides 8T");
+        static_assert(sizeof(T) * 8 % hn::Lanes(d_out) == 0, "Lanes(d) must divides 8T");
 
-        HWY_ALIGN constexpr std::array<T, hn::Lanes(d)> mask_data = maskShiftIota<T, hn::Lanes(d)>();
-        auto mask = hn::Load(d, mask_data.data());
-        auto w = hn::Set(d, counts[i]);
-        for (std::size_t j = 0; j < sizeof(T) * 8; j += hn::Lanes(d)) {
+        HWY_ALIGN constexpr std::array<T, hn::Lanes(d_out)> mask_data = maskShiftIota<T, hn::Lanes(d_out)>();
+        auto mask = hn::Load(d_out, mask_data.data());
+        auto w = hn::Set(d_out, buf[i]);
+        for (std::size_t j = 0; j < sizeof(T) * 8; j += hn::Lanes(d_out)) {
             auto result = ((w & mask) == mask);
-            // buf[j] = 0 + 1 = 0 - (0xFFFFFFFF)
-            // buf[j] = 0 + 0 = 0 - (0x00000000)
-            hn::Store(hn::Zero(d) - hn::VecFromMask(d, result), d, &buf[j]);
-            w = hn::ShiftRight<hn::Lanes(d)>(w);
+            hn::Store(hn::Load(d_out, &aggregatedBuf[j]) + hn::VecFromMask(d_out, result), d_out, &aggregatedBuf[j]);
+            w = hn::ShiftRight<hn::Lanes(d_out)>(w);
+        }
+        buf[i] = counts[i];
+        w = hn::Set(d_out, buf[i]);
+        for (std::size_t j = 0; j < sizeof(T) * 8; j += hn::Lanes(d_out)) {
+            auto result = ((w & mask) == mask);
+            hn::Store(hn::Load(d_out, &aggregatedBuf[j]) - hn::VecFromMask(d_out, result), d_out, &aggregatedBuf[j]);
+            w = hn::ShiftRight<hn::Lanes(d_out)>(w);
         }
 #endif
     }
 }
 
 // Diep:
-// Add site scores in q and r to p
-// q and r are children of p
-template <typename T = parsimonyNumber>
-static inline void addPerSiteSubtreeScores(partitionList *pr, int pNumber, int qNumber,
-                                 int rNumber) {
-    constexpr hn::ScalableTag<T> d;
-//    static_assert(hn::Lanes(d) == INTS_PER_VECTOR);
-    parsimonyNumber *pBuf, *qBuf, *rBuf;
-    for (int i = 0; i < pr->numberOfPartitions; ++i) {
-        int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
-        pBuf = &(pr->partitionData[i]
-                     ->perSitePartialPars[partialParsLength * pNumber]);
-        qBuf = &(pr->partitionData[i]
-                     ->perSitePartialPars[partialParsLength * qNumber]);
-        rBuf = &(pr->partitionData[i]
-                     ->perSitePartialPars[partialParsLength * rNumber]);
-        for (std::size_t k = 0; k < partialParsLength; k += hn::Lanes(d)) {
-            auto pBufVec = hn::Load(d, &pBuf[k]);
-            auto qBufVec = hn::Load(d, &qBuf[k]);
-            auto rBufVec = hn::Load(d, &rBuf[k]);
-            pBufVec += qBufVec + rBufVec;
-            hn::Store(pBufVec, d, &pBuf[k]);
-        }
-    }
-}
-
-// Diep:
 // Reset site scores of p
 void resetPerSiteNodeScores(partitionList *pr, int pNumber) {
-    parsimonyNumber *pBuf;
-    for (int i = 0; i < pr->numberOfPartitions; ++i) {
-        int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
-        pBuf = &(pr->partitionData[i]
-                     ->perSitePartialPars[partialParsLength * pNumber]);
-        memset(pBuf, 0, partialParsLength * sizeof(parsimonyNumber));
-    }
+//    parsimonyNumber *pBuf;
+//    for (int i = 0; i < pr->numberOfPartitions; ++i) {
+//        int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
+//        pBuf = &(pr->partitionData[i]
+//                     ->perSitePartialPars[partialParsLength * pNumber]);
+//        memset(pBuf, 0, partialParsLength * sizeof(parsimonyNumber));
+//    }
 }
 
 static int checkerPars(pllInstance *tr, nodeptr p) {
@@ -615,12 +623,7 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
             }
         }
 
-        tr->parsimonyScore[pNumber] = totalScore + tr->parsimonyScore[rNumber] +
-                                      tr->parsimonyScore[qNumber];
-        if (perSiteScores)
-            addPerSiteSubtreeScores(
-                pr, pNumber, qNumber,
-                rNumber); // Diep: add rNumber and qNumber to pNumber
+        tr->parsimonyScore[pNumber] = totalScore + tr->parsimonyScore[rNumber] + tr->parsimonyScore[qNumber];
     }
 }
 
@@ -862,10 +865,6 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
             }
         }
         }
-    }
-
-    if (perSiteScores) {
-        addPerSiteSubtreeScores(pr, tr->perSitePartialParsRoot, pNumber, qNumber);
     }
 
     return sum;
@@ -2187,23 +2186,27 @@ static void compressDNA(pllInstance *tr, partitionList *pr, int *informative,
 
         rax_posix_memalign((void **)&(pr->partitionData[model]->parsVect),
                            PLL_BYTE_ALIGNMENT,
-                           (size_t)compressedEntriesPadded * states *
-                               totalNodes * sizeof(parsimonyNumber));
+                           (size_t)compressedEntriesPadded * states * totalNodes * sizeof(parsimonyNumber));
 
         for (i = 0; i < compressedEntriesPadded * states * totalNodes; ++i)
             pr->partitionData[model]->parsVect[i] = 0;
 
         if (perSiteScores) {
             /* for per site parsimony score at each node */
-            rax_posix_memalign(
-                (void **)&(pr->partitionData[model]->perSitePartialPars),
-                PLL_BYTE_ALIGNMENT,
-                totalNodes * (size_t)compressedEntriesPadded * PLL_PCF *
-                    sizeof(parsimonyNumber));
-            for (i = 0;
-                 i < totalNodes * (size_t)compressedEntriesPadded * PLL_PCF;
-                 ++i)
-                pr->partitionData[model]->perSitePartialPars[i] = 0;
+            rax_posix_memalign((void **)&(pr->partitionData[model]->perSitePartialPars),
+                               PLL_BYTE_ALIGNMENT,
+                               totalNodes * (size_t)compressedEntriesPadded * sizeof(parsimonyNumber));
+            std::fill(pr->partitionData[model]->perSitePartialPars,
+                      pr->partitionData[model]->perSitePartialPars + (totalNodes * (size_t)compressedEntriesPadded),
+                      0);
+
+            /* maintain the aggregated partial parsimony per site */
+            rax_posix_memalign((void **)&(pr->partitionData[model]->aggregatedPerSitePartialPars),
+                               PLL_BYTE_ALIGNMENT,
+                               compressedEntriesPadded * PLL_PCF * sizeof(parsimonyNumber));
+            std::fill(pr->partitionData[model]->aggregatedPerSitePartialPars,
+                      pr->partitionData[model]->aggregatedPerSitePartialPars + compressedEntriesPadded * PLL_PCF,
+                      0);
         }
 
         for (i = 0; i < (size_t)tr->mxtips; ++i) {
@@ -2725,9 +2728,7 @@ void pllComputePatternParsimony(pllInstance *tr, partitionList *pr,
 
     for (int i = 0; i < pr->numberOfPartitions; ++i) {
         int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
-        parsimonyNumber *p =
-            &(pr->partitionData[i]
-                  ->perSitePartialPars[partialParsLength * tr->perSitePartialParsRoot]);
+        parsimonyNumber *p = pr->partitionData[i]->aggregatedPerSitePartialPars;
 
         for (ptn = pr->partitionData[i]->lower;
              ptn < pr->partitionData[i]->upper; ptn++) {
@@ -2779,9 +2780,7 @@ void pllComputePatternParsimony(pllInstance *tr, partitionList *pr,
     //	cout << "Pattern pars by PLL: ";
     for (int i = 0; i < pr->numberOfPartitions; ++i) {
         int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
-        parsimonyNumber *p =
-            &(pr->partitionData[i]
-                  ->perSitePartialPars[partialParsLength * tr->perSitePartialParsRoot]);
+        parsimonyNumber *p = pr->partitionData[i]->aggregatedPerSitePartialPars;
 
         int upperIndex = pr->partitionData[i]->upper;
         if (globalParam->sort_alignment)
@@ -2817,9 +2816,7 @@ void pllComputeSiteParsimony(pllInstance *tr, partitionList *pr, int *site_pars,
 
     for (int i = 0; i < pr->numberOfPartitions; ++i) {
         int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
-        parsimonyNumber *p =
-            &(pr->partitionData[i]
-                  ->perSitePartialPars[partialParsLength * tr->start->number]);
+        parsimonyNumber *p = pr->partitionData[i]->aggregatedPerSitePartialPars;
 
         for (int k = 0; k < pr->partitionData[i]->width; ++k) {
             site_pars[site] = p[k];
@@ -2843,9 +2840,7 @@ void pllComputeSiteParsimony(pllInstance *tr, partitionList *pr,
 
     for (int i = 0; i < pr->numberOfPartitions; ++i) {
         int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
-        parsimonyNumber *p =
-            &(pr->partitionData[i]
-                  ->perSitePartialPars[partialParsLength * tr->start->number]);
+        parsimonyNumber *p = pr->partitionData[i]->aggregatedPerSitePartialPars;
 
         for (int k = 0; k < pr->partitionData[i]->width; ++k) {
             site_pars[site] = p[k];

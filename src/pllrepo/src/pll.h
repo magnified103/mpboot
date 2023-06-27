@@ -1061,6 +1061,8 @@ typedef struct {
     parsimonyNumber *perSiteParsScores;
 
     parsimonyNumber *perSitePartialPars; /* Diep added - for UFBoot */
+    parsimonyNumber *aggregatedPerSitePartialPars; /* Maintain the aggregated partial parsimony per site */
+
     int numInformativePatterns;          /* Diep added - for UFBoot */
 
     // Diep: to store weight of informative patterns (For weighted version)
