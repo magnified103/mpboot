@@ -5,6 +5,7 @@
  *      Author: diep
  */
 #include "sprparsimony.h"
+#include "aco.h"
 #include "parstree.h"
 #include <string>
 /**
@@ -44,7 +45,7 @@
 #define USHORT_PER_VECTOR 32
 #define INTS_PER_VECTOR 16
 #define LONG_INTS_PER_VECTOR 8
-//#define LONG_INTS_PER_VECTOR (64/sizeof(long))
+// #define LONG_INTS_PER_VECTOR (64/sizeof(long))
 #define INT_TYPE __m512i
 #define CAST double *
 #define SET_ALL_BITS_ONE _mm512_set1_epi32(0xFFFFFFFF)
@@ -67,7 +68,7 @@
 #define USHORT_PER_VECTOR 16
 #define INTS_PER_VECTOR 8
 #define LONG_INTS_PER_VECTOR 4
-//#define LONG_INTS_PER_VECTOR (32/sizeof(long))
+// #define LONG_INTS_PER_VECTOR (32/sizeof(long))
 #define INT_TYPE __m256d
 #define CAST double *
 #define SET_ALL_BITS_ONE                                                       \
@@ -94,11 +95,11 @@
 #ifdef __i386__
 #define ULINT_SIZE 32
 #define LONG_INTS_PER_VECTOR 4
-//#define LONG_INTS_PER_VECTOR (16/sizeof(long))
+// #define LONG_INTS_PER_VECTOR (16/sizeof(long))
 #else
 #define ULINT_SIZE 64
 #define LONG_INTS_PER_VECTOR 2
-//#define LONG_INTS_PER_VECTOR (16/sizeof(long))
+// #define LONG_INTS_PER_VECTOR (16/sizeof(long))
 #endif
 #define INT_TYPE __m128i
 #define CAST __m128i *
@@ -149,7 +150,7 @@ parsimonyNumber
 bool first_call = true; // is this the first call to pllOptimizeSprParsimony
 bool doing_stepwise_addition = false; // is the stepwise addition on
 
-void resetGlobalParamOnNewAln(){
+void resetGlobalParamOnNewAln() {
     globalParam = NULL;
     iqtree = NULL;
     bestTreeScoreHits = 0;
@@ -161,7 +162,7 @@ void resetGlobalParamOnNewAln(){
     pllRepsSegments = -1;
     pllSegmentUpper = NULL;
     pllRemainderLowerBounds = NULL;
-    first_call = true; 
+    first_call = true;
     doing_stepwise_addition = false;
 }
 
@@ -603,6 +604,9 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
     int model, *ti = tr->ti, count = ti[0], index;
 
     for (index = 4; index < count; index += 4) {
+        if (globalParam->aco) {
+            aco->incCounter();
+        }
         unsigned int totalScore = 0;
 
         size_t pNumber = (size_t)ti[index], qNumber = (size_t)ti[index + 1],
@@ -1005,6 +1009,10 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
     if (perSiteScores) {
         resetPerSiteNodeScores(pr, tr->start->number);
         addPerSiteSubtreeScores(pr, tr->start->number, pNumber, qNumber);
+    }
+
+    if (globalParam->aco) {
+        aco->incCounter();
     }
 
     for (model = 0; model < pr->numberOfPartitions; model++) {

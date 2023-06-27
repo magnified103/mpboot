@@ -4,6 +4,7 @@
  * static (globally can't have functions or variables with the same name)
  */
 #include <algorithm>
+#include "aco.h"
 #include <sprparsimony.h>
 #include <tbrparsimony.h>
 

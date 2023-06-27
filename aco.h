@@ -21,23 +21,24 @@ class ACOAlgo {
         TBR,
     };
     struct ACONode {
-
         NodeTag tag;
+        int cnt;
         vector<int> adj;
-        ACONode(NodeTag _tag) { tag = _tag; }
+        ACONode(NodeTag _tag) {
+            tag = _tag;
+            cnt = 0;
+        }
     };
     struct ACOEdge {
         int fromNode;
         int toNode;
         double pheromone;
         double prior;
-        double newPheromone;
         ACOEdge(int _fromNode, int _toNode, double _prior) {
             fromNode = _fromNode;
             toNode = _toNode;
             prior = _prior;
             pheromone = PHERO_MAX;
-            newPheromone = pheromone;
         }
         void updateNewPhero(bool isOnPath, double EVAPORATION_RATE,
                             double c = 1.0) {
@@ -46,27 +47,29 @@ class ACOAlgo {
             // Modified (TODO):   c = newScore / bestScore
             // (the better the score, the more it converges to PHERO_MAX)
             if (isOnPath) {
-                newPheromone = (1 - EVAPORATION_RATE) * newPheromone +
-                               EVAPORATION_RATE * PHERO_MAX * c;
+                pheromone = (1 - EVAPORATION_RATE) * pheromone +
+                            EVAPORATION_RATE * PHERO_MAX * c;
             } else {
-                newPheromone = (1 - EVAPORATION_RATE) * newPheromone +
-                               EVAPORATION_RATE * PHERO_MIN;
+                pheromone = (1 - EVAPORATION_RATE) * pheromone +
+                            EVAPORATION_RATE * PHERO_MIN;
             }
         }
     };
 
     // TODO: Try UPDATE_ITER 10% of num stop conditions
-    int UPDATE_ITER = 20;
-    double EVAPORATION_RATE = 0.5;
+    int UPDATE_ITER;
+    double EVAPORATION_RATE;
     static constexpr double PHERO_MAX = 1;
     static constexpr double PHERO_MIN = 0.001;
     int curNode;
     int curIter;
-    clock_t curTime;
+    int lastCounter;
+    int curCounter;
     vector<int> par;
     vector<ACONode> nodes;
     vector<ACOEdge> edges;
-    vector<pair<double, vector<int>>> savedPath;
+    vector<pair<int, vector<int>>> savedPath;
+    vector<bool> isOnPath;
     ACOAlgo();
     void setUpParamsAndGraph(Params *params);
     int moveNextNode();
@@ -75,9 +78,33 @@ class ACOAlgo {
     void updateNewPheromonePath(vector<int> &edgesOnPath);
     void updateNewPheromone(int diffMP);
     void applyNewPheromone();
-    void registerTime();
-    double getTimeFromLastRegistered();
+    void registerCounter();
+    int getNumCounters();
+    void reportUsage();
+    void incCounter();
 
     NodeTag getNodeTag(int u) { return nodes[u].tag; }
+    string nodeTagToString(NodeTag tag) {
+        switch (tag) {
+        case ROOT:
+            return "ROOT";
+        case RATCHET:
+            return "RATCHET";
+        case IQP:
+            return "IQP";
+        case RANDOM_NNI:
+            return "RANDOM_NNI";
+        case NNI:
+            return "NNI";
+        case SPR:
+            return "SPR";
+        case TBR:
+            return "TBR";
+        default:
+            return "Unknown";
+        }
+    }
 };
+
+extern ACOAlgo *aco;
 #endif /* ACO_H_ */

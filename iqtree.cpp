@@ -43,7 +43,8 @@ int pllCostNstates;                       // Diep: For weighted version
 parsimonyNumber *vectorCostMatrix = NULL; // BQM: vectorized cost matrix
 int pllRepsSegments;
 int *pllSegmentUpper;
-ACOAlgo *aco;
+
+ACOAlgo *aco = new ACOAlgo();
 
 IQTree::IQTree() : PhyloTree() { init(); }
 
@@ -83,8 +84,6 @@ void IQTree::init() {
     reps_segments = -1;
     segment_upper = NULL;
     original_sample = NULL;
-
-    aco = new ACOAlgo();
 }
 
 IQTree::IQTree(Alignment *aln) : PhyloTree(aln) { init(); }
@@ -1821,7 +1820,7 @@ double IQTree::doTreeSearch() {
 
         Alignment *saved_aln = aln;
         aco->curNode = ACOAlgo::ROOT;
-        aco->registerTime();
+        aco->registerCounter();
         int algoType = aco->moveNextNode();
 
         /*--------------------------------------------------------------------------
@@ -2248,6 +2247,9 @@ double IQTree::doTreeSearch() {
 
     readTreeString(bestTreeString);
 
+    if (params->aco) {
+        aco->reportUsage();
+    }
     if (testNNI)
         outNNI.close();
     if (params->write_intermediate_trees)

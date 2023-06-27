@@ -3,12 +3,21 @@ ACOAlgo::ACOAlgo() {}
 void ACOAlgo::setUpParamsAndGraph(Params *params) {
     UPDATE_ITER = params->aco_update_iter;
     EVAPORATION_RATE = params->aco_evaporation_rate;
-    int RATCHET_PRIOR = params->aco_ratchet_prior;
-    int IQP_PRIOR = params->aco_iqp_prior;
-    int RANDOM_NNI_PRIOR = params->aco_random_nni_prior;
-    int NNI_PRIOR = params->aco_nni_prior;
-    int SPR_PRIOR = params->aco_spr_prior;
-    int TBR_PRIOR = params->aco_tbr_prior;
+    double RATCHET_PRIOR = params->aco_ratchet_prior;
+    double IQP_PRIOR = params->aco_iqp_prior;
+    double RANDOM_NNI_PRIOR = params->aco_random_nni_prior;
+    double NNI_PRIOR = params->aco_nni_prior;
+    double SPR_PRIOR = params->aco_spr_prior;
+    double TBR_PRIOR = params->aco_tbr_prior;
+    cout << "ACO Params: \n";
+    cout << "UPDATE_ITER = " << UPDATE_ITER << '\n';
+    cout << "EVAPORATION_RATE = " << EVAPORATION_RATE << '\n';
+    cout << "RATCHET_PRIOR = " << RATCHET_PRIOR << '\n';
+    cout << "IQP_PRIOR = " << IQP_PRIOR << '\n';
+    cout << "RANDOM_NNI_PRIOR = " << RANDOM_NNI_PRIOR << '\n';
+    cout << "NNI_PRIOR = " << NNI_PRIOR << '\n';
+    cout << "SPR_PRIOR = " << SPR_PRIOR << '\n';
+    cout << "TBR_PRIOR = " << TBR_PRIOR << '\n';
 
     addNode(ROOT);
     addNode(RATCHET);
@@ -29,6 +38,9 @@ void ACOAlgo::setUpParamsAndGraph(Params *params) {
     }
     curIter = 0;
     curNode = 0;
+    curCounter = 0;
+
+    isOnPath.assign(edges.size(), false);
 }
 void ACOAlgo::addNode(NodeTag tag) {
     nodes.push_back(ACONode(tag));
@@ -41,13 +53,9 @@ void ACOAlgo::addEdge(int from, int to, double prior) {
     nodes[from].adj.push_back(edgeId);
 }
 
-void ACOAlgo::registerTime() { curTime = clock(); }
+void ACOAlgo::registerCounter() { lastCounter = curCounter; }
 
-double ACOAlgo::getTimeFromLastRegistered() {
-    clock_t nowTime = clock();
-    double elapsed_time = ((double)(nowTime - curTime)) / CLOCKS_PER_SEC;
-    return elapsed_time;
-}
+int ACOAlgo::getNumCounters() { return curCounter - lastCounter; }
 
 int ACOAlgo::moveNextNode() {
     double sum = 0;
@@ -66,6 +74,7 @@ int ACOAlgo::moveNextNode() {
         if (random < sum || i == nodes[u].adj.size() - 1) {
             curNode = edges[E].toNode;
             par[curNode] = E;
+            nodes[curNode].cnt++;
             return curNode;
         }
     }
@@ -74,17 +83,14 @@ int ACOAlgo::moveNextNode() {
 }
 
 void ACOAlgo::updateNewPheromonePath(vector<int> &edgesOnPath) {
-    vector<bool> isOnPath(edges.size(), false);
     for (int E : edgesOnPath) {
         isOnPath[E] = true;
-    }
-    for (int i = 0; i < edges.size(); ++i) {
-        edges[i].updateNewPhero(isOnPath[i], EVAPORATION_RATE);
     }
 }
 
 void ACOAlgo::updateNewPheromone(int diffMP) {
-    double t = getTimeFromLastRegistered();
+    // numCounters measures how long the chosen hill-climbing procedure ran
+    int numCounters = getNumCounters();
     vector<int> edgesOnPath;
     int u = curNode;
     while (u) {
@@ -96,8 +102,9 @@ void ACOAlgo::updateNewPheromone(int diffMP) {
         updateNewPheromonePath(edgesOnPath);
     } else {
         // Didn't improve the tree
-        // -> Save the paths, get the fastest ones to update
-        savedPath.push_back({t, edgesOnPath});
+        // -> Save the paths, get the fastest ones (minimum of numCounters) to
+        // update
+        savedPath.push_back({numCounters, edgesOnPath});
     }
     curNode = 0;
     curIter++;
@@ -121,7 +128,16 @@ void ACOAlgo::applyNewPheromone() {
         updateNewPheromonePath(savedPath[i].second);
     }
     savedPath.clear();
-    for (auto E : edges) {
-        E.pheromone = E.newPheromone;
+    for (int i = 0; i < edges.size(); ++i) {
+        edges[i].updateNewPhero(isOnPath[i], EVAPORATION_RATE);
+        isOnPath[i] = false;
     }
 }
+
+void ACOAlgo::reportUsage() {
+    for (int i = 1; i < (int)nodes.size(); ++i) {
+        cout << nodeTagToString(getNodeTag(i)) << " : " << nodes[i].cnt << '\n';
+    }
+}
+
+void ACOAlgo::incCounter() { curCounter++; }
