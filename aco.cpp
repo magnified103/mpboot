@@ -85,6 +85,7 @@ int ACOAlgo::moveNextNode() {
 void ACOAlgo::updateNewPheromonePath(vector<int> &edgesOnPath) {
     for (int E : edgesOnPath) {
         isOnPath[E] = true;
+        edges[E].updateNewPhero(true, EVAPORATION_RATE);
     }
 }
 
@@ -118,7 +119,9 @@ void ACOAlgo::applyNewPheromone() {
     // Get the paths that is fastest
     sort(savedPath.begin(), savedPath.end(),
          [&](const pair<long long, vector<int>> &A,
-             const pair<long long, vector<int>> &B) { return A.first < B.first; });
+             const pair<long long, vector<int>> &B) {
+             return A.first < B.first;
+         });
     // If there are less than half of UPDATE_ITER paths that have diffMP > 0,
     // Update using savedPath until there are half of paths updated
     for (int i = 0;
@@ -129,7 +132,9 @@ void ACOAlgo::applyNewPheromone() {
     }
     savedPath.clear();
     for (int i = 0; i < edges.size(); ++i) {
-        edges[i].updateNewPhero(isOnPath[i], EVAPORATION_RATE);
+        if (!isOnPath[i]) {
+            edges[i].updateNewPhero(isOnPath[i], EVAPORATION_RATE);
+        }
         isOnPath[i] = false;
     }
 }

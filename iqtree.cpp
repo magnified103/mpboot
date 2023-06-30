@@ -184,7 +184,9 @@ void IQTree::setParams(Params &params) {
     // tree.setIQPIterations(params.stop_condition, params.stop_confidence,
     // params.min_iterations, params.max_iterations);
 
-    aco->setUpParamsAndGraph(&params);
+    if (params.aco) {
+        aco->setUpParamsAndGraph(&params);
+    }
     stop_rule.initialize(params);
 
     // tree.setIQPAssessQuartet(params.iqp_assess_quartet);
@@ -1819,9 +1821,11 @@ double IQTree::doTreeSearch() {
         }
 
         Alignment *saved_aln = aln;
-        aco->curNode = ACOAlgo::ROOT;
-        aco->registerCounter();
-        int algoType = aco->moveNextNode();
+        if (params->aco) {
+            aco->curNode = ACOAlgo::ROOT;
+            aco->registerCounter();
+            aco->moveNextNode();
+        }
 
         /*--------------------------------------------------------------------------
          * PARSIMONY RATCHET-LIKE IDEA
@@ -1830,7 +1834,7 @@ double IQTree::doTreeSearch() {
         //		long tmp_num_ratchet_bootcands = treels.size();
         if (params->ratchet_iter >= 0) {
             if ((params->aco &&
-                 aco->getNodeTag(algoType) == ACOAlgo::RATCHET) ||
+                 aco->getNodeTag() == ACOAlgo::RATCHET) ||
                 (!params->aco && params->ratchet_iter == ratchet_iter_count)) {
                 //				string candidateTree =
                 // candidateTrees.getRandCandVecTree(); // Diep: to pick from
@@ -1889,10 +1893,10 @@ double IQTree::doTreeSearch() {
                     string candidateTree = candidateTrees.getRandCandTree();
                     readTreeString(candidateTree);
                     if (params->aco == true) {
-                        if (aco->getNodeTag(algoType) == ACOAlgo::IQP) {
+                        if (aco->getNodeTag() == ACOAlgo::IQP) {
                             doIQP();
                         } else {
-                            assert(aco->getNodeTag(algoType) ==
+                            assert(aco->getNodeTag() ==
                                    ACOAlgo::RANDOM_NNI);
                             doRandomNNIs(
                                 numNNI); // Diep: This doesn't work well

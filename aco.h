@@ -84,6 +84,7 @@ class ACOAlgo {
     void incCounter();
 
     NodeTag getNodeTag(int u) { return nodes[u].tag; }
+    NodeTag getNodeTag() { return nodes[curNode].tag; }
     string nodeTagToString(NodeTag tag) {
         switch (tag) {
         case ROOT:
