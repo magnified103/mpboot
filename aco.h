@@ -44,7 +44,7 @@ class ACOAlgo {
                             double c = 1.0) {
             // Smooth Max-Min Ant System (Huan, Linh-Trung, et al. 2012).
             // Default:           c = 1.0
-            // Modified (TODO):   c = newScore / bestScore
+            // Modified (TODO):   c = bestScore / newScore
             // (the better the score, the more it converges to PHERO_MAX)
             if (isOnPath) {
                 pheromone = (1 - EVAPORATION_RATE) * pheromone +
@@ -63,12 +63,12 @@ class ACOAlgo {
     static constexpr double PHERO_MIN = 0.001;
     int curNode;
     int curIter;
-    int lastCounter;
-    int curCounter;
+    long long lastCounter;
+    long long curCounter;
     vector<int> par;
     vector<ACONode> nodes;
     vector<ACOEdge> edges;
-    vector<pair<int, vector<int>>> savedPath;
+    vector<pair<long long, vector<int>>> savedPath;
     vector<bool> isOnPath;
     ACOAlgo();
     void setUpParamsAndGraph(Params *params);
@@ -79,7 +79,7 @@ class ACOAlgo {
     void updateNewPheromone(int diffMP);
     void applyNewPheromone();
     void registerCounter();
-    int getNumCounters();
+    long long getNumCounters();
     void reportUsage();
     void incCounter();
 

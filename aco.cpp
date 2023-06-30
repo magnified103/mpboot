@@ -27,17 +27,17 @@ void ACOAlgo::setUpParamsAndGraph(Params *params) {
     addNode(SPR);
     addNode(TBR);
 
-    addEdge(0, 1, RATCHET_PRIOR);
-    addEdge(0, 2, IQP_PRIOR);
-    addEdge(0, 3, RANDOM_NNI_PRIOR);
+    addEdge(ROOT, RATCHET, RATCHET_PRIOR);
+    addEdge(ROOT, IQP, IQP_PRIOR);
+    addEdge(ROOT, RANDOM_NNI, RANDOM_NNI_PRIOR);
 
     for (int i = 1; i <= 3; ++i) {
-        addEdge(i, 4, NNI_PRIOR);
-        addEdge(i, 5, SPR_PRIOR);
-        addEdge(i, 6, TBR_PRIOR);
+        addEdge(i, NNI, NNI_PRIOR);
+        addEdge(i, SPR, SPR_PRIOR);
+        addEdge(i, TBR, TBR_PRIOR);
     }
     curIter = 0;
-    curNode = 0;
+    curNode = ROOT;
     curCounter = 0;
 
     isOnPath.assign(edges.size(), false);
@@ -55,7 +55,7 @@ void ACOAlgo::addEdge(int from, int to, double prior) {
 
 void ACOAlgo::registerCounter() { lastCounter = curCounter; }
 
-int ACOAlgo::getNumCounters() { return curCounter - lastCounter; }
+long long ACOAlgo::getNumCounters() { return curCounter - lastCounter; }
 
 int ACOAlgo::moveNextNode() {
     double sum = 0;
@@ -90,7 +90,7 @@ void ACOAlgo::updateNewPheromonePath(vector<int> &edgesOnPath) {
 
 void ACOAlgo::updateNewPheromone(int diffMP) {
     // numCounters measures how long the chosen hill-climbing procedure ran
-    int numCounters = getNumCounters();
+    long long numCounters = getNumCounters();
     vector<int> edgesOnPath;
     int u = curNode;
     while (u) {
@@ -106,7 +106,7 @@ void ACOAlgo::updateNewPheromone(int diffMP) {
         // update
         savedPath.push_back({numCounters, edgesOnPath});
     }
-    curNode = 0;
+    curNode = ROOT;
     curIter++;
     if (curIter == UPDATE_ITER) {
         applyNewPheromone();
@@ -117,8 +117,8 @@ void ACOAlgo::updateNewPheromone(int diffMP) {
 void ACOAlgo::applyNewPheromone() {
     // Get the paths that is fastest
     sort(savedPath.begin(), savedPath.end(),
-         [&](const pair<double, vector<int>> &A,
-             const pair<double, vector<int>> &B) { return A.first < B.first; });
+         [&](const pair<long long, vector<int>> &A,
+             const pair<long long, vector<int>> &B) { return A.first < B.first; });
     // If there are less than half of UPDATE_ITER paths that have diffMP > 0,
     // Update using savedPath until there are half of paths updated
     for (int i = 0;
