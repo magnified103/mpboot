@@ -132,7 +132,7 @@ static inline void storePerSiteNodeScores(partitionList *pr, int model,
     int nodeStart = partialParsLength * nodeNumber;
     int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
     for (std::size_t i = 0; i < hn::Lanes(d); ++i) {
-        parsimonyNumber *buf = &(pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
+        parsimonyNumber *buf = (parsimonyNumber*)pr->partitionData[model]->perSitePartialPars + nodeStartPlusOffset;
         nodeStartPlusOffset += sizeof(T) * 8;
         //		buf =
         //&(pr->partitionData[model]->perSitePartialPars[nodeStart +
@@ -171,12 +171,12 @@ static inline void addPerSiteSubtreeScores(partitionList *pr, int pNumber, int q
     parsimonyNumber *pBuf, *qBuf, *rBuf;
     for (int i = 0; i < pr->numberOfPartitions; ++i) {
         int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
-        pBuf = &(pr->partitionData[i]
-                ->perSitePartialPars[partialParsLength * pNumber]);
-        qBuf = &(pr->partitionData[i]
-                ->perSitePartialPars[partialParsLength * qNumber]);
-        rBuf = &(pr->partitionData[i]
-                ->perSitePartialPars[partialParsLength * rNumber]);
+        pBuf = (parsimonyNumber*)pr->partitionData[i]
+                ->perSitePartialPars + (partialParsLength * pNumber);
+        qBuf = (parsimonyNumber*)pr->partitionData[i]
+                ->perSitePartialPars + (partialParsLength * qNumber);
+        rBuf = (parsimonyNumber*)pr->partitionData[i]
+                ->perSitePartialPars + (partialParsLength * rNumber);
         for (std::size_t k = 0; k < partialParsLength; k += hn::Lanes(d)) {
             auto pBufVec = hn::Load(d, &pBuf[k]);
             auto qBufVec = hn::Load(d, &qBuf[k]);
@@ -193,8 +193,8 @@ static void resetPerSiteNodeScores(partitionList *pr, int pNumber) {
     parsimonyNumber *pBuf;
     for (int i = 0; i < pr->numberOfPartitions; ++i) {
         int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
-        pBuf = &(pr->partitionData[i]
-                     ->perSitePartialPars[partialParsLength * pNumber]);
+        pBuf = (parsimonyNumber*)pr->partitionData[i]
+                     ->perSitePartialPars + (partialParsLength * pNumber);
         memset(pBuf, 0, partialParsLength * sizeof(parsimonyNumber));
     }
 }
@@ -577,7 +577,7 @@ static void compressDNAUppass(pllInstance *tr, partitionList *pr,
             for (i = 0;
                  i < totalNodes * (size_t)compressedEntriesPadded * PLL_PCF;
                  ++i)
-                pr->partitionData[model]->perSitePartialPars[i] = 0;
+                ((parsimonyNumber*)pr->partitionData[model]->perSitePartialPars)[i] = 0;
         }
 
         for (i = 0; i < (size_t)tr->mxtips; ++i) {

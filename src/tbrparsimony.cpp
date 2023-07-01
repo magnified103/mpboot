@@ -145,13 +145,13 @@ static void initializeCostMatrix() {
 // Diep:
 // Reset site scores of p
 static void resetPerSiteNodeScores(partitionList *pr, int pNumber) {
-    parsimonyNumber *pBuf;
-    for (int i = 0; i < pr->numberOfPartitions; i++) {
-        int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
-        pBuf = &(pr->partitionData[i]
-                     ->perSitePartialPars[partialParsLength * pNumber]);
-        memset(pBuf, 0, partialParsLength * sizeof(parsimonyNumber));
-    }
+//    parsimonyNumber *pBuf;
+//    for (int i = 0; i < pr->numberOfPartitions; i++) {
+//        int partialParsLength = pr->partitionData[i]->parsimonyLength * PLL_PCF;
+//        pBuf = &(pr->partitionData[i]
+//                     ->perSitePartialPars[partialParsLength * pNumber]);
+//        memset(pBuf, 0, partialParsLength * sizeof(parsimonyNumber));
+//    }
 }
 
 static void getxnodeLocal(nodeptr p) {
@@ -541,147 +541,6 @@ static void _updateInternalPllOnRatchet(pllInstance *tr, partitionList *pr) {
             tr->aliaswgt[ptn] = iqtree->aln->at(ptn).frequency;
         }
     }
-}
-static void compressDNA(pllInstance *tr, partitionList *pr, int *informative,
-                        int perSiteScores) {
-    constexpr hn::ScalableTag<parsimonyNumber> d;
-    if (pllCostMatrix != NULL) {
-        if (globalParam->sankoff_short_int)
-            return compressSankoffDNA<parsimonyNumberShort>(tr, pr, informative, perSiteScores);
-        else
-            return compressSankoffDNA<parsimonyNumber>(tr, pr, informative, perSiteScores);
-    }
-
-    size_t totalNodes, i, model;
-
-    totalNodes = 2 * (size_t)tr->mxtips;
-
-    tr->perSitePartialParsRoot = 0; /** The index where the per-site partial parsimony will be stored */
-
-    for (model = 0; model < (size_t)pr->numberOfPartitions; model++) {
-        size_t k, states = (size_t)pr->partitionData[model]->states,
-                  compressedEntries, compressedEntriesPadded, entries = 0,
-                  lower = pr->partitionData[model]->lower,
-                  upper = pr->partitionData[model]->upper;
-
-        parsimonyNumber **compressedTips = (parsimonyNumber **)rax_malloc(
-                            states * sizeof(parsimonyNumber *)),
-                        *compressedValues = (parsimonyNumber *)rax_malloc(
-                            states * sizeof(parsimonyNumber));
-
-        pr->partitionData[model]->numInformativePatterns =
-            0; // to fix score bug THAT too many uninformative sites cause
-               // out-of-bound array access
-
-        for (i = lower; i < upper; i++)
-            if (informative[i]) {
-                entries += (size_t)tr->aliaswgt[i];
-                pr->partitionData[model]->numInformativePatterns++;
-            }
-
-        compressedEntries = entries / PLL_PCF;
-
-        if (entries % PLL_PCF != 0)
-            compressedEntries++;
-
-        if (compressedEntries % hn::Lanes(d) != 0) {
-            compressedEntriesPadded = compressedEntries + (hn::Lanes(d) - (compressedEntries % hn::Lanes(d)));
-        } else {
-            compressedEntriesPadded = compressedEntries;
-        }
-
-        rax_posix_memalign((void **)&(pr->partitionData[model]->parsVect),
-                           PLL_BYTE_ALIGNMENT,
-                           (size_t)compressedEntriesPadded * states *
-                               totalNodes * sizeof(parsimonyNumber));
-
-        for (i = 0; i < compressedEntriesPadded * states * totalNodes; i++)
-            pr->partitionData[model]->parsVect[i] = 0;
-
-        if (perSiteScores) {
-            /* for per site parsimony score at each node */
-            rax_posix_memalign(
-                (void **)&(pr->partitionData[model]->perSitePartialPars),
-                PLL_BYTE_ALIGNMENT,
-                totalNodes * (size_t)compressedEntriesPadded * PLL_PCF *
-                    sizeof(parsimonyNumber));
-            for (i = 0;
-                 i < totalNodes * (size_t)compressedEntriesPadded * PLL_PCF;
-                 ++i)
-                pr->partitionData[model]->perSitePartialPars[i] = 0;
-        }
-
-        for (i = 0; i < (size_t)tr->mxtips; i++) {
-            size_t w = 0, compressedIndex = 0, compressedCounter = 0, index = 0;
-
-            for (k = 0; k < states; k++) {
-                compressedTips[k] =
-                    &(pr->partitionData[model]
-                          ->parsVect[(compressedEntriesPadded * states *
-                                      (i + 1)) +
-                                     (compressedEntriesPadded * k)]);
-                compressedValues[k] = 0;
-            }
-
-            for (index = lower; index < (size_t)upper; index++) {
-                if (informative[index]) {
-                    const unsigned int *bitValue =
-                        getBitVector(pr->partitionData[model]->dataType);
-
-                    parsimonyNumber value = bitValue[tr->yVector[i + 1][index]];
-
-                    for (w = 0; w < (size_t)tr->aliaswgt[index]; w++) {
-                        for (k = 0; k < states; k++) {
-                            if (value & mask32[k])
-                                compressedValues[k] |=
-                                    mask32[compressedCounter];
-                        }
-
-                        compressedCounter++;
-
-                        if (compressedCounter == PLL_PCF) {
-                            for (k = 0; k < states; k++) {
-                                compressedTips[k][compressedIndex] =
-                                    compressedValues[k];
-                                compressedValues[k] = 0;
-                            }
-
-                            compressedCounter = 0;
-                            compressedIndex++;
-                        }
-                    }
-                }
-            }
-
-            for (; compressedIndex < compressedEntriesPadded;
-                 compressedIndex++) {
-                for (; compressedCounter < PLL_PCF; compressedCounter++)
-                    for (k = 0; k < states; k++)
-                        compressedValues[k] |= mask32[compressedCounter];
-
-                for (k = 0; k < states; k++) {
-                    compressedTips[k][compressedIndex] = compressedValues[k];
-                    compressedValues[k] = 0;
-                }
-
-                compressedCounter = 0;
-            }
-        }
-
-        pr->partitionData[model]->parsimonyLength = compressedEntriesPadded;
-
-        rax_free(compressedTips);
-        rax_free(compressedValues);
-
-        // table transform
-        table_transform(pr->partitionData[model]->parsVect, totalNodes, states, compressedEntriesPadded);
-    }
-
-    rax_posix_memalign((void **)&(tr->parsimonyScore), PLL_BYTE_ALIGNMENT,
-                       sizeof(unsigned int) * totalNodes);
-
-    for (i = 0; i < totalNodes; i++)
-        tr->parsimonyScore[i] = 0;
 }
 
 void _allocateParsimonyDataStructuresTBR(pllInstance *tr, partitionList *pr,

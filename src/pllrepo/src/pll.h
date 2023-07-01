@@ -1060,8 +1060,8 @@ typedef struct {
     unsigned int *scoreIncrease; /* HynDuf added - for uppass optimize */
     parsimonyNumber *perSiteParsScores;
 
-    parsimonyNumber *perSitePartialPars; /* Diep added - for UFBoot */
-    parsimonyNumber *aggregatedPerSitePartialPars; /* Maintain the aggregated partial parsimony per site */
+    void *perSitePartialPars; /* Diep added - for UFBoot */
+    void *aggregatedPerSitePartialPars; /* Maintain the aggregated partial parsimony per site */
 
     int numInformativePatterns;          /* Diep added - for UFBoot */
 

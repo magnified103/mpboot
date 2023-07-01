@@ -15,6 +15,8 @@
 void resetGlobalParamOnNewAln(); // Diep 2021-12-28: This serves analysis
                                  // composed of multiple runs (such as SBS);
 
+void compressDNA(pllInstance *tr, partitionList *pr, int *informative, int perSiteScores);
+
 /*
  * An alternative for pllComputeRandomizedStepwiseAdditionParsimonyTree
  * because the original one seems to have the wrong deallocation function
