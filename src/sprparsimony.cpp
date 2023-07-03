@@ -471,6 +471,17 @@ void newviewSankoffParsimonyIterativeFastSIMD(pllInstance *tr,
     }
 }
 
+static inline std::uint32_t verticalSum(hn::Vec<hn::ScalableTag<std::uint8_t>> vec) {
+    constexpr hn::ScalableTag<std::uint8_t> d;
+    HWY_ALIGN std::uint8_t counts[hn::Lanes(d)];
+    hn::Store(vec, d, counts);
+    std::uint32_t sum = 0;
+    for (auto count: counts) {
+        sum += count;
+    }
+    return sum;
+}
+
 template <typename Traits>
 void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
                                     int perSiteScores) {
@@ -507,11 +518,12 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
         return;
     }
     constexpr hn::ScalableTag<parsimonyNumber> d;
+    constexpr hn::ScalableTag<std::uint8_t> dPopcnt;
 
     int model, *ti = tr->ti, count = ti[0], index;
 
     for (index = 4; index < count; index += 4) {
-        unsigned int totalScore = 0;
+        auto totalScoreVec = hn::Zero(dPopcnt);
 
         size_t pNumber = (size_t)ti[index], qNumber = (size_t)ti[index + 1],
                rNumber = (size_t)ti[index + 2];
@@ -545,7 +557,7 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 
                     v_N = hn::Not(v_N);
 
-                    totalScore += vectorPopcount(v_N);
+                    totalScoreVec += hn::PopulationCount(hn::BitCast(dPopcnt, v_N));
                     if (perSiteScores)
                         storePerSiteNodeScores(tr, pr, model, v_N, i, pNumber);
                 }
@@ -583,7 +595,7 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 
                     v_N = hn::Not(v_N);
 
-                    totalScore += vectorPopcount(v_N);
+                    totalScoreVec += hn::PopulationCount(hn::BitCast(dPopcnt, v_N));
                     if (perSiteScores)
                         storePerSiteNodeScores(tr, pr, model, v_N, i, pNumber);
                 }
@@ -606,7 +618,7 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 
                     v_N = hn::Not(v_N);
 
-                    totalScore += vectorPopcount(v_N);
+                    totalScoreVec += hn::PopulationCount(hn::BitCast(dPopcnt, v_N));
                     if (perSiteScores)
                         storePerSiteNodeScores(tr, pr, model, v_N, i, pNumber);
                 }
@@ -629,7 +641,7 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 
                     v_N = hn::Not(v_N);
 
-                    totalScore += vectorPopcount(v_N);
+                    totalScoreVec += hn::PopulationCount(hn::BitCast(dPopcnt, v_N));
                     if (perSiteScores)
                         storePerSiteNodeScores(tr, pr, model, v_N, i, pNumber);
                 }
@@ -637,7 +649,9 @@ void _newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
             }
         }
 
-        tr->parsimonyScore[pNumber] = totalScore + tr->parsimonyScore[rNumber] + tr->parsimonyScore[qNumber];
+        tr->parsimonyScore[pNumber] = verticalSum(totalScoreVec)
+                                        + tr->parsimonyScore[rNumber]
+                                        + tr->parsimonyScore[qNumber];
     }
 }
 
@@ -778,6 +792,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
     }
 
     constexpr hn::ScalableTag<parsimonyNumber> d;
+    constexpr hn::ScalableTag<std::uint8_t> dPopcnt;
 
     size_t pNumber = (size_t)tr->ti[1], qNumber = (size_t)tr->ti[2];
 
@@ -789,6 +804,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
         _newviewParsimonyIterativeFast(tr, pr, perSiteScores);
 
     sum = tr->parsimonyScore[pNumber] + tr->parsimonyScore[qNumber];
+    auto sumVec = hn::Zero(dPopcnt);
 
     if (perSiteScores) {
         resetPerSiteNodeScores(pr, tr->perSitePartialParsRoot);
@@ -812,7 +828,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 
                 v_N = hn::Not(v_N);
 
-                sum += vectorPopcount(v_N);
+                sumVec += hn::PopulationCount(hn::BitCast(dPopcnt, v_N));
                 if (perSiteScores) {
                     storePerSiteNodeScores(tr, pr, model, v_N, i, tr->perSitePartialParsRoot);
                 }
@@ -832,7 +848,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 
                 v_N = hn::Not(v_N);
 
-                sum += vectorPopcount(v_N);
+                sumVec += hn::PopulationCount(hn::BitCast(dPopcnt, v_N));
                 if (perSiteScores) {
                     storePerSiteNodeScores(tr, pr, model, v_N, i, tr->perSitePartialParsRoot);
                 }
@@ -851,7 +867,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 
                 v_N = hn::Not(v_N);
 
-                sum += vectorPopcount(v_N);
+                sumVec += hn::PopulationCount(hn::BitCast(dPopcnt, v_N));
                 if (perSiteScores) {
                     storePerSiteNodeScores(tr, pr, model, v_N, i, tr->perSitePartialParsRoot);
                 }
@@ -870,7 +886,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
 
                 v_N = hn::Not(v_N);
 
-                sum += vectorPopcount(v_N);
+                sumVec += hn::PopulationCount(hn::BitCast(dPopcnt, v_N));
                 if (perSiteScores) {
                     storePerSiteNodeScores(tr, pr, model, v_N, i, tr->perSitePartialParsRoot);
                 }
@@ -881,7 +897,7 @@ unsigned int _evaluateParsimonyIterativeFast(pllInstance *tr, partitionList *pr,
         }
     }
 
-    return sum;
+    return sum += verticalSum(sumVec);
 }
 
 /**
