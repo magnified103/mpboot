@@ -1737,6 +1737,10 @@ double IQTree::doTreeSearch() {
     double cur_correlation = 0.0;
     int ratchet_iter_count = 0;
     assert(pllInst != NULL);
+
+    if (params->aco) {
+        aco->initBestScore(-bestScore);
+    }
     /*====================================================
      * MAIN LOOP OF THE IQ-TREE ALGORITHM
      *====================================================*/
@@ -2337,7 +2341,6 @@ string IQTree::doAntColonySearch(int &nniCount, int &nniSteps) {
             curScore = optimizeNNI(nniCount, nniSteps);
             treeString = getTreeString();
         } else {
-
             int treeOper = aco->moveNextNode();
             int newScore = 0;
             string treeString1 = getTreeString();
@@ -2400,8 +2403,10 @@ string IQTree::doAntColonySearch(int &nniCount, int &nniSteps) {
                 _pllFreeParsimonyDataStructures(pllInst, pllPartitions);
             }
             // cout << "Cur score: " << curScore << '\n';
-            aco->updateNewPheromone(newScore - curScore);
+            aco->updateNewPheromone(-curScore, -newScore);
             // cout << "New score: " << newScore << '\n';
+            // cout << "Best score: " << bestScore << '\n';
+
             curScore = newScore;
         }
     } else if (params->pll) {

@@ -1,7 +1,9 @@
 #include "aco.h"
 ACOAlgo::ACOAlgo() {}
 void ACOAlgo::setUpParamsAndGraph(Params *params) {
-    UPDATE_ITER = params->aco_update_iter;
+    // UPDATE_ITER = params->aco_update_iter;
+    UPDATE_ITER =
+        params->aco_update_iter + (int)params->unsuccess_iteration * 2 / 100;
     EVAPORATION_RATE = params->aco_evaporation_rate;
     double RATCHET_PRIOR = params->aco_ratchet_prior;
     double IQP_PRIOR = params->aco_iqp_prior;
@@ -39,6 +41,7 @@ void ACOAlgo::setUpParamsAndGraph(Params *params) {
     curIter = 0;
     curNode = ROOT;
     curCounter = 0;
+    foundBetterScore = false;
 
     isOnPath.assign(edges.size(), false);
 }
@@ -82,14 +85,7 @@ int ACOAlgo::moveNextNode() {
     return 0;
 }
 
-void ACOAlgo::updateNewPheromonePath(vector<int> &edgesOnPath) {
-    for (int E : edgesOnPath) {
-        isOnPath[E] = true;
-        edges[E].updateNewPhero(true, EVAPORATION_RATE);
-    }
-}
-
-void ACOAlgo::updateNewPheromone(int diffMP) {
+void ACOAlgo::updateNewPheromone(int oldScore, int newScore) {
     // numCounters measures how long the chosen hill-climbing procedure ran
     long long numCounters = getNumCounters();
     vector<int> edgesOnPath;
@@ -99,12 +95,38 @@ void ACOAlgo::updateNewPheromone(int diffMP) {
         edgesOnPath.push_back(E);
         u = edges[E].fromNode;
     }
-    if (diffMP > 0) {
-        updateNewPheromonePath(edgesOnPath);
+    if (newScore < curBestScore) {
+        // cout << "P0\n";
+        for (int i = 0; i < edges.size(); ++i) {
+            isOnPath[i] = false;
+        }
+        for (int E : edgesOnPath) {
+            isOnPath[E] = true;
+            edges[E].updateNewPhero(true, EVAPORATION_RATE);
+        }
+        for (int i = 0; i < edges.size(); ++i) {
+            if (!isOnPath[i]) {
+                edges[i].updateNewPhero(false, EVAPORATION_RATE);
+            }
+            isOnPath[i] = false;
+        }
+        savedPath.clear();
+        curIter = 0;
+        curBestScore = newScore;
+        foundBetterScore = true;
+    } else if (foundBetterScore && newScore == curBestScore) {
+        // cout << "P1\n";
+        for (int E : edgesOnPath) {
+            isOnPath[E] = true;
+            edges[E].updateNewPhero(true, EVAPORATION_RATE);
+        }
+        // } else if (oldScore - newScore >= newScore - curBestScore) {
+        //     cout << "P2\n";
+        //     for (int E : edgesOnPath) {
+        //         isOnPath[E] = true;
+        //     }
     } else {
-        // Didn't improve the tree
-        // -> Save the paths, get the fastest ones (minimum of numCounters) to
-        // update
+        // cout << "P3\n";
         savedPath.push_back({numCounters, edgesOnPath});
     }
     curNode = ROOT;
@@ -124,17 +146,26 @@ void ACOAlgo::applyNewPheromone() {
          });
     // If there are less than half of UPDATE_ITER paths that have diffMP > 0,
     // Update using savedPath until there are half of paths updated
+    // cout << "foundBetterScore = " << foundBetterScore << '\n';
     for (int i = 0;
          i < min((int)savedPath.size(),
                  UPDATE_ITER / 2 - (UPDATE_ITER - (int)savedPath.size()));
          ++i) {
-        updateNewPheromonePath(savedPath[i].second);
+        if (foundBetterScore) {
+            for (int E : savedPath[i].second) {
+                isOnPath[E] = true;
+                // edges[E].updateNewPhero(true, EVAPORATION_RATE);
+            }
+        } else {
+            for (int E : savedPath[i].second) {
+                isOnPath[E] = true;
+                edges[E].updateNewPhero(true, EVAPORATION_RATE);
+            }
+        }
     }
     savedPath.clear();
     for (int i = 0; i < edges.size(); ++i) {
-        if (!isOnPath[i]) {
-            edges[i].updateNewPhero(isOnPath[i], EVAPORATION_RATE);
-        }
+        edges[i].updateNewPhero(isOnPath[i], EVAPORATION_RATE);
         isOnPath[i] = false;
     }
 }

@@ -60,9 +60,11 @@ class ACOAlgo {
     int UPDATE_ITER;
     double EVAPORATION_RATE;
     static constexpr double PHERO_MAX = 1;
-    static constexpr double PHERO_MIN = 0.001;
+    static constexpr double PHERO_MIN = 0.1;
     int curNode;
     int curIter;
+    int curBestScore;
+    bool foundBetterScore = false;
     long long lastCounter;
     long long curCounter;
     vector<int> par;
@@ -75,14 +77,14 @@ class ACOAlgo {
     int moveNextNode();
     void addNode(NodeTag tag);
     void addEdge(int from, int to, double prior);
-    void updateNewPheromonePath(vector<int> &edgesOnPath);
-    void updateNewPheromone(int diffMP);
+    void updateNewPheromone(int oldScore, int newScore);
     void applyNewPheromone();
     void registerCounter();
     long long getNumCounters();
     void reportUsage();
     void incCounter();
 
+    void initBestScore(int bestScore) { cout << bestScore << '\n';  curBestScore = bestScore; }
     NodeTag getNodeTag(int u) { return nodes[u].tag; }
     NodeTag getNodeTag() { return nodes[curNode].tag; }
     string nodeTagToString(NodeTag tag) {
