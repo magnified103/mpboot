@@ -3386,6 +3386,7 @@ void pllComputePatternParsimony(pllInstance *tr, partitionList *pr,
             upperIndex = pr->partitionData[i]->numInformativePatterns;
         for (ptn = pr->partitionData[i]->lower; ptn < upperIndex; ptn++) {
             //			cout << p[site] << ", ";
+            assert(site < partialParsLength);
             ptn_pars[ptn] = p[site];
             sum += ptn_pars[ptn] * tr->aliaswgt[ptn];
             site += tr->aliaswgt[ptn];
