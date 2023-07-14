@@ -3,8 +3,8 @@
  * NOTE: Use functions the same as in sprparsimony.cpp, so I have to declare it
  * static (globally can't have functions or variables with the same name)
  */
-#include <algorithm>
 #include "aco.h"
+#include <algorithm>
 #include <sprparsimony.h>
 #include <tbrparsimony.h>
 
@@ -1760,6 +1760,10 @@ static int pllTestTBRMoveLeaf(pllInstance *tr, partitionList *pr,
         evaluateParsimonyTBR(tr, pr, p->back, insertBranch, p, perSiteScores);
     tr->curRoot = removeBranch;
     tr->curRootBack = removeBranch->back;
+    if (perSiteScores) {
+        // If UFBoot is enabled ...
+        pllSaveCurrentTreeTBRParsimony(tr, pr, mp); // run UFBoot
+    }
     if (globalParam->tbr_test_draw == true) {
         drawTreeTBR(tr, pr);
     }
