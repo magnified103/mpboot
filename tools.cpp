@@ -976,6 +976,10 @@ void parseArg(int argc, char *argv[], Params &params) {
                 params.aco_tbr_prior = convert_double(argv[cnt]);
                 continue;
             }
+            if (strcmp(argv[cnt], "-aco_stop_cond") == 0) {
+                params.stop_condition = SC_ACO_UNSUCCESS_ITERATION;
+                continue;
+            }
             if (strcmp(argv[cnt], "-spr_tbr") == 0) {
                 params.spr_tbr = true;
                 continue;

@@ -177,3 +177,18 @@ void ACOAlgo::reportUsage() {
 }
 
 void ACOAlgo::incCounter() { curCounter++; }
+
+int ACOAlgo::getNumStopCond(int unsuccess_iters) {
+    double p_nni = 0, p_spr = 0, p_tbr = 0;
+    for (int i = 1; i <= 3; ++i) {
+        assert(nodes[i].adj.size() == 3);
+        p_nni += edges[nodes[i].adj[0]].pheromone;
+        p_spr += edges[nodes[i].adj[1]].pheromone;
+        p_tbr += edges[nodes[i].adj[2]].pheromone;
+    }
+    double sum = p_nni + p_spr + p_tbr;
+    p_nni /= sum;
+    p_spr /= sum;
+    p_tbr /= sum;
+    return int(p_nni * unsuccess_iters + p_spr * unsuccess_iters + p_tbr * 100);
+}

@@ -83,8 +83,9 @@ class ACOAlgo {
     long long getNumCounters();
     void reportUsage();
     void incCounter();
+    int getNumStopCond(int unsuccess_iters);
 
-    void initBestScore(int bestScore) { cout << bestScore << '\n';  curBestScore = bestScore; }
+    void initBestScore(int bestScore) { curBestScore = bestScore; }
     NodeTag getNodeTag(int u) { return nodes[u].tag; }
     NodeTag getNodeTag() { return nodes[curNode].tag; }
     string nodeTagToString(NodeTag tag) {
