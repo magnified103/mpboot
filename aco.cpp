@@ -1,5 +1,6 @@
 #include "aco.h"
 #include <iomanip>
+#include <sstream>
 ACOAlgo::ACOAlgo() {}
 void ACOAlgo::setUpParamsAndGraph(Params *params) {
     // UPDATE_ITER = params->aco_update_iter;
@@ -200,13 +201,16 @@ void ACOAlgo::reportPheroPercentage() {
     p_nni /= sum2;
     p_spr /= sum2;
     p_tbr /= sum2;
-    cout << "%Phero:\n";
-    printf("PER_RATCHET = %.3f\n", p_ratchet);
-    printf("PER_IQP = %.3f\n", p_iqp);
-    printf("PER_RANDOM_NNI = %.3f\n", p_random_nni);
-    printf("PER_NNI = %.3f\n", p_nni);
-    printf("PER_SPR = %.3f\n", p_spr);
-    printf("PER_TBR = %.3f\n", p_tbr);
+    ostringstream tem;
+    tem << "%Phero:\n";
+    tem << fixed << setprecision(3);
+    tem << "PER_RATCHET = " << p_ratchet << '\n';
+    tem << "PER_IQP = " << p_iqp << '\n';
+    tem << "PER_RANDOM_NNI = " << p_random_nni << '\n';
+    tem << "PER_NNI = " << p_nni << '\n';
+    tem << "PER_TBR = " << p_tbr << '\n';
+    string temStr = tem.str();
+    cout << temStr;
 }
 
 int ACOAlgo::getNumStopCond(int unsuccess_iters) {
