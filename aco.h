@@ -83,6 +83,7 @@ class ACOAlgo {
     long long getNumCounters();
     void reportUsage();
     void incCounter();
+    void reportPheroPercentage();
     int getNumStopCond(int unsuccess_iters);
 
     void initBestScore(int bestScore) { curBestScore = bestScore; }

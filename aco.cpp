@@ -1,4 +1,5 @@
 #include "aco.h"
+#include <iomanip>
 ACOAlgo::ACOAlgo() {}
 void ACOAlgo::setUpParamsAndGraph(Params *params) {
     // UPDATE_ITER = params->aco_update_iter;
@@ -114,6 +115,7 @@ void ACOAlgo::updateNewPheromone(int oldScore, int newScore) {
         curIter = 0;
         curBestScore = newScore;
         foundBetterScore = true;
+        reportPheroPercentage();
     } else if (foundBetterScore && newScore == curBestScore) {
         // cout << "P1\n";
         for (int E : edgesOnPath) {
@@ -168,6 +170,7 @@ void ACOAlgo::applyNewPheromone() {
         edges[i].updateNewPhero(isOnPath[i], EVAPORATION_RATE);
         isOnPath[i] = false;
     }
+    reportPheroPercentage();
 }
 
 void ACOAlgo::reportUsage() {
@@ -177,6 +180,34 @@ void ACOAlgo::reportUsage() {
 }
 
 void ACOAlgo::incCounter() { curCounter++; }
+
+void ACOAlgo::reportPheroPercentage() {
+    double p_ratchet = edges[0].pheromone;
+    double p_iqp = edges[1].pheromone;
+    double p_random_nni = edges[2].pheromone;
+    double p_nni = 0, p_spr = 0, p_tbr = 0;
+    for (int i = 1; i <= 3; ++i) {
+        assert(nodes[i].adj.size() == 3);
+        p_nni += edges[nodes[i].adj[0]].pheromone;
+        p_spr += edges[nodes[i].adj[1]].pheromone;
+        p_tbr += edges[nodes[i].adj[2]].pheromone;
+    }
+    double sum1 = p_ratchet + p_iqp + p_random_nni;
+    p_ratchet /= sum1;
+    p_iqp /= sum1;
+    p_random_nni /= sum1;
+    double sum2 = p_nni + p_spr + p_tbr;
+    p_nni /= sum2;
+    p_spr /= sum2;
+    p_tbr /= sum2;
+    cout << "%Phero:\n";
+    printf("PER_RATCHET = %.3f\n", p_ratchet);
+    printf("PER_IQP = %.3f\n", p_iqp);
+    printf("PER_RANDOM_NNI = %.3f\n", p_random_nni);
+    printf("PER_NNI = %.3f\n", p_nni);
+    printf("PER_SPR = %.3f\n", p_spr);
+    printf("PER_TBR = %.3f\n", p_tbr);
+}
 
 int ACOAlgo::getNumStopCond(int unsuccess_iters) {
     double p_nni = 0, p_spr = 0, p_tbr = 0;
