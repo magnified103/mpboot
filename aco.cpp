@@ -208,6 +208,7 @@ void ACOAlgo::reportPheroPercentage() {
     tem << "PER_IQP = " << p_iqp << '\n';
     tem << "PER_RANDOM_NNI = " << p_random_nni << '\n';
     tem << "PER_NNI = " << p_nni << '\n';
+    tem << "PER_SPR = " << p_spr << '\n';
     tem << "PER_TBR = " << p_tbr << '\n';
     string temStr = tem.str();
     cout << temStr;
