@@ -13,9 +13,6 @@ class ACOAlgo {
   public:
     enum NodeTag {
         ROOT,
-        RATCHET,
-        IQP,
-        RANDOM_NNI,
         NNI,
         SPR,
         TBR,
@@ -93,12 +90,6 @@ class ACOAlgo {
         switch (tag) {
         case ROOT:
             return "ROOT";
-        case RATCHET:
-            return "RATCHET";
-        case IQP:
-            return "IQP";
-        case RANDOM_NNI:
-            return "RANDOM_NNI";
         case NNI:
             return "NNI";
         case SPR:

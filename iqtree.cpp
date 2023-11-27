@@ -1827,8 +1827,6 @@ double IQTree::doTreeSearch() {
         Alignment *saved_aln = aln;
         if (params->aco) {
             aco->curNode = ACOAlgo::ROOT;
-            aco->registerCounter();
-            aco->moveNextNode();
         }
 
         /*--------------------------------------------------------------------------
@@ -1837,9 +1835,7 @@ double IQTree::doTreeSearch() {
         //		long tmp_num_ratchet_trees = treels_logl.size();
         //		long tmp_num_ratchet_bootcands = treels.size();
         if (params->ratchet_iter >= 0) {
-            if ((params->aco &&
-                 aco->getNodeTag() == ACOAlgo::RATCHET) ||
-                (!params->aco && params->ratchet_iter == ratchet_iter_count)) {
+            if (params->ratchet_iter == ratchet_iter_count) {
                 //				string candidateTree =
                 // candidateTrees.getRandCandVecTree(); // Diep: to pick from
                 // vector-stored candidates
@@ -1896,24 +1892,12 @@ double IQTree::doTreeSearch() {
                     // from vector-stored candidates
                     string candidateTree = candidateTrees.getRandCandTree();
                     readTreeString(candidateTree);
-                    if (params->aco == true) {
-                        if (aco->getNodeTag() == ACOAlgo::IQP) {
-                            doIQP();
-                        } else {
-                            assert(aco->getNodeTag() ==
-                                   ACOAlgo::RANDOM_NNI);
-                            doRandomNNIs(
-                                numNNI); // Diep: This doesn't work well
-                                         // with sorted parsimony. Why?
-                        }
+                    if (params->iqp) {
+                        doIQP();
                     } else {
-                        if (params->iqp) {
-                            doIQP();
-                        } else {
-                            doRandomNNIs(
-                                numNNI); // Diep: This doesn't work well
-                                         // with sorted parsimony. Why?
-                        }
+                        doRandomNNIs(
+                            numNNI); // Diep: This doesn't work well
+                                        // with sorted parsimony. Why?
                     }
                 } else {
                     doIQP();
@@ -2341,6 +2325,7 @@ string IQTree::doAntColonySearch(int &nniCount, int &nniSteps) {
             curScore = optimizeNNI(nniCount, nniSteps);
             treeString = getTreeString();
         } else {
+            aco->registerCounter();
             int treeOper = aco->moveNextNode();
             int newScore = 0;
             string treeString1 = getTreeString();

@@ -909,7 +909,6 @@ void parseArg(int argc, char *argv[], Params &params) {
         try {
             if (strcmp(argv[cnt], "-aco") == 0) {
                 params.aco = true;
-                params.iqp = true;
                 continue;
             }
             if (strcmp(argv[cnt], "-aco_update_iter") == 0) {
