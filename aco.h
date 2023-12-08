@@ -61,6 +61,7 @@ class ACOAlgo {
     int curNode;
     int curIter;
     int curBestScore;
+    float curBestRatio;
     bool foundBetterScore = false;
     long long lastCounter;
     long long curCounter;

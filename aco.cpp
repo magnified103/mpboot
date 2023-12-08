@@ -30,6 +30,7 @@ void ACOAlgo::setUpParamsAndGraph(Params *params) {
     curNode = ROOT;
     curCounter = 0;
     foundBetterScore = false;
+    curBestRatio = 0;
 
     isOnPath.assign(edges.size(), false);
 }
@@ -83,40 +84,16 @@ void ACOAlgo::updateNewPheromone(int oldScore, int newScore) {
         edgesOnPath.push_back(E);
         u = edges[E].fromNode;
     }
-    if (newScore < curBestScore) {
-        // cout << "P0\n";
-        for (int i = 0; i < edges.size(); ++i) {
-            isOnPath[i] = false;
-        }
-        for (int E : edgesOnPath) {
+    if (newScore <= curBestScore) {
+        for (auto E: edgesOnPath) {
             isOnPath[E] = true;
-            edges[E].updateNewPhero(true, EVAPORATION_RATE);
         }
-        for (int i = 0; i < edges.size(); ++i) {
-            if (!isOnPath[i]) {
-                edges[i].updateNewPhero(false, EVAPORATION_RATE);
-            }
-            isOnPath[i] = false;
-        }
-        savedPath.clear();
-        curIter = 0;
         curBestScore = newScore;
-        foundBetterScore = true;
-        reportPheroPercentage();
-    } else if (foundBetterScore && newScore == curBestScore) {
-        // cout << "P1\n";
-        for (int E : edgesOnPath) {
+    } else if ((oldScore - newScore) / (float)numCounters >= curBestRatio) {
+        curBestRatio = (oldScore - newScore) / (float)numCounters;
+        for (auto E: edgesOnPath) {
             isOnPath[E] = true;
-            edges[E].updateNewPhero(true, EVAPORATION_RATE);
         }
-        // } else if (oldScore - newScore >= newScore - curBestScore) {
-        //     cout << "P2\n";
-        //     for (int E : edgesOnPath) {
-        //         isOnPath[E] = true;
-        //     }
-    } else {
-        // cout << "P3\n";
-        savedPath.push_back({numCounters, edgesOnPath});
     }
     curNode = ROOT;
     curIter++;
@@ -127,36 +104,11 @@ void ACOAlgo::updateNewPheromone(int oldScore, int newScore) {
 }
 
 void ACOAlgo::applyNewPheromone() {
-    // Get the paths that is fastest
-    sort(savedPath.begin(), savedPath.end(),
-         [&](const pair<long long, vector<int>> &A,
-             const pair<long long, vector<int>> &B) {
-             return A.first < B.first;
-         });
-    // If there are less than half of UPDATE_ITER paths that have diffMP > 0,
-    // Update using savedPath until there are half of paths updated
-    // cout << "foundBetterScore = " << foundBetterScore << '\n';
-    for (int i = 0;
-         i < min((int)savedPath.size(),
-                 UPDATE_ITER / 2 - (UPDATE_ITER - (int)savedPath.size()));
-         ++i) {
-        if (foundBetterScore) {
-            for (int E : savedPath[i].second) {
-                isOnPath[E] = true;
-                // edges[E].updateNewPhero(true, EVAPORATION_RATE);
-            }
-        } else {
-            for (int E : savedPath[i].second) {
-                isOnPath[E] = true;
-                edges[E].updateNewPhero(true, EVAPORATION_RATE);
-            }
-        }
-    }
-    savedPath.clear();
     for (int i = 0; i < edges.size(); ++i) {
         edges[i].updateNewPhero(isOnPath[i], EVAPORATION_RATE);
         isOnPath[i] = false;
     }
+    curBestRatio = 0;
     reportPheroPercentage();
 }
 
