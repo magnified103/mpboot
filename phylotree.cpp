@@ -547,6 +547,7 @@ void setBitsAll(UINT* &bit_vec, int num) {
  * A|C|G|T -> 15
  */
 UINT dna_state_map[128];
+UINT bin_state_map[2];
 UINT prot_state_map[128];
 /*
  * this will recompute for 2 DNA states as input and map to result of Fitch algorithm:
@@ -556,12 +557,17 @@ UINT prot_state_map[128];
  * End effect: an array of size 256, with 4 left bit of index for state 1 and 4 right bit for state 2
  */
 UINT dna_fitch_result[256];
+UINT bin_fitch_result[16];
 /*
  * either 0 or 1
  */
 UINT dna_fitch_step[256];
+UINT bin_fitch_step[16];
 
 void precomputeFitchInfo() {
+	bin_state_map[0] = 1; // '0'
+	bin_state_map[1] = 2; // '1'
+
 	dna_state_map[0] = 1; // A
 	dna_state_map[1] = 2; // C
 	dna_state_map[2] = 4; // G
@@ -579,6 +585,18 @@ void precomputeFitchInfo() {
     dna_state_map[1+2+4+3] = 1+2+4; // A or G or C
 
     int state;
+    for (state = 0; state < 16; state++) {
+    	UINT state1 = state & 3;
+    	UINT state2 = state >> 2;
+    	UINT intersection = state1 & state2;
+    	if (intersection == 0) {
+    		bin_fitch_result[state] = state1 | state2;
+    		bin_fitch_step[state] = 1;
+    	} else {
+    		bin_fitch_result[state] = intersection;
+    		bin_fitch_step[state] = 0;
+    	}
+    }
     for (state = 0; state < 256; state++) {
     	UINT state1 = state & 15;
     	UINT state2 = state >> 4;
@@ -705,6 +723,58 @@ void PhyloTree::computePartialParsimony(PhyloNeighbor *dad_branch, PhyloNode *da
     assert(dad_branch->partial_pars);
     dad_branch->partial_lh_computed |= 2;
 
+    if (nstates == 2 && (node->isLeaf() || node->degree() == 3)) {
+    	// ULTRAFAST VERSION FOR BINARY, assuming that UINT is 32-bit integer
+        if (node->isLeaf() && dad) {
+            // external node
+            for (ptn = 0; ptn < aln->size(); ptn += 16) {
+            	UINT states = 0;
+            	int maxi = aln->size() - ptn;
+            	if(maxi > 16) maxi = 16;
+            	for (int i = 0; i < maxi; ++i) {
+            		UINT bit_state = bin_state_map[(aln->at(ptn+i))[node->id]];
+            		states |= (bit_state << (i << 1));
+            		dad_branch->partial_pars[ptn_pars_start_id + ptn + i] = 0;
+            	}
+            	dad_branch->partial_pars[ptn/16] = states;
+            }
+            dad_branch->partial_pars[pars_size - 1] = 0; // set subtree score = 0
+        } else {
+            // internal node
+        	memset(dad_branch->partial_pars + ptn_pars_start_id, 0, nptn * sizeof(int));
+        	UINT *left = NULL, *right = NULL;
+        	int pars_steps = 0;
+            FOR_NEIGHBOR_IT(node, dad, it)if ((*it)->node->name != ROOT_NAME) {
+                computePartialParsimony((PhyloNeighbor*) (*it), (PhyloNode*) node);
+                if (!left)
+                	left = ((PhyloNeighbor*) (*it))->partial_pars;
+                else
+                	right = ((PhyloNeighbor*) (*it))->partial_pars;
+                pars_steps += ((PhyloNeighbor*) (*it))->partial_pars[pars_size-1];
+                for (int p = 0; p < nptn; ++p)
+                	dad_branch->partial_pars[ptn_pars_start_id + p] += ((PhyloNeighbor*) (*it))->partial_pars[ptn_pars_start_id + p];
+            }
+            for (ptn = 0; ptn < aln->size(); ptn += 16) {
+            	UINT states_left = left[ptn/16];
+            	UINT states_right = right[ptn/16];
+            	UINT states_dad = 0;
+            	int maxi = aln->size() - ptn;
+            	if(maxi > 16) maxi = 16;
+            	for (int i = 0; i < maxi; ++i) {
+            		UINT state_left = (states_left >> (i << 1)) & 3;
+            		UINT state_right = (states_right >> (i << 1)) & 3;
+            		UINT state_both = state_left | (state_right << 2);
+            		states_dad |= bin_fitch_result[state_both] << (i << 1);
+            		pars_steps += bin_fitch_step[state_both] * aln->at(ptn+i).frequency;
+            		dad_branch->partial_pars[ptn_pars_start_id + ptn + i] += bin_fitch_step[state_both];
+            	}
+            	dad_branch->partial_pars[ptn/16] = states_dad;
+            }
+            dad_branch->partial_pars[pars_size - 1] = pars_steps;
+        }
+        return;
+    } // END OF BINARY VERSION
+    
     if (nstates == 4 && aln->seq_type == SEQ_DNA && (node->isLeaf() || node->degree() == 3)) {
     	// ULTRAFAST VERSION FOR DNA, assuming that UINT is 32-bit integer
         if (node->isLeaf() && dad) {
@@ -969,7 +1039,25 @@ int PhyloTree::computeParsimonyBranch(PhyloNeighbor *dad_branch, PhyloNode *dad,
     int i, ptn;
     int tree_pars = 0;
 
-    if (aln->num_states == 4 && aln->seq_type == SEQ_DNA) {
+    if (aln->num_states == 2) {
+    	// ULTRAFAST VERSION FOR BINARY
+        for (ptn = 0; ptn < aln->size(); ptn += 16) {
+        	UINT states_left = node_branch->partial_pars[ptn/16];
+        	UINT states_right = dad_branch->partial_pars[ptn/16];
+        	UINT states_dad = 0;
+        	int maxi = aln->size() - ptn;
+        	if (maxi > 16) maxi = 16;
+			for (i = 0; i < maxi; ++i) {
+				UINT state_left = (states_left >> (i << 1)) & 3;
+				UINT state_right = (states_right >> (i << 1)) & 3;
+				UINT state_both = state_left | (state_right << 2);
+				states_dad |= bin_fitch_result[state_both] << (i << 1);
+				tree_pars += bin_fitch_step[state_both] * aln->at(ptn+i).frequency;
+				_pattern_pars[ptn + i] = node_branch->partial_pars[ptn_pars_start_id + ptn + i] +
+					dad_branch->partial_pars[ptn_pars_start_id + ptn + i] + bin_fitch_step[state_both];
+			}
+        }
+    } else if (aln->num_states == 4 && aln->seq_type == SEQ_DNA) {
     	// ULTRAFAST VERSION FOR DNA
         for (ptn = 0; ptn < aln->size(); ptn+=8) {
         	UINT states_left = node_branch->partial_pars[ptn/8];
