@@ -605,7 +605,7 @@ void Alignment::extractDataBlock(NxsCharactersBlock *data_block) {
         }
 }
 
-bool Alignment::addPattern(Pattern &pat, int site, int freq) {
+bool Alignment::addPattern(Pattern &pat, int site, int freq, int ras_pars_score) {
     // check if pattern contains only gaps
     bool gaps_only = true;
     for (Pattern::iterator it = pat.begin(); it != pat.end(); it++)
@@ -621,6 +621,7 @@ bool Alignment::addPattern(Pattern &pat, int site, int freq) {
     PatternIntMap::iterator pat_it = pattern_index.find(pat);
     if (pat_it == pattern_index.end()) { // not found
         pat.frequency = freq;
+        pat.ras_pars_score = ras_pars_score;
         pat.computeConst(STATE_UNKNOWN);
         push_back(pat);
         pattern_index[pat] = size()-1;
@@ -628,6 +629,7 @@ bool Alignment::addPattern(Pattern &pat, int site, int freq) {
     } else {
         int index = pat_it->second;
         at(index).frequency += freq;
+        at(index).ras_pars_score = ras_pars_score;
         site_pattern[site] = index;
     }
     return gaps_only;
@@ -1565,7 +1567,7 @@ void Alignment::extractSubAlignment(Alignment *aln, IntVector &seq_id, int min_t
             pat.push_back(ch);
         }
         if (true_char < min_true_char) continue;
-        addPattern(pat, site, (*pit).frequency);
+        addPattern(pat, site, (*pit).frequency, (*pit).ras_pars_score);
         for (int i = 0; i < (*pit).frequency; i++)
             site_pattern[site++] = size()-1;
     }

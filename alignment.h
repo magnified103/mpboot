@@ -81,7 +81,7 @@ public:
             @return TRUE if pattern contains only gaps or unknown char. 
                             In that case, the pattern won't be added.
      */
-    bool addPattern(Pattern &pat, int site, int freq = 1);
+    bool addPattern(Pattern &pat, int site, int freq = 1, int ras_pars_score = 0);
 
 
     /**
