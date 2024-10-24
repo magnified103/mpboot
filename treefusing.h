@@ -1,0 +1,8 @@
+//
+// Created on 24/10/2024.
+//
+
+#ifndef MPBOOT_TREEFUSING_H
+#define MPBOOT_TREEFUSING_H
+
+#endif //MPBOOT_TREEFUSING_H

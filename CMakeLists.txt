@@ -399,6 +399,7 @@ candidateset.cpp
 checkpoint.cpp
 parstree.cpp
 sprparsimony.cpp
+treefusing.cpp
 test.cpp
 )
 
