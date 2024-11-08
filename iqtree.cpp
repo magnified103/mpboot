@@ -28,6 +28,7 @@
 #include "pllrepo/src/pllInternal.h"
 #include "nnisearch.h"
 #include "sprparsimony.h"
+#include "treefusing.h"
 #include "vectorclass/vectorclass.h"
 #include "vectorclass/vectormath_common.h"
 #include "parstree.h"
@@ -613,6 +614,69 @@ void IQTree::initializePLL(Params &params) {
 		pllSegmentUpper = NULL;
 		pllRepsSegments = -1;
 	}
+}
+
+
+void IQTree::createPLL(Params &params, pllInstance* &pllInst, pllAlignmentData* &pllAlignment, partitionList* &pllPartitions) {
+    pllInstanceAttr pllAttr;
+    pllAttr.rateHetModel = PLL_GAMMA;
+    pllAttr.fastScaling = PLL_FALSE;
+    pllAttr.saveMemory = PLL_FALSE;
+    pllAttr.useRecom = PLL_FALSE;
+    pllAttr.randomNumberSeed = params.ran_seed;
+#ifdef _OPENMP
+    pllAttr.numberOfThreads = params.num_threads; /* This only affects the pthreads version */
+#else
+    pllAttr.numberOfThreads = 1;
+#endif
+
+    /* Create a PLL instance */
+    pllInst = pllCreateInstance(&pllAttr);
+
+    /* Read in the alignment file */
+    stringstream pllAln;
+    if (aln->isSuperAlignment()) {
+        ((SuperAlignment*) aln)->printCombinedAlignment(pllAln);
+    } else {
+        aln->printPhylip(pllAln);
+    }
+    string pllAlnStr = pllAln.str();
+    pllAlignment = pllParsePHYLIPString(pllAlnStr.c_str(), pllAlnStr.length());
+
+    /* Read in the partition information */
+    // BQM: to avoid printing file
+    stringstream pllPartitionFileHandle;
+    createPLLPartition(params, pllPartitionFileHandle);
+    pllQueue *partitionInfo = pllPartitionParseString(pllPartitionFileHandle.str().c_str());
+
+    /* Validate the partitions */
+    if (!pllPartitionsValidate(partitionInfo, pllAlignment)) {
+        outError("pllPartitionsValidate");
+    }
+
+    /* Commit the partitions and build a partitions structure */
+    pllPartitions = pllPartitionsCommit(partitionInfo, pllAlignment);
+
+    /* We don't need the the intermediate partition queue structure anymore */
+    pllQueuePartitionsDestroy(&partitionInfo);
+
+    // Diep: 	Added this IF statement so that UFBoot-MP SPR code doesn't affect other IQTree mode
+    // 			alignment in  UFBoot-MP SPR branch will be sorted by pattern and site pars score
+    // PLL eliminates duplicate sites from the alignment and update weights vector
+    // Diep 2021-12-29:
+    //  For maximum parsimony, SYNCING between two cores (IQ-TREE and PLL) must always be guaranteed!!!!!!!!
+    //  Especially necessary if having ratchet on.
+    if(params.maximum_parsimony)
+        pllSortedAlignmentRemoveDups(pllAlignment, pllPartitions); // to sync IQTree aln and PLL one
+    else
+        pllAlignmentRemoveDups(pllAlignment, pllPartitions);
+
+    pllTreeInitTopologyForAlignment(pllInst, pllAlignment);
+
+    /* Connect the alignment and partition structure with the tree structure */
+    if (!pllLoadAlignment(pllInst, pllAlignment, pllPartitions)) {
+        outError("Incompatible tree/alignment combination");
+    }
 }
 
 
@@ -2006,6 +2070,44 @@ double IQTree::doTreeSearch() {
 	            }
 	        }
         } // end of bootstrap convergence test
+    }
+
+    // Viet Dung: tree fusing
+    for (int it = 1; it <= 1; it++) {
+        string targetTreeString = candidateTrees.getRandCandTree();
+        for (int it2 = 1; it2 <= 1; it2++) {
+            string sourceTreeString = candidateTrees.getRandCandTree();
+            if (targetTreeString == sourceTreeString) {
+                continue;
+            }
+
+            pllInstance* pllSourceInst = pllCreateInstance(&pllAttr);
+            pllInstance* pllTargetInst = pllCreateInstance(&pllAttr);
+            pllTreeInitTopologyForAlignment(pllSourceInst, pllAlignment);
+            pllTreeInitTopologyForAlignment(pllTargetInst, pllAlignment);
+
+            /* Connect the alignment and partition structure with the tree structure */
+            if (!pllLoadAlignment(pllSourceInst, pllAlignment, pllPartitions)) {
+                outError("Incompatible tree/alignment combination");
+            }
+
+            /* Connect the alignment and partition structure with the tree structure */
+            if (!pllLoadAlignment(pllTargetInst, pllAlignment, pllPartitions)) {
+                outError("Incompatible tree/alignment combination");
+            }
+
+            pllNewickTree *sourceBtree = pllNewickParseString(sourceTreeString.c_str());
+            assert(sourceBtree != NULL);
+            pllTreeInitTopologyNewick(pllSourceInst, sourceBtree, PLL_FALSE);
+            pllNewickParseDestroy(&sourceBtree);
+
+            pllNewickTree *targetBtree = pllNewickParseString(targetTreeString.c_str());
+            assert(targetBtree != NULL);
+//            pllTreeInitTopologyNewick(pllTargetInst, targetBtree, PLL_FALSE);
+            pllOptimizeTreeFusingParsimony(pllTargetInst, pllPartitions, targetBtree, pllSourceInst, this);
+
+            pllNewickParseDestroy(&targetBtree);
+        }
     }
 
 	// Diep: optimize bootstrap trees if -opt_btree is specified along with -bb -mpars

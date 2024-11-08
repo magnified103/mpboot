@@ -944,6 +944,7 @@ protected:
 
     void estDeltaMin();
 
+    void createPLL(Params &, pllInstance* &, pllAlignmentData* &, partitionList* &);
 };
 
 void estimateNNICutoff(Params &params);
