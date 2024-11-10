@@ -2107,6 +2107,14 @@ double IQTree::doTreeSearch() {
             pllOptimizeTreeFusingParsimony(pllTargetInst, pllPartitions, targetBtree, pllSourceInst, this);
 
             pllNewickParseDestroy(&targetBtree);
+
+            pllTreeToNewick(pllTargetInst->tree_string, pllTargetInst, pllPartitions, pllTargetInst->start->back, PLL_TRUE,
+                            PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+            string treeString = string(pllTargetInst->tree_string);
+            readTreeString(treeString);
+            initializeAllPartialPars();
+            clearAllPartialLH();
+            curScore = -computeParsimony();
         }
     }
 

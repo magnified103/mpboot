@@ -7,7 +7,7 @@
 
 #include "iqtree.h"
 
-int pllOptimizeTreeFusingParsimony(pllInstance * tr, partitionList * pr, pllNewickTree * btree,
+void pllOptimizeTreeFusingParsimony(pllInstance * tr, partitionList * pr, pllNewickTree * btree,
                                    pllInstance * sourceTr, IQTree *_iqtree);
 
 #endif //MPBOOT_TREEFUSING_H
