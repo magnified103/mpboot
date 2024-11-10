@@ -121,20 +121,20 @@ extern double masterTime;
 
 /* program options */
 extern Params *globalParam;
-IQTree * iqtree = NULL;
-unsigned long bestTreeScoreHits; // to count hits to bestParsimony
+static IQTree * iqtree = NULL;
+static unsigned long bestTreeScoreHits; // to count hits to bestParsimony
 
 extern parsimonyNumber * pllCostMatrix; // Diep: For weighted version
 extern int pllCostNstates; // Diep: For weighted version
 extern parsimonyNumber *vectorCostMatrix; // BQM: vectorized cost matrix
-parsimonyNumber highest_cost;
+static parsimonyNumber highest_cost;
 
 //(if needed) split the parsimony vector into several segments to avoid overflow when calc rell based on vec8us
 extern int pllRepsSegments; // # of segments
 extern int * pllSegmentUpper; // array of first index of the next segment, see IQTree::segment_upper
-parsimonyNumber * pllRemainderLowerBounds; // array of lower bound score for the un-calculated part to the right of a segment
-bool first_call = true; // is this the first call to pllOptimizeSprParsimony
-bool doing_stepwise_addition = false; // is the stepwise addition on
+static parsimonyNumber * pllRemainderLowerBounds; // array of lower bound score for the un-calculated part to the right of a segment
+static bool first_call = true; // is this the first call to pllOptimizeSprParsimony
+static bool doing_stepwise_addition = false; // is the stepwise addition on
 
 static void resetGlobalParamOnNewAln(){
     globalParam = NULL;
@@ -2436,6 +2436,16 @@ static void _pllFreeParsimonyDataStructures(pllInstance *tr, partitionList *pr)
 
 }
 
+
+void assertNode(pllInstance * tr, nodeptr p) {
+    if (p->number <= tr->mxtips) {
+        return;
+    }
+    assert(p != p->next);
+    assert(p != p->next->next);
+    assert(p->next != p->next->next);
+}
+
 static nodeptr duplicateTreeTopology(pllInstance * tr, nodeptr s, std::vector<nodeptr> &unused) {
     if (s->number <= tr->mxtips) {
         // leaf
@@ -2453,6 +2463,7 @@ static nodeptr duplicateTreeTopology(pllInstance * tr, nodeptr s, std::vector<no
     p->xPars = 1;
     p->next->xPars = 0;
     p->next->next->xPars = 0;
+    assertNode(tr, p);
     return p;
 }
 
@@ -2491,8 +2502,13 @@ static int pllTestTreeFusing(pllInstance * tr, partitionList * pr, nodeptr p, no
     nodeptr s = p->back;
     hookupDefault(q->next, p);
     hookupDefault(q->next->next, s);
+    assertNode(tr, p);
+    assertNode(tr, q);
 
     unsigned int mp = evaluateParsimony(tr, pr, q, PLL_FALSE, perSiteScores);
+
+    // restore
+    hookupDefault(p, s);
 
     if (mp <= tr->bestParsimony) {
         tr->bestParsimony = mp;
@@ -2529,13 +2545,31 @@ void pllRearrangeTreeFusing(pllInstance * targetTr, pllInstance * sourceTr, part
     std::vector<nodeptr> leaves;
     retrieveTreeLeaves(sourceTr, target_branch, leaves);
 
+    if (save_tree) {
+        cout << "Removed leaves\n";
+        for (auto node: leaves) {
+            cout << node->number << " ";
+        }
+        cout << "\n";
+    }
+
     std::vector<bool> bts(targetTr->mxtips + 1);
     for (auto ptr: leaves) {
         bts[ptr->number] = 1;
     }
 
     std::vector<nodeptr> inner;
-    pruneTreeLeaves(targetTr, targetTr->start->back, inner, bts);
+    nodeptr prune1 = pruneTreeLeaves(targetTr, targetTr->start->back, inner, bts);
+    nodeptr prune2 = pruneTreeLeaves(targetTr, targetTr->start, inner, bts);
+    if (prune1 && prune2) {
+        hookupDefault(prune1, prune2);
+    } else {
+        nodeptr pp = prune1 ? prune1 : prune2;
+        nodeptr pp_a = pp->next->back;
+        nodeptr pp_b = pp->next->next->back;
+        hookupDefault(pp_a, pp_b);
+        inner.push_back(pp);
+    }
 
     nodeptr p = duplicateTreeTopology(targetTr, target_branch, inner);
     assert(inner.size() == 1);  // one inner node remaining
@@ -2543,8 +2577,16 @@ void pllRearrangeTreeFusing(pllInstance * targetTr, pllInstance * sourceTr, part
     nodeptr q = inner.back();
     inner.pop_back();
 
-    nodeptr s = targetTr->start;
-    nodeptr t = targetTr->start->back;
+    nodeptr s = NULL;
+    for (int i = 1; i <= targetTr->mxtips; i++) {
+        if (!bts[i]) {
+            s = targetTr->nodep[i];
+            break;
+        }
+    }
+    assert(s != NULL);
+
+    nodeptr t = s->back;
 
     hookupDefault(q->next, s);
     hookupDefault(q->next->next, t);
@@ -2574,6 +2616,9 @@ void pllRearrangeTreeFusing(pllInstance * targetTr, pllInstance * sourceTr, part
 void pllOptimizeTreeFusingParsimony(pllInstance * tr, partitionList * pr, pllNewickTree * btree,
                                    pllInstance * sourceTr, IQTree *_iqtree) {
     int perSiteScores = globalParam->gbo_replicates > 0;
+
+    iqtree = _iqtree; // update pointer to IQTree
+
     if(globalParam->ratchet_iter >= 0 && (iqtree->on_ratchet_hclimb1 || iqtree->on_ratchet_hclimb2)){
         // oct 23: in non-ratchet iteration, allocate is not triggered
         _updateInternalPllOnRatchet(tr, pr);
@@ -2588,12 +2633,22 @@ void pllOptimizeTreeFusingParsimony(pllInstance * tr, partitionList * pr, pllNew
     std::vector<nodeptr> candidates;
 
     for (int i = tr->mxtips + 1; i <= tr->mxtips + tr->mxtips - 2; i++) {
-        candidates.push_back(sourceTr->nodep[i]);
-        candidates.push_back(sourceTr->nodep[i]->next);
-        candidates.push_back(sourceTr->nodep[i]->next->next);
+        if (sourceTr->nodep[i]->back->number > tr->mxtips) {
+            candidates.push_back(sourceTr->nodep[i]);
+        }
+        if (sourceTr->nodep[i]->next->back->number > tr->mxtips) {
+            candidates.push_back(sourceTr->nodep[i]->next);
+        }
+        if (sourceTr->nodep[i]->next->next->back->number > tr->mxtips) {
+            candidates.push_back(sourceTr->nodep[i]->next->next);
+        }
     }
 
+    pllTreeInitTopologyNewick(tr, btree, PLL_FALSE);
+
     nodeptr best = NULL;
+    tr->bestParsimony = UINT_MAX;
+    tr->bestParsimony = evaluateParsimony(tr, pr, tr->start->back, PLL_TRUE, perSiteScores);
 
     for (auto cand: candidates) {
         // load tree from newick
@@ -2609,7 +2664,20 @@ void pllOptimizeTreeFusingParsimony(pllInstance * tr, partitionList * pr, pllNew
     }
 
     pllTreeInitTopologyNewick(tr, btree, PLL_FALSE);
+    pllTreeToNewick(tr->tree_string, tr, pr, tr->start->back, PLL_TRUE,
+                    PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+    auto tree_string_1 = string(tr->tree_string);
+    cout << tree_string_1 << "\n";
     if (best) {
         pllRearrangeTreeFusing(tr, sourceTr, pr, best, perSiteScores, true);
+
+        pllTreeToNewick(tr->tree_string, tr, pr, tr->start->back, PLL_TRUE,
+                        PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+        auto tree_string_2 = string(tr->tree_string);
+        cout << tree_string_2 << "\n";
+        pllTreeToNewick(sourceTr->tree_string, sourceTr, pr, sourceTr->start->back, PLL_TRUE,
+                        PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+        auto tree_string_3 = string(sourceTr->tree_string);
+        cout << tree_string_3 << "\n";
     }
 }

@@ -2115,6 +2115,19 @@ double IQTree::doTreeSearch() {
             initializeAllPartialPars();
             clearAllPartialLH();
             curScore = -computeParsimony();
+
+            cout << "Best score from tree fusing: " << -curScore << "\n";
+
+            // update best tree
+            if (params->snni) {
+                candidateTrees.update(treeString, curScore);
+                if (verbose_mode >= VB_MED) {
+                    printBestScores(candidateTrees.popSize);
+                }
+            } else {
+                // The IQPNNI algorithm
+                readTreeString(bestTreeString);
+            }
         }
     }
 
