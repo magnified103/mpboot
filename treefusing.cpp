@@ -2651,13 +2651,13 @@ void pllRearrangeTreeFusing(pllInstance * targetTr, pllInstance * sourceTr, part
     std::vector<nodeptr> leaves;
     retrieveTreeLeaves(sourceTr, target_branch, leaves);
 
-    if (save_tree) {
-        cout << "Removed leaves\n";
-        for (auto node: leaves) {
-            cout << node->number << " ";
-        }
-        cout << "\n";
-    }
+//    if (save_tree) {
+//        cout << "Removed leaves\n";
+//        for (auto node: leaves) {
+//            cout << node->number << " ";
+//        }
+//        cout << "\n";
+//    }
 
     std::vector<bool> bts(targetTr->mxtips + 1);
     for (auto ptr: leaves) {
@@ -2751,7 +2751,7 @@ void pllOptimizeTreeFusingParsimony(pllInstance * tr, partitionList * pr, pllNew
 
     nodeptr best = NULL;
     tr->bestParsimony = UINT_MAX;
-    tr->bestParsimony = evaluateParsimony(tr, pr, tr->start->back, PLL_TRUE, perSiteScores);
+//    tr->bestParsimony = evaluateParsimony(tr, pr, tr->start->back, PLL_TRUE, perSiteScores);
 
     for (auto cand: candidates) {
         // load tree from newick
@@ -2766,21 +2766,20 @@ void pllOptimizeTreeFusingParsimony(pllInstance * tr, partitionList * pr, pllNew
         }
     }
 
-    pllTreeInitTopologyNewick(tr, btree, PLL_FALSE);
-    pllTreeToNewick(tr->tree_string, tr, pr, tr->start->back, PLL_TRUE,
-                    PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
-    auto tree_string_1 = string(tr->tree_string);
-    cout << tree_string_1 << "\n";
+    pllTreeInitTopologyNewick(tr, btree, PLL_TRUE);
+//    pllTreeToNewick(tr->tree_string, tr, pr, tr->start->back, PLL_TRUE, PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+//    auto tree_string_1 = string(tr->tree_string);
+//    cout << tree_string_1 << "\n";
     if (best) {
         pllRearrangeTreeFusing(tr, sourceTr, pr, best, perSiteScores, true);
 
-        pllTreeToNewick(tr->tree_string, tr, pr, tr->start->back, PLL_TRUE,
-                        PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
-        auto tree_string_2 = string(tr->tree_string);
-        cout << tree_string_2 << "\n";
-        pllTreeToNewick(sourceTr->tree_string, sourceTr, pr, sourceTr->start->back, PLL_TRUE,
-                        PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
-        auto tree_string_3 = string(sourceTr->tree_string);
-        cout << tree_string_3 << "\n";
+//        pllTreeToNewick(tr->tree_string, tr, pr, tr->start->back, PLL_TRUE,
+//                        PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+//        auto tree_string_2 = string(tr->tree_string);
+//        cout << tree_string_2 << "\n";
+//        pllTreeToNewick(sourceTr->tree_string, sourceTr, pr, sourceTr->start->back, PLL_TRUE,
+//                        PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+//        auto tree_string_3 = string(sourceTr->tree_string);
+//        cout << tree_string_3 << "\n";
     }
 }

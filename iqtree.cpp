@@ -2072,28 +2072,20 @@ double IQTree::doTreeSearch() {
         } // end of bootstrap convergence test
     }
 
+    pllInstance* pllSourceInst = pllCreateInstance(&pllAttr);
+    pllTreeInitTopologyForAlignment(pllSourceInst, pllAlignment);
+    /* Connect the alignment and partition structure with the tree structure */
+    if (!pllLoadAlignment(pllSourceInst, pllAlignment, pllPartitions)) {
+        outError("Incompatible tree/alignment combination");
+    }
+
     // Viet Dung: tree fusing
-    for (int it = 1; it <= 1; it++) {
+    for (int it = 1; it <= 20; it++) {
         string targetTreeString = candidateTrees.getRandCandTree();
-        for (int it2 = 1; it2 <= 1; it2++) {
+        for (int it2 = 1; it2 <= 20; it2++) {
             string sourceTreeString = candidateTrees.getRandCandTree();
             if (targetTreeString == sourceTreeString) {
                 continue;
-            }
-
-            pllInstance* pllSourceInst = pllCreateInstance(&pllAttr);
-            pllInstance* pllTargetInst = pllCreateInstance(&pllAttr);
-            pllTreeInitTopologyForAlignment(pllSourceInst, pllAlignment);
-            pllTreeInitTopologyForAlignment(pllTargetInst, pllAlignment);
-
-            /* Connect the alignment and partition structure with the tree structure */
-            if (!pllLoadAlignment(pllSourceInst, pllAlignment, pllPartitions)) {
-                outError("Incompatible tree/alignment combination");
-            }
-
-            /* Connect the alignment and partition structure with the tree structure */
-            if (!pllLoadAlignment(pllTargetInst, pllAlignment, pllPartitions)) {
-                outError("Incompatible tree/alignment combination");
             }
 
             pllNewickTree *sourceBtree = pllNewickParseString(sourceTreeString.c_str());
@@ -2104,31 +2096,56 @@ double IQTree::doTreeSearch() {
             pllNewickTree *targetBtree = pllNewickParseString(targetTreeString.c_str());
             assert(targetBtree != NULL);
 //            pllTreeInitTopologyNewick(pllTargetInst, targetBtree, PLL_FALSE);
-            pllOptimizeTreeFusingParsimony(pllTargetInst, pllPartitions, targetBtree, pllSourceInst, this);
+            pllOptimizeTreeFusingParsimony(pllInst, pllPartitions, targetBtree, pllSourceInst, this);
 
             pllNewickParseDestroy(&targetBtree);
 
-            pllTreeToNewick(pllTargetInst->tree_string, pllTargetInst, pllPartitions, pllTargetInst->start->back, PLL_TRUE,
+            pllTreeToNewick(pllInst->tree_string, pllInst, pllPartitions, pllInst->start->back, PLL_TRUE,
                             PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
-            string treeString = string(pllTargetInst->tree_string);
-            cout << "output: " << treeString << "\n";
+            string treeString = string(pllInst->tree_string);
+//            cout << "output: " << treeString << "\n";
             readTreeString(treeString);
             initializeAllPartialPars();
             clearAllPartialLH();
             curScore = -computeParsimony();
+            targetTreeString = treeString;
+        }
+        cout << "Best score from tree fusing: " << -bestScore << "\n";
 
-            cout << "Best score from tree fusing: " << -curScore << "\n";
+        int max_spr_rad = params->spr_maxtrav;
+        if(on_opt_btree && params->opt_btree_nni) params->spr_maxtrav = 1;
 
-            // update best tree
-            if (params->snni) {
-                candidateTrees.update(treeString, curScore);
-                if (verbose_mode >= VB_MED) {
-                    printBestScores(candidateTrees.popSize);
-                }
-            } else {
-                // The IQPNNI algorithm
-                readTreeString(bestTreeString);
+        readTreeString(targetTreeString);
+        pllNewickTree *sprStartTree = pllNewickParseString(targetTreeString.c_str());
+        assert(sprStartTree != NULL);
+        pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
+
+        // ----------------- Key step: ask PLL to run SPR hill-climbing
+        pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav, max_spr_rad, this);
+
+        pllNewickParseDestroy(&sprStartTree);
+
+        pllTreeToNewick(pllInst->tree_string, pllInst, pllPartitions, pllInst->start->back, PLL_TRUE,
+                        PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+        targetTreeString = string(pllInst->tree_string);
+
+
+        readTreeString(targetTreeString);
+        initializeAllPartialPars();
+        clearAllPartialLH();
+        curScore = -computeParsimony();
+
+        cout << "Best score after tree-fusing-spr: " << -curScore << "\n";
+
+        // update best tree
+        if (params->snni) {
+            candidateTrees.update(targetTreeString, curScore);
+            if (verbose_mode >= VB_MED) {
+                printBestScores(candidateTrees.popSize);
             }
+        } else {
+            // The IQPNNI algorithm
+            readTreeString(targetTreeString);
         }
     }
 
