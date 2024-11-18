@@ -2111,6 +2111,7 @@ double IQTree::doTreeSearch() {
             pllTreeToNewick(pllTargetInst->tree_string, pllTargetInst, pllPartitions, pllTargetInst->start->back, PLL_TRUE,
                             PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
             string treeString = string(pllTargetInst->tree_string);
+            cout << "output: " << treeString << "\n";
             readTreeString(treeString);
             initializeAllPartialPars();
             clearAllPartialLH();

@@ -2489,6 +2489,62 @@ static nodeptr pruneTreeLeaves(pllInstance * tr, nodeptr s, std::vector<nodeptr>
     return a ? a : b;
 }
 
+static std::string renderNode(pllInstance * tr, nodeptr p) {
+    std::stringstream ss;
+    if (p->number <= tr->mxtips) {
+        ss << p->number;
+    } else {
+        ss << 'n' << std::hex << (((std::uintptr_t)p >> 4) & 0xfff);
+    }
+    return ss.str();
+}
+
+static void retrieveTreeInfo(pllInstance * tr, nodeptr p, std::vector<nodeptr> &edges, std::vector<nodeptr> &subgraphs) {
+//    assert(p->xPars);
+    if (p->number <= tr->mxtips) {
+        subgraphs.push_back(p);
+        return;
+    }
+    subgraphs.push_back(p);
+    edges.push_back(p->next);
+    edges.push_back(p->next->next);
+    retrieveTreeInfo(tr, p->next->back, edges, subgraphs);
+    retrieveTreeInfo(tr, p->next->next->back, edges, subgraphs);
+}
+
+static std::string dotFile(pllInstance * tr, const std::vector<nodeptr> &edges, const std::vector<nodeptr> &subgraphs, nodeptr root) {
+    std::ostringstream ss;
+    ss << "digraph G {\n";
+
+    for (const auto &p: subgraphs) {
+        if (p->number <= tr->mxtips) {
+            // leaf
+            ss << renderNode(tr, p) << "[shape=square,style=filled];\n";
+        } else {
+            ss << "subgraph {\n";
+            ss << "label=\"" << p->number << "\";\n";
+            ss << "cluster=true;\n";
+            if (p->xPars) {
+                ss << renderNode(tr, p) << "[shape=square,style=filled];\n";
+            }
+            if (p->next->xPars) {
+                ss << renderNode(tr, p->next) << "[shape=square,style=filled];\n";
+            }
+            if (p->next->next->xPars) {
+                ss << renderNode(tr, p->next->next) << "[shape=square,style=filled];\n";
+            }
+            ss << renderNode(tr, p) << "->" << renderNode(tr, p->next) << "->" << renderNode(tr, p->next->next) << "->" << renderNode(tr, p) << ";\n";
+            ss << "}\n";
+        }
+    }
+    for (const auto &p: edges) {
+        ss << renderNode(tr, p) << "->" << renderNode(tr, p->back) << "[dir=both];\n";
+    }
+    ss << renderNode(tr, root) << "->" << renderNode(tr, root->back) << "[dir=both,color=blue];\n";
+    ss << "}\n";
+    return ss.str();
+}
+
 static void retrieveTreeLeaves(pllInstance * tr, nodeptr s, std::vector<nodeptr> &leaves) {
     if (s->number <= tr->mxtips) {
         leaves.push_back(s);
@@ -2498,14 +2554,30 @@ static void retrieveTreeLeaves(pllInstance * tr, nodeptr s, std::vector<nodeptr>
     retrieveTreeLeaves(tr, s->next->next->back, leaves);
 }
 
-static int pllTestTreeFusing(pllInstance * tr, partitionList * pr, nodeptr p, nodeptr q, int perSiteScores) {
+static void drawTree(pllInstance * tr, nodeptr root) {
+    std::vector<nodeptr> edges, subgraphs;
+    retrieveTreeInfo(tr, root, edges, subgraphs);
+    retrieveTreeInfo(tr, root->back, edges, subgraphs);
+    cout << "--------------------------------------------------\n";
+    cout << dotFile(tr, edges, subgraphs, root);
+    cout << "--------------------------------------------------\n";
+}
+
+static void pllTestTreeFusing(pllInstance * tr, partitionList * pr, nodeptr p, nodeptr q, int perSiteScores) {
     nodeptr s = p->back;
     hookupDefault(q->next, p);
     hookupDefault(q->next->next, s);
     assertNode(tr, p);
     assertNode(tr, q);
 
+    // reset xPars for node q
+    // so that the parsimonies are recalculated
+    q->xPars = 0;
+    q->next->xPars = 1;
+
     unsigned int mp = evaluateParsimony(tr, pr, q, PLL_FALSE, perSiteScores);
+
+//    drawTree(tr, q);
 
     // restore
     hookupDefault(p, s);
@@ -2513,7 +2585,41 @@ static int pllTestTreeFusing(pllInstance * tr, partitionList * pr, nodeptr p, no
     if (mp <= tr->bestParsimony) {
         tr->bestParsimony = mp;
     }
-    return mp;
+}
+
+static bool pllSaveTreeFusing(pllInstance * tr, partitionList * pr, nodeptr p, nodeptr q, int perSiteScores) {
+    nodeptr s = p->back;
+    hookupDefault(q->next, p);
+    hookupDefault(q->next->next, s);
+    assertNode(tr, p);
+    assertNode(tr, q);
+
+    // reset xPars for node q
+    // so that the parsimonies are recalculated
+    q->xPars = 0;
+    q->next->xPars = 1;
+
+    unsigned int mp = evaluateParsimony(tr, pr, q, PLL_FALSE, perSiteScores);
+
+//    cout << "abc " << mp << "\n";
+//    drawTree(tr, q);
+//
+//    mp = evaluateParsimony(tr, pr, tr->start->back, PLL_FALSE, perSiteScores);
+//
+//    cout << "def " << mp << "\n";
+//    drawTree(tr, q);
+//
+//    mp = evaluateParsimony(tr, pr, q, PLL_FALSE, perSiteScores);
+//
+//    cout << "ghi " << mp << "\n";
+
+    if (mp == tr->bestParsimony) {
+        return true;
+    }
+
+    // restore
+    hookupDefault(p, s);
+    return false;
 }
 
 static int pllRestoreBestFusing(pllInstance * tr, partitionList *pr, nodeptr p, nodeptr q, int perSiteScores) {
@@ -2521,8 +2627,8 @@ static int pllRestoreBestFusing(pllInstance * tr, partitionList *pr, nodeptr p, 
         return 0;
     }
 
-    return pllTestTreeFusing(tr, pr, p->next, q, perSiteScores) == tr->bestParsimony
-        || pllTestTreeFusing(tr, pr, p->next->next, q, perSiteScores) == tr->bestParsimony
+    return pllSaveTreeFusing(tr, pr, p->next, q, perSiteScores)
+        || pllSaveTreeFusing(tr, pr, p->next->next, q, perSiteScores)
         || pllRestoreBestFusing(tr, pr, p->next->back, q, perSiteScores)
         || pllRestoreBestFusing(tr, pr, p->next->next->back, q, perSiteScores);
 }
@@ -2593,11 +2699,8 @@ void pllRearrangeTreeFusing(pllInstance * targetTr, pllInstance * sourceTr, part
     hookupDefault(p, q);
 
     // calculate initial scores
-    int counter = 4;
-    computeTraversalInfoParsimony(p, targetTr->ti, &counter, targetTr->mxtips, PLL_TRUE, perSiteScores);
-    computeTraversalInfoParsimony(q, targetTr->ti, &counter, targetTr->mxtips, PLL_TRUE, perSiteScores);
-    targetTr->ti[0] = counter;
-    newviewParsimonyIterativeFast(targetTr, pr, perSiteScores);
+    evaluateParsimony(targetTr, pr, p, PLL_TRUE, perSiteScores);
+//    drawTree(targetTr, p);
 
     // cut tree
     hookupDefault(s, t);
