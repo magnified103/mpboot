@@ -4,6 +4,7 @@
 #include "treefusing.h"
 #include "parstree.h"
 #include <string>
+#include <cstdint>
 /**
  * PLL (version 1.0.0) a software library for phylogenetic inference
  * Copyright (C) 2013 Tomas Flouri and Alexandros Stamatakis
