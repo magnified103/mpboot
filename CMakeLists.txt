@@ -401,6 +401,7 @@ checkpoint.cpp
 parstree.cpp
 sprparsimony.cpp
 tbrparsimony.cpp
+treefusing.cpp
 test.cpp
 )
 

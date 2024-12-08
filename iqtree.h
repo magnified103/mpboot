@@ -112,12 +112,12 @@ public:
     */
     virtual void setCheckpoint(Checkpoint *checkpoint);
 
-    /** 
+    /**
         save object into the checkpoint
     */
     virtual void saveCheckpoint();
 
-    /** 
+    /**
         restore object from the checkpoint
     */
     virtual void restoreCheckpoint();

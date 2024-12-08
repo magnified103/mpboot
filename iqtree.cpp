@@ -29,6 +29,7 @@
 #include "sprparsimony.h"
 #include "tbrparsimony.h"
 #include "timeutil.h"
+#include "treefusing.h"
 #include "vectorclass/vectorclass.h"
 #include "vectorclass/vectormath_common.h"
 #include <numeric>
@@ -2332,6 +2333,83 @@ endl;
         checkpoint->dump();
     }
 
+    pllInstance* pllSourceInst = pllCreateInstance(&pllAttr);
+    pllTreeInitTopologyForAlignment(pllSourceInst, pllAlignment);
+    /* Connect the alignment and partition structure with the tree structure */
+    if (!pllLoadAlignment(pllSourceInst, pllAlignment, pllPartitions)) {
+        outError("Incompatible tree/alignment combination");
+    }
+
+    // Viet Dung: tree fusing
+    for (int it = 1; it <= 20; it++) {
+        string targetTreeString = candidateTrees.getRandCandTree();
+        for (int it2 = 1; it2 <= 20; it2++) {
+            string sourceTreeString = candidateTrees.getRandCandTree();
+            if (targetTreeString == sourceTreeString) {
+                continue;
+            }
+
+            pllNewickTree *sourceBtree = pllNewickParseString(sourceTreeString.c_str());
+            assert(sourceBtree != NULL);
+            pllTreeInitTopologyNewick(pllSourceInst, sourceBtree, PLL_FALSE);
+            pllNewickParseDestroy(&sourceBtree);
+
+            pllNewickTree *targetBtree = pllNewickParseString(targetTreeString.c_str());
+            assert(targetBtree != NULL);
+//            pllTreeInitTopologyNewick(pllTargetInst, targetBtree, PLL_FALSE);
+            pllOptimizeTreeFusingParsimony(pllInst, pllPartitions, targetBtree, pllSourceInst, this);
+
+            pllNewickParseDestroy(&targetBtree);
+
+            pllTreeToNewick(pllInst->tree_string, pllInst, pllPartitions, pllInst->start->back, PLL_TRUE,
+                            PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+            string treeString = string(pllInst->tree_string);
+//            cout << "output: " << treeString << "\n";
+            readTreeString(treeString);
+            initializeAllPartialPars();
+            clearAllPartialLH();
+            curScore = -computeParsimony();
+            targetTreeString = treeString;
+        }
+        cout << "Best score from tree fusing: " << -bestScore << "\n";
+
+        int max_spr_rad = params->spr_maxtrav;
+        if(on_opt_btree && params->opt_btree_nni) params->spr_maxtrav = 1;
+
+        readTreeString(targetTreeString);
+        pllNewickTree *sprStartTree = pllNewickParseString(targetTreeString.c_str());
+        assert(sprStartTree != NULL);
+        pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
+
+        // ----------------- Key step: ask PLL to run SPR hill-climbing
+        pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav, max_spr_rad, this);
+
+        pllNewickParseDestroy(&sprStartTree);
+
+        pllTreeToNewick(pllInst->tree_string, pllInst, pllPartitions, pllInst->start->back, PLL_TRUE,
+                        PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+        targetTreeString = string(pllInst->tree_string);
+
+
+        readTreeString(targetTreeString);
+        initializeAllPartialPars();
+        clearAllPartialLH();
+        curScore = -computeParsimony();
+
+        cout << "Best score after tree-fusing-spr: " << -curScore << "\n";
+
+        // update best tree
+        if (params->snni) {
+            candidateTrees.update(targetTreeString, curScore);
+            if (verbose_mode >= VB_MED) {
+                printBestScores(candidateTrees.popSize);
+            }
+        } else {
+            // The IQPNNI algorithm
+            readTreeString(targetTreeString);
+        }
+    }
+
     // Diep: optimize bootstrap trees if -opt_btree is specified along with -bb
     // -mpars
     if (params->gbo_replicates && params->maximum_parsimony) {
@@ -2343,6 +2421,16 @@ endl;
                  << endl;
         }
     }
+
+	// Diep: optimize bootstrap trees if -opt_btree is specified along with -bb -mpars
+	if(params->gbo_replicates && params->maximum_parsimony){
+		if(params->optimize_boot_trees){
+			double otime = getCPUTime();
+			cout << "Optimizing bootstrap trees ..." << endl;
+			optimizeBootTrees();
+			cout << "CPU Time used:  " << getCPUTime() - otime << " sec." << endl;
+		}
+	}
 
     // Diep: added the text to output to observe the # of candidate trees
     if (params->gbo_replicates && ((curIt - 1) % (params->step_iterations / 2) != 0)) {
