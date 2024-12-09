@@ -554,6 +554,9 @@ void IQTree::initializePLL(Params &params) {
     /* Create a PLL instance */
     pllInst = pllCreateInstance(&pllAttr);
 
+    /* tree fusing */
+    pllSourceInst = pllCreateInstance(&pllAttr);
+
     /* Read in the alignment file */
     stringstream pllAln;
 	if (aln->isSuperAlignment()) {
@@ -632,6 +635,9 @@ void IQTree::createPLL(Params &params, pllInstance* &pllInst, pllAlignmentData* 
 
     /* Create a PLL instance */
     pllInst = pllCreateInstance(&pllAttr);
+
+    /* tree fusing */
+    pllSourceInst = pllCreateInstance(&pllAttr);
 
     /* Read in the alignment file */
     stringstream pllAln;
@@ -2072,7 +2078,6 @@ double IQTree::doTreeSearch() {
         } // end of bootstrap convergence test
     }
 
-    pllInstance* pllSourceInst = pllCreateInstance(&pllAttr);
     pllTreeInitTopologyForAlignment(pllSourceInst, pllAlignment);
     /* Connect the alignment and partition structure with the tree structure */
     if (!pllLoadAlignment(pllSourceInst, pllAlignment, pllPartitions)) {
@@ -2080,74 +2085,74 @@ double IQTree::doTreeSearch() {
     }
 
     // Viet Dung: tree fusing
-    for (int it = 1; it <= 20; it++) {
-        string targetTreeString = candidateTrees.getRandCandTree();
-        for (int it2 = 1; it2 <= 20; it2++) {
-            string sourceTreeString = candidateTrees.getRandCandTree();
-            if (targetTreeString == sourceTreeString) {
-                continue;
-            }
-
-            pllNewickTree *sourceBtree = pllNewickParseString(sourceTreeString.c_str());
-            assert(sourceBtree != NULL);
-            pllTreeInitTopologyNewick(pllSourceInst, sourceBtree, PLL_FALSE);
-            pllNewickParseDestroy(&sourceBtree);
-
-            pllNewickTree *targetBtree = pllNewickParseString(targetTreeString.c_str());
-            assert(targetBtree != NULL);
-//            pllTreeInitTopologyNewick(pllTargetInst, targetBtree, PLL_FALSE);
-            pllOptimizeTreeFusingParsimony(pllInst, pllPartitions, targetBtree, pllSourceInst, this);
-
-            pllNewickParseDestroy(&targetBtree);
-
-            pllTreeToNewick(pllInst->tree_string, pllInst, pllPartitions, pllInst->start->back, PLL_TRUE,
-                            PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
-            string treeString = string(pllInst->tree_string);
-//            cout << "output: " << treeString << "\n";
-            readTreeString(treeString);
-            initializeAllPartialPars();
-            clearAllPartialLH();
-            curScore = -computeParsimony();
-            targetTreeString = treeString;
-        }
-        cout << "Best score from tree fusing: " << -bestScore << "\n";
-
-        int max_spr_rad = params->spr_maxtrav;
-        if(on_opt_btree && params->opt_btree_nni) params->spr_maxtrav = 1;
-
-        readTreeString(targetTreeString);
-        pllNewickTree *sprStartTree = pllNewickParseString(targetTreeString.c_str());
-        assert(sprStartTree != NULL);
-        pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
-
-        // ----------------- Key step: ask PLL to run SPR hill-climbing
-        pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav, max_spr_rad, this);
-
-        pllNewickParseDestroy(&sprStartTree);
-
-        pllTreeToNewick(pllInst->tree_string, pllInst, pllPartitions, pllInst->start->back, PLL_TRUE,
-                        PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
-        targetTreeString = string(pllInst->tree_string);
-
-
-        readTreeString(targetTreeString);
-        initializeAllPartialPars();
-        clearAllPartialLH();
-        curScore = -computeParsimony();
-
-        cout << "Best score after tree-fusing-spr: " << -curScore << "\n";
-
-        // update best tree
-        if (params->snni) {
-            candidateTrees.update(targetTreeString, curScore);
-            if (verbose_mode >= VB_MED) {
-                printBestScores(candidateTrees.popSize);
-            }
-        } else {
-            // The IQPNNI algorithm
-            readTreeString(targetTreeString);
-        }
-    }
+//    for (int it = 1; it <= 20; it++) {
+//        string targetTreeString = candidateTrees.getRandCandTree();
+//        for (int it2 = 1; it2 <= 20; it2++) {
+//            string sourceTreeString = candidateTrees.getRandCandTree();
+//            if (targetTreeString == sourceTreeString) {
+//                continue;
+//            }
+//
+//            pllNewickTree *sourceBtree = pllNewickParseString(sourceTreeString.c_str());
+//            assert(sourceBtree != NULL);
+//            pllTreeInitTopologyNewick(pllSourceInst, sourceBtree, PLL_FALSE);
+//            pllNewickParseDestroy(&sourceBtree);
+//
+//            pllNewickTree *targetBtree = pllNewickParseString(targetTreeString.c_str());
+//            assert(targetBtree != NULL);
+////            pllTreeInitTopologyNewick(pllTargetInst, targetBtree, PLL_FALSE);
+//            pllOptimizeTreeFusingParsimony(pllInst, pllPartitions, targetBtree, pllSourceInst, this);
+//
+//            pllNewickParseDestroy(&targetBtree);
+//
+//            pllTreeToNewick(pllInst->tree_string, pllInst, pllPartitions, pllInst->start->back, PLL_TRUE,
+//                            PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+//            string treeString = string(pllInst->tree_string);
+////            cout << "output: " << treeString << "\n";
+//            readTreeString(treeString);
+//            initializeAllPartialPars();
+//            clearAllPartialLH();
+//            curScore = -computeParsimony();
+//            targetTreeString = treeString;
+//        }
+//        cout << "Best score from tree fusing: " << -bestScore << "\n";
+//
+//        int max_spr_rad = params->spr_maxtrav;
+//        if(on_opt_btree && params->opt_btree_nni) params->spr_maxtrav = 1;
+//
+//        readTreeString(targetTreeString);
+//        pllNewickTree *sprStartTree = pllNewickParseString(targetTreeString.c_str());
+//        assert(sprStartTree != NULL);
+//        pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
+//
+//        // ----------------- Key step: ask PLL to run SPR hill-climbing
+//        pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav, max_spr_rad, this);
+//
+//        pllNewickParseDestroy(&sprStartTree);
+//
+//        pllTreeToNewick(pllInst->tree_string, pllInst, pllPartitions, pllInst->start->back, PLL_TRUE,
+//                        PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+//        targetTreeString = string(pllInst->tree_string);
+//
+//
+//        readTreeString(targetTreeString);
+//        initializeAllPartialPars();
+//        clearAllPartialLH();
+//        curScore = -computeParsimony();
+//
+//        cout << "Best score after tree-fusing-spr: " << -curScore << "\n";
+//
+//        // update best tree
+//        if (params->snni) {
+//            candidateTrees.update(targetTreeString, curScore);
+//            if (verbose_mode >= VB_MED) {
+//                printBestScores(candidateTrees.popSize);
+//            }
+//        } else {
+//            // The IQPNNI algorithm
+//            readTreeString(targetTreeString);
+//        }
+//    }
 
 	// Diep: optimize bootstrap trees if -opt_btree is specified along with -bb -mpars
 	if(params->gbo_replicates && params->maximum_parsimony){
@@ -2269,6 +2274,26 @@ string IQTree::doNNISearch(int& nniCount, int& nniSteps) {
 			assert(sprStartTree != NULL);
 			pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
 
+            if (params->fusing_pars && curIt % 10 == 0) {
+                for (int it = 1; it <= params->fusing_numsrc; it++) {
+                    string sourceTreeString = candidateTrees.getRandCandTree();
+                    pllNewickTree *sourceBtree = pllNewickParseString(sourceTreeString.c_str());
+                    assert(sourceBtree != NULL);
+
+                    pllTreeInitTopologyNewick(pllSourceInst, sourceBtree, PLL_FALSE);
+                    pllNewickParseDestroy(&sourceBtree);
+
+                    pllOptimizeTreeFusingParsimony(pllInst, pllPartitions, sprStartTree, pllSourceInst, this);
+
+                    pllTreeToNewick(pllInst->tree_string, pllInst, pllPartitions, pllInst->start->back, PLL_TRUE,
+                                    PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+
+                    readTreeString(pllInst->tree_string);
+                    initializeAllPartialPars();
+                    clearAllPartialLH();
+                    curScore = -computeParsimony();
+                }
+            }
             // ----------------- Key step: ask PLL to run SPR hill-climbing
 			pllOptimizeSprParsimony(pllInst, pllPartitions, params->spr_mintrav, max_spr_rad, this);
 

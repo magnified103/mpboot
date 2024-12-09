@@ -2727,7 +2727,7 @@ void pllOptimizeTreeFusingParsimony(pllInstance * tr, partitionList * pr, pllNew
         // oct 23: in non-ratchet iteration, allocate is not triggered
         _updateInternalPllOnRatchet(tr, pr);
         _allocateParsimonyDataStructures(tr, pr, perSiteScores);
-    }else if(first_call || (iqtree && iqtree->on_opt_btree))
+    }else if(first_call || (iqtree && iqtree->on_opt_btree) || !tr->ti)
         _allocateParsimonyDataStructures(tr, pr, perSiteScores); // called once if not running ratchet
 
     if(first_call){

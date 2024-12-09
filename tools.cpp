@@ -553,6 +553,8 @@ void get2RandNumb(const int size, int &first, int &second) {
 void parseArg(int argc, char *argv[], Params &params) {
     int cnt;
     verbose_mode = VB_MIN;
+    params.fusing_pars = false;
+    params.fusing_numsrc = 3;
     params.tree_gen = NONE;
     params.user_file = NULL;
     params.out_prefix = NULL;
@@ -2395,6 +2397,18 @@ void parseArg(int argc, char *argv[], Params &params) {
             	params.spr_maxtrav = convert_int(argv[cnt]);
             	params.sprDist = params.spr_maxtrav; // Diep: hopefully this speed the pllMakeParsimonyTreeFast...
             	continue;
+            }
+            if(strcmp(argv[cnt], "-fusing_pars") == 0) {
+                params.fusing_pars = true;
+                continue;
+            }
+            if(strcmp(argv[cnt], "-fusing_numsrc") == 0) {
+                cnt++;
+                if (cnt >= argc) {
+                    throw "Use " + string(argv[cnt]) + " <number of src trees>";
+                }
+                params.fusing_numsrc = convert_int(argv[cnt]);
+                continue;
             }
 			if(strcmp(argv[cnt], "-sitepars") == 0){
             	params.test_site_pars = true;

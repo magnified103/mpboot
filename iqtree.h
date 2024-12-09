@@ -486,6 +486,11 @@ public:
     pllInstance *pllInst;
 
     /**
+     * Instance of PLL, for tree fusing
+     */
+    pllInstance *pllSourceInst;
+
+    /**
      *	PLL data structure for alignment
      */
     pllAlignmentData *pllAlignment;

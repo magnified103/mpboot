@@ -1524,6 +1524,12 @@ struct Params {
     int spr_mintrav;
     int spr_maxtrav;
 
+    /**
+     * Viet Dung: to optimize the parsimony tree using tree fusing
+     */
+    bool fusing_pars;
+    /* number of fusing source trees */
+    int fusing_numsrc;
     /*
      * Diep: option for comparing PLL site parsimony and IQTree
      */
