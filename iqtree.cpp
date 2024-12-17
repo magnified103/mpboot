@@ -2274,7 +2274,7 @@ string IQTree::doNNISearch(int& nniCount, int& nniSteps) {
 			assert(sprStartTree != NULL);
 			pllTreeInitTopologyNewick(pllInst, sprStartTree, PLL_FALSE);
 
-            if (params->fusing_pars && curIt % 10 == 0) {
+            if (params->fusing_pars && curIt % params->fusing_ratio == 0) {
                 for (int it = 1; it <= params->fusing_numsrc; it++) {
                     string sourceTreeString = candidateTrees.getRandCandTree();
                     pllNewickTree *sourceBtree = pllNewickParseString(sourceTreeString.c_str());

@@ -555,6 +555,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     verbose_mode = VB_MIN;
     params.fusing_pars = false;
     params.fusing_numsrc = 3;
+    params.fusing_ratio = 20;
     params.tree_gen = NONE;
     params.user_file = NULL;
     params.out_prefix = NULL;
@@ -2408,6 +2409,14 @@ void parseArg(int argc, char *argv[], Params &params) {
                     throw "Use " + string(argv[cnt]) + " <number of src trees>";
                 }
                 params.fusing_numsrc = convert_int(argv[cnt]);
+                continue;
+            }
+            if(strcmp(argv[cnt], "-fusing_ratio") == 0) {
+                cnt++;
+                if (cnt >= argc) {
+                    throw "Use " + string(argv[cnt]) + " <number of SPR/TBR per one fusing iteration>";
+                }
+                params.fusing_ratio = convert_int(argv[cnt]);
                 continue;
             }
 			if(strcmp(argv[cnt], "-sitepars") == 0){

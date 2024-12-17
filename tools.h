@@ -1530,6 +1530,7 @@ struct Params {
     bool fusing_pars;
     /* number of fusing source trees */
     int fusing_numsrc;
+    int fusing_ratio;
     /*
      * Diep: option for comparing PLL site parsimony and IQTree
      */
