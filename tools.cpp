@@ -554,7 +554,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     int cnt;
     verbose_mode = VB_MIN;
     params.fusing_pars = false;
-    params.fusing_numsrc = 3;
+    params.fusing_numsrc = 1;
     params.fusing_ratio = 20;
     params.tree_gen = NONE;
     params.user_file = NULL;
