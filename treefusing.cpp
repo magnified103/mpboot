@@ -2751,8 +2751,8 @@ void pllOptimizeTreeFusingParsimony(pllInstance * tr, partitionList * pr, pllNew
     pllTreeInitTopologyNewick(tr, btree, PLL_FALSE);
 
     nodeptr best = NULL;
-    tr->bestParsimony = UINT_MAX;
-//    tr->bestParsimony = evaluateParsimony(tr, pr, tr->start->back, PLL_TRUE, perSiteScores);
+//    tr->bestParsimony = UINT_MAX;
+    tr->bestParsimony = evaluateParsimony(tr, pr, tr->start->back, PLL_TRUE, perSiteScores);
 
     for (auto cand: candidates) {
         // load tree from newick
