@@ -114,6 +114,7 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	message("Compiler      : Clang")
 	set(CLANG "TRUE")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 #	set(COMBINED_FLAGS "-Wall -Wno-unused-function -Wno-sign-compare -pedantic -D_GNU_SOURCE -Wno-nested-anon-types")
 	set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 	set(CMAKE_C_FLAGS_RELEASE "-O3")
@@ -216,7 +217,7 @@ if (IQTREE_FLAGS MATCHES "fma") # AVX+FMA instruction set
 
 elseif (IQTREE_FLAGS MATCHES "avx2") # AVX instruction set
  	message("Vectorization : AVX2")
-	add_definitions(-D__SSE3 -D__AVX) # define both SSE3 and AVX directive
+    add_definitions(-D__SSE3 -D__AVX -D__AVX2) # define both SSE3 and AVX directive
 	if (VCC) 
 		set(COMBINED_FLAGS "${COMBINED_FLAGS} /arch:AVX2")
 	elseif (CLANG)
@@ -399,6 +400,7 @@ candidateset.cpp
 checkpoint.cpp
 parstree.cpp
 sprparsimony.cpp
+tbrparsimony.cpp
 treefusing.cpp
 test.cpp
 )

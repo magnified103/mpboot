@@ -249,76 +249,144 @@ static inline unsigned int vectorPopcount(INT_TYPE v)
 
 /********************************DNA FUNCTIONS *****************************************************************/
 
-
-
 // Diep:
 // store per site score to nodeNumber
+// V.Dung 22-07-24: highly vectorized version
 #if (defined(__SSE3) || defined(__AVX))
+static inline void storePerSiteNodeScores(partitionList *pr, int model,
+                                          INT_TYPE v, unsigned int offset,
+                                          int nodeNumber) {
 
-#ifdef _WIN32
+    unsigned int counts[INTS_PER_VECTOR]
+        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+    parsimonyNumber *buf;
 
-static inline void storePerSiteNodeScores (partitionList * pr, int model, INT_TYPE v, unsigned int offset , int nodeNumber)
-{
-  PLL_ALIGN_BEGIN unsigned int counts[INTS_PER_VECTOR] PLL_ALIGN_END;
-	parsimonyNumber * buf;
+    VECTOR_STORE((CAST)counts, v);
 
-	int
-		i,
-		j;
+    int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
+    int nodeStart = partialParsLength * nodeNumber;
+    int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
 
-	VECTOR_STORE((CAST)counts, v);
+    static_assert(sizeof(parsimonyNumber) == 4, "sizeof(parsimonyNumber) = 4");
 
-  // int sum =0;
+    for (int i = 0; i < INTS_PER_VECTOR; ++i) {
+        buf = &(
+            pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
+        nodeStartPlusOffset += sizeof(unsigned int) * 8;
+        //		buf =
+        //&(pr->partitionData[model]->perSitePartialPars[nodeStart +
+        // offset * PLL_PCF + i * ULINT_SIZE]); // Diep's 		buf =
+        //&(pr->partitionData[model]->perSitePartialPars[nodeStart + offset *
+        // PLL_PCF + i]); // Tomas's code
 
-  // for(i = 0; i < INTS_PER_VECTOR; i++)
-  //   sum += __builtin_popcount(counts[i]);
-  // cout<<sum<<"\n";
+        /* OLD CODE */
+        // for (int j = 0; j < ULINT_SIZE; ++j)
+        //     buf[j] += ((counts[i] >> j) & 1);
+#ifdef __AVX2
+        const int parsPerVector = 32 / 4;
+        const __m256i bit = _mm256_set_epi32(
+            (1 << 7), (1 << 6),
+            (1 << 5), (1 << 4),
+            (1 << 3), (1 << 2),
+            (1 << 1), (1 << 0)
+        );
+        __m256i base = _mm256_set1_epi32(counts[i]);
 
-	int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
-	int nodeStart = partialParsLength * nodeNumber;
-	int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
-	for (i = 0; i < INTS_PER_VECTOR; ++i){
-		buf = &(pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
-		nodeStartPlusOffset += 32;
-//		buf = &(pr->partitionData[model]->perSitePartialPars[nodeStart + offset * PLL_PCF + i * ULINT_SIZE]); // Diep's
-//		buf = &(pr->partitionData[model]->perSitePartialPars[nodeStart + offset * PLL_PCF + i]); // Tomas's code
-		for (j = 0; j < 32; ++ j) {
-			buf[j] += ((counts[i] >> j) & 1);
-    }
-	}
-    
-}
+        for (int j = 0; j < sizeof(unsigned int) * 8; j += parsPerVector) {
+            __m256i mask = _mm256_and_si256(base, bit);
+            mask = _mm256_cmpeq_epi32(mask, bit);
+            mask = _mm256_sub_epi32(_mm256_load_si256((__m256i*)(&buf[j])), mask);
+            _mm256_store_si256((__m256i*)(&buf[j]), mask);
 
+            base = _mm256_srli_epi32(base, parsPerVector);
+        }
 #else
+        const int parsPerVector = 16 / 4;
+        const __m128i bit = _mm_set_epi32(
+            (1 << 3), (1 << 2),
+            (1 << 1), (1 << 0)
+        );
+        __m128i base = _mm_set1_epi32(counts[i]);
 
-static inline void storePerSiteNodeScores (partitionList * pr, int model, INT_TYPE v, unsigned int offset , int nodeNumber)
-{
+        for (int j = 0; j < sizeof(unsigned int) * 8; j += parsPerVector) {
+            __m128i mask = _mm_and_si128(base, bit);
+            mask = _mm_cmpeq_epi32(mask, bit);
+            mask = _mm_sub_epi32(_mm_load_si128((__m128i*)(&buf[j])), mask);
+            _mm_store_si128((__m128i*)(&buf[j]), mask);
 
-	unsigned long
-		counts[LONG_INTS_PER_VECTOR] __attribute__ ((aligned (PLL_BYTE_ALIGNMENT)));
-		parsimonyNumber * buf;
-
-	int
-		i,
-		j;
-
-	VECTOR_STORE((CAST)counts, v);
-
-	int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
-	int nodeStart = partialParsLength * nodeNumber;
-	int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
-	for (i = 0; i < LONG_INTS_PER_VECTOR; ++i){
-		buf = &(pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
-		nodeStartPlusOffset += ULINT_SIZE;
-//		buf = &(pr->partitionData[model]->perSitePartialPars[nodeStart + offset * PLL_PCF + i * ULINT_SIZE]); // Diep's
-//		buf = &(pr->partitionData[model]->perSitePartialPars[nodeStart + offset * PLL_PCF + i]); // Tomas's code
-		for (j = 0; j < ULINT_SIZE; ++ j)
-			buf[j] += ((counts[i] >> j) & 1);
-	}
-    
+            base = _mm_srli_epi32(base, parsPerVector);
+        }
+#endif
+    }
 }
 
+// V.Dung: same as storePerSiteNodeScores, but process with negated bit vector
+static inline void storePerSiteNodeScoresNegated(partitionList *pr, int model,
+                                                 INT_TYPE not_v, unsigned int offset,
+                                                 int nodeNumber) {
+
+    unsigned int counts[INTS_PER_VECTOR]
+        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+    parsimonyNumber *buf;
+
+    VECTOR_STORE((CAST)counts, not_v);
+
+    int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
+    int nodeStart = partialParsLength * nodeNumber;
+    int nodeStartPlusOffset = nodeStart + offset * PLL_PCF;
+
+    static_assert(sizeof(parsimonyNumber) == 4, "sizeof(parsimonyNumber) = 4");
+
+    for (int i = 0; i < INTS_PER_VECTOR; ++i) {
+        buf = &(
+            pr->partitionData[model]->perSitePartialPars[nodeStartPlusOffset]);
+        nodeStartPlusOffset += sizeof(unsigned int) * 8;
+        //		buf =
+        //&(pr->partitionData[model]->perSitePartialPars[nodeStart +
+        // offset * PLL_PCF + i * ULINT_SIZE]); // Diep's 		buf =
+        //&(pr->partitionData[model]->perSitePartialPars[nodeStart + offset *
+        // PLL_PCF + i]); // Tomas's code
+
+        /* OLD CODE */
+        // for (int j = 0; j < ULINT_SIZE; ++j)
+        //     buf[j] += ((counts[i] >> j) & 1);
+#ifdef __AVX2
+        const int parsPerVector = 32 / 4;
+        const __m256i bit = _mm256_set_epi32(
+            (1 << 7), (1 << 6),
+            (1 << 5), (1 << 4),
+            (1 << 3), (1 << 2),
+            (1 << 1), (1 << 0)
+        );
+        __m256i base = _mm256_set1_epi32(counts[i]);
+
+        for (int j = 0; j < sizeof(unsigned int) * 8; j += parsPerVector) {
+            __m256i mask = _mm256_andnot_si256(base, bit);
+            mask = _mm256_cmpeq_epi32(mask, bit);
+            mask = _mm256_sub_epi32(_mm256_load_si256((__m256i*)(&buf[j])), mask);
+            _mm256_store_si256((__m256i*)(&buf[j]), mask);
+
+            base = _mm256_srli_epi32(base, parsPerVector);
+        }
+#else
+        const int parsPerVector = 16 / 4;
+        const __m128i bit = _mm_set_epi32(
+            (1 << 3), (1 << 2),
+            (1 << 1), (1 << 0)
+        );
+        __m128i base = _mm_set1_epi32(counts[i]);
+
+        for (int j = 0; j < sizeof(unsigned int) * 8; j += parsPerVector) {
+            __m128i mask = _mm_andnot_si128(base, bit);
+            mask = _mm_cmpeq_epi32(mask, bit);
+            mask = _mm_sub_epi32(_mm_load_si128((__m128i*)(&buf[j])), mask);
+            _mm_store_si128((__m128i*)(&buf[j]), mask);
+
+            base = _mm_srli_epi32(base, parsPerVector);
+        }
 #endif
+    }
+}
 
 
 // Diep:
@@ -364,6 +432,82 @@ void addPerSiteSubtreeScores(partitionList *pr, int pNumber, int qNumber, int rN
 }
 
 
+// Combine storePerSiteNodeScoresNegated and addPerSiteSubtreeScores
+static inline void storePerSiteSubtreeScoresNegated(partitionList *pr, int model,
+                                                    INT_TYPE not_v, unsigned int offset,
+                                                    int pNumber, int qNumber, int rNumber) {
+    unsigned int counts[INTS_PER_VECTOR]
+        __attribute__((aligned(PLL_BYTE_ALIGNMENT)));
+    parsimonyNumber *pbuf, *qbuf, *rbuf;
+
+    VECTOR_STORE((CAST)counts, not_v);
+
+    int partialParsLength = pr->partitionData[model]->parsimonyLength * PLL_PCF;
+    int pStart = partialParsLength * pNumber;
+    int pStartPlusOffset = pStart + offset * PLL_PCF;
+    int qStart = partialParsLength * qNumber;
+    int qStartPlusOffset = qStart + offset * PLL_PCF;
+    int rStart = partialParsLength * rNumber;
+    int rStartPlusOffset = rStart + offset * PLL_PCF;
+
+    static_assert(sizeof(parsimonyNumber) == 4, "sizeof(parsimonyNumber) = 4");
+
+    for (int i = 0; i < INTS_PER_VECTOR; ++i) {
+        pbuf = &(pr->partitionData[model]->perSitePartialPars[pStartPlusOffset]);
+        qbuf = &(pr->partitionData[model]->perSitePartialPars[qStartPlusOffset]);
+        rbuf = &(pr->partitionData[model]->perSitePartialPars[rStartPlusOffset]);
+        pStartPlusOffset += sizeof(unsigned int) * 8;
+        qStartPlusOffset += sizeof(unsigned int) * 8;
+        rStartPlusOffset += sizeof(unsigned int) * 8;
+        //		buf = &(pr->partitionData[model]->perSitePartialPars[nodeStart +
+        // offset * PLL_PCF + i * ULINT_SIZE]); // Diep's 		buf =
+        //&(pr->partitionData[model]->perSitePartialPars[nodeStart + offset *
+        // PLL_PCF + i]); // Tomas's code
+
+        /* OLD CODE */
+        // for (j = 0; j < ULINT_SIZE; ++j)
+        //   buf[j] += ((counts[i] >> j) & 1);
+#ifdef __AVX2
+        const int parsPerVector = 32 / 4;
+        const __m256i bit = _mm256_set_epi32(
+            (1 << 7), (1 << 6),
+            (1 << 5), (1 << 4),
+            (1 << 3), (1 << 2),
+            (1 << 1), (1 << 0)
+        );
+        __m256i base = _mm256_set1_epi32(counts[i]);
+
+        for (int j = 0; j < sizeof(unsigned int) * 8; j += parsPerVector) {
+            __m256i mask = _mm256_andnot_si256(base, bit);
+            mask = _mm256_cmpeq_epi32(mask, bit);
+            mask = _mm256_sub_epi32(_mm256_load_si256((__m256i*)(&pbuf[j])), mask);
+            mask = _mm256_add_epi32(_mm256_load_si256((__m256i*)(&qbuf[j])), mask);
+            mask = _mm256_add_epi32(_mm256_load_si256((__m256i*)(&rbuf[j])), mask);
+            _mm256_store_si256((__m256i*)(&pbuf[j]), mask);
+
+            base = _mm256_srli_epi32(base, parsPerVector);
+        }
+#else
+        const int parsPerVector = 16 / 4;
+        const __m128i bit = _mm_set_epi32(
+            (1 << 3), (1 << 2),
+            (1 << 1), (1 << 0)
+        );
+        __m128i base = _mm_set1_epi32(counts[i]);
+
+        for (int j = 0; j < sizeof(unsigned int) * 8; j += parsPerVector) {
+            __m128i mask = _mm_andnot_si128(base, bit);
+            mask = _mm_cmpeq_epi32(mask, bit);
+            mask = _mm_sub_epi32(_mm_load_si128((__m128i*)(&pbuf[j])), mask);
+            mask = _mm_add_epi32(_mm_load_si128((__m128i*)(&qbuf[j])), mask);
+            mask = _mm_add_epi32(_mm_load_si128((__m128i*)(&rbuf[j])), mask);
+            _mm_store_si128((__m128i*)(&pbuf[j]), mask);
+
+            base = _mm_srli_epi32(base, parsPerVector);
+        }
+#endif
+    }
+}
 // Diep:
 // Reset site scores of p
 void resetPerSiteNodeScores(partitionList *pr, int pNumber){
@@ -550,7 +694,6 @@ void newviewSankoffParsimonyIterativeFastSIMD(pllInstance *tr, partitionList * p
     }
 }
 
-
 static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, int perSiteScores)
 {
 	if(pllCostMatrix) {
@@ -640,62 +783,49 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
         return;
     }
 
-  INT_TYPE
+    INT_TYPE
     allOne = SET_ALL_BITS_ONE;
 
-  int
-    model,
-    *ti = tr->ti,
-    count = ti[0],
-    index;
+    int model, *ti = tr->ti, count = ti[0], index;
 
-  for(index = 4; index < count; index += 4)
-    {
-      unsigned int
-        totalScore = 0;
+    for (index = 4; index < count; index += 4) {
+        unsigned int totalScore = 0;
 
-      size_t
-        pNumber = (size_t)ti[index],
-        qNumber = (size_t)ti[index + 1],
-        rNumber = (size_t)ti[index + 2];
+        size_t pNumber = (size_t)ti[index], qNumber = (size_t)ti[index + 1],
+               rNumber = (size_t)ti[index + 2];
 
-      if(perSiteScores){
-		  if(qNumber <= tr->mxtips) resetPerSiteNodeScores(pr, qNumber);
-		  if(rNumber <= tr->mxtips) resetPerSiteNodeScores(pr, rNumber);
-      }
+        if (perSiteScores) {
+            if (qNumber == tr->start->number)
+                resetPerSiteNodeScores(pr, qNumber);
+            if (rNumber == tr->start->number && qNumber != rNumber)
+                resetPerSiteNodeScores(pr, rNumber);
+        }
 
-      for(model = 0; model < pr->numberOfPartitions; model++)
-        {
-          size_t
-            k,
-            states = pr->partitionData[model]->states,
-            width = pr->partitionData[model]->parsimonyLength;
+        for (model = 0; model < pr->numberOfPartitions; model++) {
+            size_t k, states = pr->partitionData[model]->states,
+                      width = pr->partitionData[model]->parsimonyLength;
 
-          unsigned int
-            i;
+            unsigned int i;
 
-          switch(states)
-            {
-            case 2:
-              {
-                parsimonyNumber
-                  *left[2],
-                  *right[2],
-                  *cur[2];
+            switch (states) {
+            case 2: {
+                parsimonyNumber *left[2], *right[2], *cur[2];
 
-                for(k = 0; k < 2; k++)
-                  {
-                    left[k]  = &(pr->partitionData[model]->parsVect[(width * 2 * qNumber) + width * k]);
-                    right[k] = &(pr->partitionData[model]->parsVect[(width * 2 * rNumber) + width * k]);
-                    cur[k]  = &(pr->partitionData[model]->parsVect[(width * 2 * pNumber) + width * k]);
-                  }
+                for (k = 0; k < 2; k++) {
+                    left[k] =
+                        &(pr->partitionData[model]
+                              ->parsVect[(width * 2 * qNumber) + width * k]);
+                    right[k] =
+                        &(pr->partitionData[model]
+                              ->parsVect[(width * 2 * rNumber) + width * k]);
+                    cur[k] =
+                        &(pr->partitionData[model]
+                              ->parsVect[(width * 2 * pNumber) + width * k]);
+                }
 
-                for(i = 0; i < width; i += INTS_PER_VECTOR)
-                  {
+                for (i = 0; i < width; i += INTS_PER_VECTOR) {
                     INT_TYPE
-                      s_r, s_l, v_N,
-                      l_A, l_C,
-                      v_A, v_C;
+                    s_r, s_l, v_N, l_A, l_C, v_A, v_C;
 
                     s_l = VECTOR_LOAD((CAST)(&left[0][i]));
                     s_r = VECTOR_LOAD((CAST)(&right[0][i]));
@@ -709,37 +839,41 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
 
                     v_N = VECTOR_BIT_OR(l_A, l_C);
 
-                    VECTOR_STORE((CAST)(&cur[0][i]), VECTOR_BIT_OR(l_A, VECTOR_AND_NOT(v_N, v_A)));
-                    VECTOR_STORE((CAST)(&cur[1][i]), VECTOR_BIT_OR(l_C, VECTOR_AND_NOT(v_N, v_C)));
+                    VECTOR_STORE((CAST)(&cur[0][i]),
+                                 VECTOR_BIT_OR(l_A, VECTOR_AND_NOT(v_N, v_A)));
+                    VECTOR_STORE((CAST)(&cur[1][i]),
+                                 VECTOR_BIT_OR(l_C, VECTOR_AND_NOT(v_N, v_C)));
 
-                    v_N = VECTOR_AND_NOT(v_N, allOne);
+                    // v_N = VECTOR_AND_NOT(v_N, allOne);
 
-                    totalScore += vectorPopcount(v_N);
-                    if (perSiteScores)
-                       storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                  }
-              }
-              break;
-            case 4:
-              {
-                parsimonyNumber
-                  *left[4],
-                  *right[4],
-                  *cur[4];
+                    // totalScore += vectorPopcount(v_N);
+                    // if (perSiteScores)
+                    //     storePerSiteNodeScores(pr, model, v_N, i, pNumber);
 
-                for(k = 0; k < 4; k++)
-                  {
-                    left[k]  = &(pr->partitionData[model]->parsVect[(width * 4 * qNumber) + width * k]);
-                    right[k] = &(pr->partitionData[model]->parsVect[(width * 4 * rNumber) + width * k]);
-                    cur[k]  = &(pr->partitionData[model]->parsVect[(width * 4 * pNumber) + width * k]);
-                  }
+                    totalScore += LONG_INTS_PER_VECTOR * sizeof(unsigned long) * 8 - vectorPopcount(v_N);
+                    if (perSiteScores) {
+                        storePerSiteSubtreeScoresNegated(pr, model, v_N, i, pNumber, qNumber, rNumber);
+                    }
+                }
+            } break;
+            case 4: {
+                parsimonyNumber *left[4], *right[4], *cur[4];
 
-                for(i = 0; i < width; i += INTS_PER_VECTOR)
-                  {
+                for (k = 0; k < 4; k++) {
+                    left[k] =
+                        &(pr->partitionData[model]
+                              ->parsVect[(width * 4 * qNumber) + width * k]);
+                    right[k] =
+                        &(pr->partitionData[model]
+                              ->parsVect[(width * 4 * rNumber) + width * k]);
+                    cur[k] =
+                        &(pr->partitionData[model]
+                              ->parsVect[(width * 4 * pNumber) + width * k]);
+                }
+
+                for (i = 0; i < width; i += INTS_PER_VECTOR) {
                     INT_TYPE
-                      s_r, s_l, v_N,
-                      l_A, l_C, l_G, l_T,
-                      v_A, v_C, v_G, v_T;
+                    s_r, s_l, v_N, l_A, l_C, l_G, l_T, v_A, v_C, v_G, v_T;
 
                     s_l = VECTOR_LOAD((CAST)(&left[0][i]));
                     s_r = VECTOR_LOAD((CAST)(&right[0][i]));
@@ -761,119 +895,137 @@ static void newviewParsimonyIterativeFast(pllInstance *tr, partitionList *pr, in
                     l_T = VECTOR_BIT_AND(s_l, s_r);
                     v_T = VECTOR_BIT_OR(s_l, s_r);
 
-                    v_N = VECTOR_BIT_OR(VECTOR_BIT_OR(l_A, l_C), VECTOR_BIT_OR(l_G, l_T));
+                    v_N = VECTOR_BIT_OR(VECTOR_BIT_OR(l_A, l_C),
+                                        VECTOR_BIT_OR(l_G, l_T));
 
-                    VECTOR_STORE((CAST)(&cur[0][i]), VECTOR_BIT_OR(l_A, VECTOR_AND_NOT(v_N, v_A)));
-                    VECTOR_STORE((CAST)(&cur[1][i]), VECTOR_BIT_OR(l_C, VECTOR_AND_NOT(v_N, v_C)));
-                    VECTOR_STORE((CAST)(&cur[2][i]), VECTOR_BIT_OR(l_G, VECTOR_AND_NOT(v_N, v_G)));
-                    VECTOR_STORE((CAST)(&cur[3][i]), VECTOR_BIT_OR(l_T, VECTOR_AND_NOT(v_N, v_T)));
+                    VECTOR_STORE((CAST)(&cur[0][i]),
+                                 VECTOR_BIT_OR(l_A, VECTOR_AND_NOT(v_N, v_A)));
+                    VECTOR_STORE((CAST)(&cur[1][i]),
+                                 VECTOR_BIT_OR(l_C, VECTOR_AND_NOT(v_N, v_C)));
+                    VECTOR_STORE((CAST)(&cur[2][i]),
+                                 VECTOR_BIT_OR(l_G, VECTOR_AND_NOT(v_N, v_G)));
+                    VECTOR_STORE((CAST)(&cur[3][i]),
+                                 VECTOR_BIT_OR(l_T, VECTOR_AND_NOT(v_N, v_T)));
 
-                    v_N = VECTOR_AND_NOT(v_N, allOne);
+                    // v_N = VECTOR_AND_NOT(v_N, allOne);
 
-                    totalScore += vectorPopcount(v_N);
-                    if (perSiteScores)
-                       storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                  }
-              }
-              break;
-            case 20:
-              {
-                parsimonyNumber
-                  *left[20],
-                  *right[20],
-                  *cur[20];
+                    // totalScore += vectorPopcount(v_N);
+                    // if (perSiteScores)
+                    //     storePerSiteNodeScores(pr, model, v_N, i, pNumber);
 
-                for(k = 0; k < 20; k++)
-                  {
-                    left[k]  = &(pr->partitionData[model]->parsVect[(width * 20 * qNumber) + width * k]);
-                    right[k] = &(pr->partitionData[model]->parsVect[(width * 20 * rNumber) + width * k]);
-                    cur[k]  = &(pr->partitionData[model]->parsVect[(width * 20 * pNumber) + width * k]);
-                  }
+                    totalScore += LONG_INTS_PER_VECTOR * sizeof(unsigned long) * 8 - vectorPopcount(v_N);
+                    if (perSiteScores) {
+                        storePerSiteSubtreeScoresNegated(pr, model, v_N, i, pNumber, qNumber, rNumber);
+                    }
+                }
+            } break;
+            case 20: {
+                parsimonyNumber *left[20], *right[20], *cur[20];
 
-                for(i = 0; i < width; i += INTS_PER_VECTOR)
-                  {
+                for (k = 0; k < 20; k++) {
+                    left[k] =
+                        &(pr->partitionData[model]
+                              ->parsVect[(width * 20 * qNumber) + width * k]);
+                    right[k] =
+                        &(pr->partitionData[model]
+                              ->parsVect[(width * 20 * rNumber) + width * k]);
+                    cur[k] =
+                        &(pr->partitionData[model]
+                              ->parsVect[(width * 20 * pNumber) + width * k]);
+                }
+
+                for (i = 0; i < width; i += INTS_PER_VECTOR) {
                     size_t j;
 
                     INT_TYPE
-                      s_r, s_l,
-                      v_N = SET_ALL_BITS_ZERO,
-                      l_A[20],
-                      v_A[20];
+                    s_r, s_l, v_N = SET_ALL_BITS_ZERO, l_A[20], v_A[20];
 
-                    for(j = 0; j < 20; j++)
-                      {
+                    for (j = 0; j < 20; j++) {
                         s_l = VECTOR_LOAD((CAST)(&left[j][i]));
                         s_r = VECTOR_LOAD((CAST)(&right[j][i]));
                         l_A[j] = VECTOR_BIT_AND(s_l, s_r);
                         v_A[j] = VECTOR_BIT_OR(s_l, s_r);
 
                         v_N = VECTOR_BIT_OR(v_N, l_A[j]);
-                      }
+                    }
 
-                    for(j = 0; j < 20; j++)
-                      VECTOR_STORE((CAST)(&cur[j][i]), VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
+                    for (j = 0; j < 20; j++)
+                        VECTOR_STORE(
+                            (CAST)(&cur[j][i]),
+                            VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
 
-                    v_N = VECTOR_AND_NOT(v_N, allOne);
+                    // v_N = VECTOR_AND_NOT(v_N, allOne);
 
-                    totalScore += vectorPopcount(v_N);
-                    if (perSiteScores)
-                       storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                  }
-              }
-              break;
+                    // totalScore += vectorPopcount(v_N);
+                    // if (perSiteScores)
+                    //     storePerSiteNodeScores(pr, model, v_N, i, pNumber);
+
+                    totalScore += LONG_INTS_PER_VECTOR * sizeof(unsigned long) * 8 - vectorPopcount(v_N);
+                    if (perSiteScores) {
+                        storePerSiteSubtreeScoresNegated(pr, model, v_N, i, pNumber, qNumber, rNumber);
+                    }
+                }
+            } break;
             default:
 
-              {
-                parsimonyNumber
-                  *left[32],
-                  *right[32],
-                  *cur[32];
+            {
+                parsimonyNumber *left[32], *right[32], *cur[32];
 
                 assert(states <= 32);
 
-                for(k = 0; k < states; k++)
-                  {
-                    left[k]  = &(pr->partitionData[model]->parsVect[(width * states * qNumber) + width * k]);
-                    right[k] = &(pr->partitionData[model]->parsVect[(width * states * rNumber) + width * k]);
-                    cur[k]  = &(pr->partitionData[model]->parsVect[(width * states * pNumber) + width * k]);
-                  }
+                for (k = 0; k < states; k++) {
+                    left[k] = &(
+                        pr->partitionData[model]
+                            ->parsVect[(width * states * qNumber) + width * k]);
+                    right[k] = &(
+                        pr->partitionData[model]
+                            ->parsVect[(width * states * rNumber) + width * k]);
+                    cur[k] = &(
+                        pr->partitionData[model]
+                            ->parsVect[(width * states * pNumber) + width * k]);
+                }
 
-                for(i = 0; i < width; i += INTS_PER_VECTOR)
-                  {
+                for (i = 0; i < width; i += INTS_PER_VECTOR) {
                     size_t j;
 
                     INT_TYPE
-                      s_r, s_l,
-                      v_N = SET_ALL_BITS_ZERO,
-                      l_A[32],
-                      v_A[32];
+                    s_r, s_l, v_N = SET_ALL_BITS_ZERO, l_A[32], v_A[32];
 
-                    for(j = 0; j < states; j++)
-                      {
+                    for (j = 0; j < states; j++) {
                         s_l = VECTOR_LOAD((CAST)(&left[j][i]));
                         s_r = VECTOR_LOAD((CAST)(&right[j][i]));
                         l_A[j] = VECTOR_BIT_AND(s_l, s_r);
                         v_A[j] = VECTOR_BIT_OR(s_l, s_r);
 
                         v_N = VECTOR_BIT_OR(v_N, l_A[j]);
-                      }
+                    }
 
-                    for(j = 0; j < states; j++)
-                      VECTOR_STORE((CAST)(&cur[j][i]), VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
+                    for (j = 0; j < states; j++)
+                        VECTOR_STORE(
+                            (CAST)(&cur[j][i]),
+                            VECTOR_BIT_OR(l_A[j], VECTOR_AND_NOT(v_N, v_A[j])));
 
-                    v_N = VECTOR_AND_NOT(v_N, allOne);
+                    // v_N = VECTOR_AND_NOT(v_N, allOne);
 
-                    totalScore += vectorPopcount(v_N);
-                    if (perSiteScores)
-                       storePerSiteNodeScores(pr, model, v_N, i, pNumber);
-                  }
-              }
+                    // totalScore += vectorPopcount(v_N);
+                    // if (perSiteScores)
+                    //     storePerSiteNodeScores(pr, model, v_N, i, pNumber);
+
+                    totalScore += LONG_INTS_PER_VECTOR * sizeof(unsigned long) * 8 - vectorPopcount(v_N);
+                    if (perSiteScores) {
+                        storePerSiteSubtreeScoresNegated(pr, model, v_N, i, pNumber, qNumber, rNumber);
+                    }
+                }
+            }
             }
         }
 
-      tr->parsimonyScore[pNumber] = totalScore + tr->parsimonyScore[rNumber] + tr->parsimonyScore[qNumber];
-      if (perSiteScores)
-    	  addPerSiteSubtreeScores(pr, pNumber, qNumber, rNumber); // Diep: add rNumber and qNumber to pNumber
+        tr->parsimonyScore[pNumber] = totalScore + tr->parsimonyScore[rNumber] +
+                                      tr->parsimonyScore[qNumber];
+        // if (perSiteScores)
+        //     addPerSiteSubtreeScores(
+        //         pr, pNumber, qNumber,
+        //         rNumber); // Diep: add rNumber and qNumber to pNumber
     }
 }
 
@@ -1881,11 +2033,6 @@ static unsigned int evaluateParsimonyIterativeFast(pllInstance *tr, partitionLis
 
 #endif
 
-
-
-
-
-
 static unsigned int evaluateParsimony(pllInstance *tr, partitionList *pr, nodeptr p, pllBoolean full, int perSiteScores)
 {
 	volatile unsigned int result;
@@ -2636,7 +2783,7 @@ static void determineUninformativeSites(pllInstance *tr, partitionList *pr, int 
 template<class Numeric, const int VECSIZE>
 static void compressSankoffDNA(pllInstance *tr, partitionList *pr, int *informative, int perSiteScores)
 {
-//	cout << "Begin compressSankoffDNA()" << endl;
+// cout << "Begin compressSankoffDNA()" << endl;
   size_t
     totalNodes,
     i,

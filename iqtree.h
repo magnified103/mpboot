@@ -24,6 +24,7 @@
 #include <map>
 #include <stack>
 #include <vector>
+#include "checkpoint.h"
 #include "phylotree.h"
 #include "phylonode.h"
 #include "stoprule.h"
@@ -104,6 +105,22 @@ public:
     virtual ~IQTree();
 
     void init();
+
+    /**
+        set checkpoint object
+        @param checkpoint
+    */
+    virtual void setCheckpoint(Checkpoint *checkpoint);
+
+    /**
+        save object into the checkpoint
+    */
+    virtual void saveCheckpoint();
+
+    /**
+        restore object from the checkpoint
+    */
+    virtual void restoreCheckpoint();
 
     /**
      * setup all necessary parameters  (declared as virtual needed for phylosupertree)
@@ -727,6 +744,7 @@ public:
     vector<BootValType* > boot_samples;
     vector<BootValTypePars*> boot_samples_pars; // Diep added
     vector<int*> boot_samples_pars_remain_bounds; // Diep: minimal score for the remain of boot aln from segment_upper[i]
+    int cur_boot_sample;
 
     int reps_segments; // Diep added: (if needed) split the parsimony vector into several segments to avoid overflow when calc rell based on vec8us
 
@@ -949,7 +967,19 @@ protected:
 
     void estDeltaMin();
 
-    void createPLL(Params &, pllInstance* &, pllAlignmentData* &, partitionList* &);
+    /**
+        save UFBoot_trees.
+        @param checkpoint Checkpoint object
+    */
+    void saveUFBoot(Checkpoint *checkpoint);
+
+    /**
+
+        restore UFBoot_trees
+        @param checkpoint Checkpoint object
+    */
+    void restoreUFBoot(Checkpoint *checkpoint);
+
 };
 
 void estimateNNICutoff(Params &params);

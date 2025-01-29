@@ -7,8 +7,9 @@
 
 #include "phylotree.h"
 #include "candidateset.h"
+extern Params *globalParam;
 
-CandidateSet::CandidateSet(int limit, int max_candidates, Alignment *aln) {
+CandidateSet::CandidateSet(int limit, int max_candidates, Alignment *aln) : CheckpointFactory() {
     assert(max_candidates <= limit);
     assert(aln);
     this->maxCandidates = limit;
@@ -17,11 +18,53 @@ CandidateSet::CandidateSet(int limit, int max_candidates, Alignment *aln) {
     this->bestScore = -DBL_MAX;
 }
 
-CandidateSet::CandidateSet() {
+CandidateSet::CandidateSet() : CheckpointFactory() {
 	aln = NULL;
 	maxCandidates = 0;
 	popSize = 0;
 	bestScore = -DBL_MAX;
+}
+
+void CandidateSet::saveCheckpoint() {
+    checkpoint->startStruct("CandidateSet");
+    int ntrees = (int) size();
+    assert(ntrees <= globalParam->numParsTrees);
+    checkpoint->startList(ntrees);
+    for (reverse_iterator it = rbegin(); it != rend() && ntrees > 0; it++, ntrees--) {
+        checkpoint->addListElement();
+        stringstream ss;
+        ss.precision(12);
+        ss << it->second.score << " " << it->second.tree;
+//        double score = it->second.score;
+//        CKP_SAVE(score);
+//        checkpoint->put("tree", it->second.tree);
+        checkpoint->put("", ss.str());
+    }
+    checkpoint->endList();
+    checkpoint->endStruct();
+    CheckpointFactory::saveCheckpoint();
+}
+
+void CandidateSet::restoreCheckpoint() {
+    CheckpointFactory::restoreCheckpoint();
+    checkpoint->startStruct("CandidateSet");
+    double score;
+    string tree;
+    checkpoint->startList(globalParam->numParsTrees);
+    for (int i = 0; i < globalParam->numParsTrees; i++) {
+        checkpoint->addListElement();
+        string str;
+        if (!checkpoint->getString("", str)) {
+            break;
+        }
+        stringstream ss(str);
+        ss >> score >> tree;
+//        CKP_RESTORE(tree);
+        update(tree, score);
+
+    }
+    checkpoint->endList();
+    checkpoint->endStruct();
 }
 
 vector<string> CandidateSet::getEquallyOptimalTrees() {
@@ -104,8 +147,10 @@ bool CandidateSet::update(string tree, double score) {
 	candidate.tree = tree;
 	candidate.score = score;
 	candidate.topology = getTopology(tree);
-	if (candidate.score > bestScore)
-		bestScore = candidate.score;
+	if (candidate.score > bestScore) {
+        bestTreeString = tree;
+        bestScore = candidate.score;
+    }
 	if (treeTopologyExist(candidate.topology)) {
 	    // if tree topology already exist, we replace the old
 	    // by the new one (with new branch lengths) and update the score

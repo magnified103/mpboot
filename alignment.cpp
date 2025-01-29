@@ -511,6 +511,7 @@ int Alignment::readNexus(char *filename) {
 
 void Alignment::computeUnknownState() {
     switch (seq_type) {
+    case SEQ_BINARY: STATE_UNKNOWN = 2; break;
     case SEQ_DNA: STATE_UNKNOWN = 18; break;
     case SEQ_PROTEIN: STATE_UNKNOWN = 22; break;
     default: STATE_UNKNOWN = num_states; break;

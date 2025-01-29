@@ -34,6 +34,8 @@
 #include <fstream>
 #include "zlib-1.2.7/zlib.h"
 
+#define GZ_NO_COMPRESSION (1L << 11)
+
 #ifdef GZSTREAM_NAMESPACE
 namespace GZSTREAM_NAMESPACE {
 #endif
@@ -53,9 +55,12 @@ private:
     char             opened;             // open/close state of stream
     int              mode;               // I/O mode
 
+    size_t           compressed_length;
+    size_t           compressed_position; //only tracked for read (input) streams
+    
     int flush_buffer();
 public:
-    gzstreambuf() : opened(0) {
+    gzstreambuf() : opened(0), compressed_length(0), compressed_position(0) {
         setp( buffer, buffer + (bufferSize-1));
         setg( buffer + 4,     // beginning of putback area
               buffer + 4,     // read position
@@ -63,13 +68,16 @@ public:
         // ASSERT: both input & output capabilities will not be used together
     }
     int is_open() { return opened; }
-    gzstreambuf* open( const char* name, int open_mode);
+    gzstreambuf* open( const char* name, int open_mode, int compression_level=1);
     gzstreambuf* close();
     ~gzstreambuf() { close(); }
     
     virtual int     overflow( int c = EOF);
     virtual int     underflow();
     virtual int     sync();
+
+    size_t getCompressedLength();
+    size_t getCompressedPosition();
 };
 
 class gzstreambase : virtual public std::ios {
@@ -84,6 +92,8 @@ public:
 	z_off_t get_raw_bytes(); // BQM: return number of uncompressed bytes
 
     gzstreambuf* rdbuf() { return &buf; }
+    size_t getCompressedLength()   { return buf.getCompressedLength(); }
+    size_t getCompressedPosition() { return buf.getCompressedPosition(); }
 };
 
 // ----------------------------------------------------------------------------
@@ -94,7 +104,7 @@ public:
 
 class igzstream : public gzstreambase, public std::istream {
 public:
-    igzstream() : std::istream( &buf) {} 
+    igzstream() : gzstreambase(), std::istream( &buf) {}
     igzstream( const char* name, int open_mode = std::ios::in)
         : gzstreambase( name, open_mode), std::istream( &buf) {}  
     gzstreambuf* rdbuf() { return gzstreambase::rdbuf(); }
@@ -105,9 +115,11 @@ public:
 
 class ogzstream : public gzstreambase, public std::ostream {
 public:
-    ogzstream() : std::ostream( &buf) {}
+    ogzstream() : gzstreambase(), std::ostream( &buf) {
+    }
     ogzstream( const char* name, int mode = std::ios::out)
-        : gzstreambase( name, mode), std::ostream( &buf) {}  
+        : gzstreambase( name, mode), std::ostream( &buf) {
+    }
     gzstreambuf* rdbuf() { return gzstreambase::rdbuf(); }
     void open( const char* name, int open_mode = std::ios::out) {
         gzstreambase::open( name, open_mode);

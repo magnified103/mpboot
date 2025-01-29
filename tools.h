@@ -207,7 +207,7 @@ typedef vector<string> StrVector;
 /**
         matrix of double number
  */
-#define matrix(T) vector<vector<T> >
+#define mmatrix(T) vector<vector<T> >
 
 /**
         matrix of double
@@ -225,7 +225,7 @@ public:
         void setZero();
 };
  */
-typedef matrix(double) DoubleMatrix;
+typedef mmatrix(double) DoubleMatrix;
 
 typedef unsigned int UINT;
 
@@ -411,6 +411,15 @@ extern int NNI_MAX_NR_STEP;
         program parameters, everything is specified here
  */
 struct Params {
+
+	/**
+	 *  Checkpoints
+	 */
+    bool print_all_checkpoints;
+    bool ignore_checkpoint;
+    /** time (in seconds) between checkpoint dump */
+    int checkpoint_dump_interval;
+    bool ckp_rerun;
 
 	/**
 	 *  Number of starting parsimony trees
@@ -1525,6 +1534,23 @@ struct Params {
     int spr_maxtrav;
 
     /**
+     *  HynDuf: Optimize the parsimony tree using TBR implemented in PLL
+     */
+    bool tbr_pars;
+
+    /**
+     *  HynDuf: TBR's radius as required by PLL
+     */
+    int tbr_mintrav;
+    int tbr_maxtrav;
+
+    /**
+     *  HynDuf: Use a different TBR hill-climbing strategy (namely TBR-Better).
+     *  The Default version is TBR-best (default value of tbr_better is false).
+     */
+    bool tbr_better;
+
+    /**
      * Viet Dung: to optimize the parsimony tree using tree fusing
      */
     bool fusing_pars;
@@ -1772,6 +1798,8 @@ void outError(const char *error, string msg);
 void outWarning(const char *warn);
 void outWarning(string warn);
 
+/** safe version of std::getline to deal with files from different platforms */
+std::istream& safeGetline(std::istream& is, std::string& t);
 
 /*--------------------------------------------------------------*/
 /*--------------------------------------------------------------*/
@@ -2182,6 +2210,12 @@ void summarizeHeader(ostream &out, Params &params, bool budget_constraint, Input
  */
 void summarizeFooter(ostream &out, Params &params);
 
-int calculateSequenceHash(string &seq); 
+/**
+    remove white space at the beginning and end of the string
+    @param str (IN/OUT) string to be trimmed
+*/
+void trimString(string &str);
+
+int calculateSequenceHash(string &seq);
 
 #endif

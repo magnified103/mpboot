@@ -21,13 +21,14 @@
 #define STOPRULE_H
 
 #include "tools.h"
+#include "checkpoint.h"
 
 
 /**
 Stopping rule
 	@author BUI Quang Minh <minh.bui@univie.ac.at>
 */
-class StopRule
+class StopRule : public CheckpointFactory
 {
 public:
 
@@ -41,6 +42,23 @@ public:
 		destructor
 	*/
     ~StopRule();
+
+    int getCurIt() const {
+        return cur_iteration;
+    }
+
+    void setCurIt(int cur_it) {
+        cur_iteration = cur_it;
+    }
+    /**
+        save object into the checkpoint
+    */
+    virtual void saveCheckpoint();
+
+    /**
+        restore object from the checkpoint
+    */
+    virtual void restoreCheckpoint();
 
 	/**
 		read improved iteration number from a file
@@ -82,6 +100,11 @@ public:
 //	int getPredictedIteration(int cur_iteration);
 
 private:
+
+    /**
+	 *  Current iteration number
+	 */
+	int cur_iteration;
 
 	double predict (double &upperTime);
 

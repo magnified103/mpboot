@@ -637,7 +637,7 @@ void runPDTree(Params &params)
 }
 
 void checkSplitDistance(ostream &out, PDNetwork &sg) {
-	matrix(double) dist;
+	mmatrix(double) dist;
 	sg.calcDistance(dist);
 	int ntaxa = sg.getNTaxa();
 	int i, j;
@@ -1081,13 +1081,13 @@ void summarizeSplit(Params &params, PDNetwork &sg, vector<SplitSet> &pd_set, PDR
 	}
 }
 
-void printGainMatrix(char *filename, matrix(double) &delta_gain, int start_k) {
+void printGainMatrix(char *filename, mmatrix(double) &delta_gain, int start_k) {
 	try {
 		ofstream out;
 		out.exceptions(ios::failbit | ios::badbit);
 		out.open(filename);
 		int k = start_k;
-		for (matrix(double)::iterator it = delta_gain.begin(); it != delta_gain.end(); it++, k++) {
+		for (mmatrix(double)::iterator it = delta_gain.begin(); it != delta_gain.end(); it++, k++) {
 			out << k;
 			for (int i = 0; i < (*it).size(); i++)
 				out << "  " << (*it)[i];
@@ -1216,7 +1216,7 @@ void runPDSplit(Params &params) {
 	summarizeSplit(params, sg, pd_set, pd_more, true);
 
 	if (params.calc_pdgain) {
-		matrix(double) delta_gain;
+		mmatrix(double) delta_gain;
 		sg.calcPDGain(pd_set, delta_gain);
 		string filename = params.out_prefix;
 		filename += ".pdgain";
@@ -1253,7 +1253,7 @@ void calcTreeCluster(Params &params) {
 //	StrVector taxa_order;
 	//readTaxaOrder(params.taxa_order_file, taxa_order);
 	NodeVector taxa;
-	matrix(int) clusters;
+	mmatrix(int) clusters;
 	clusters.reserve(tree.leafNum - 3);
 	tree.getTaxa(taxa);
 	sort(taxa.begin(), taxa.end(), nodenamecmp);
@@ -1264,7 +1264,7 @@ void calcTreeCluster(Params &params) {
 	treename += ".clu-id";
 	tree.printTree(treename.c_str());
 
-	for (matrix(int)::iterator it = clusters.begin(); it != clusters.end(); it++, cnt++) {
+	for (mmatrix(int)::iterator it = clusters.begin(); it != clusters.end(); it++, cnt++) {
 		ostringstream filename;
 		filename << params.out_prefix << "." << cnt << ".clu";
 		ofstream out(filename.str().c_str());
@@ -2186,9 +2186,37 @@ int main(int argc, char *argv[])
 	Params params;
 	parseArg(argc, argv, params);
 
+    Checkpoint *checkpoint = new Checkpoint;
+    checkpoint->setIgnore(params.ignore_checkpoint);
+
+    string filename = (string)params.out_prefix +".ckp.gz";
+    checkpoint->setFileName(filename);
+    
+    bool append_log = false;
+    
+    if (!params.ignore_checkpoint && !params.ckp_rerun && fileExists(filename)) {
+        checkpoint->load();
+        if (checkpoint->hasKey("finished")) {
+            if (checkpoint->getBool("finished")) {
+                delete checkpoint;
+                outError("Checkpoint (" + filename + ") indicates that a previous run successfully finished\n" +
+                    "Add -ckp_rerun option if you really want to rerun the analysis and overwrite all output files.\n");
+            } else {
+                append_log = true;
+            }
+        } else {
+            outWarning("Ignore invalid checkpoint file " + filename);
+            checkpoint->clear();
+        }
+    }
 	_log_file = params.out_prefix;
 	_log_file += ".log";
 	startLogFile();
+
+    if (append_log) {
+        cout << endl << "******************************************************"
+             << endl << "CHECKPOINT: Resuming analysis from " << filename << endl << endl;
+    }
 	atexit(funcExit);
 	signal(SIGABRT, &funcAbort);
 	signal(SIGFPE, &funcAbort);
@@ -2267,6 +2295,7 @@ int main(int argc, char *argv[])
 		cout << " " << argv[i];
 	cout << endl;
 
+    checkpoint->get("mpboot.seed", params.ran_seed);
 	cout << "Seed:    " << params.ran_seed <<  " ";
 	init_random(params.ran_seed);
 
@@ -2321,6 +2350,95 @@ int main(int argc, char *argv[])
 	cout.precision(3);
 	cout.setf(ios::fixed);
 
+    // checkpoint general run information
+    checkpoint->startStruct("mpboot");
+    string command;
+    string num_cmds;
+    
+    if (CKP_RESTORE_STRING(command) && CKP_RESTORE_STRING(num_cmds)) {
+        // compare command between saved and current commands
+        int num = 0;
+        for (char c : num_cmds) {
+            num = num * 10 + (c - '0');
+        }
+        stringstream ss(command);
+        string str, lst;
+        bool mismatch = false;
+        map<string, string> cmdArgs;
+        int nargc = argc;
+        for (int i = 1; i < argc; i++) {
+            if (!(ss >> str)) {
+                outWarning("Number of command-line arguments differs from checkpoint");
+                mismatch = true;
+                break;
+            }
+            if (str == "-ckp_rerun") {
+                nargc--;
+                continue;
+            }
+            if (str[0] == '-') {
+                cmdArgs[str] = "";
+                lst = str;
+            } else {
+                cmdArgs[lst] = str;
+            }
+        }
+        if (nargc != num) {
+            outWarning("Number of command-line arguments differs from checkpoint (" + num_cmds + ")");
+            mismatch = true;
+        } else {
+            for (int i = 1; i < argc; i++) {
+                if (strcmp(argv[i], "-ckp_rerun") == 0) {
+                    continue;
+                }
+                if (argv[i][0] == '-') {
+                    if (cmdArgs.find(argv[i]) == cmdArgs.end()) {
+                        outWarning((string)"Command-line argument `" + argv[i] + "` doesn't exist in checkpoint!");
+                        mismatch = true;
+                    }
+                    lst = argv[i];
+                } else {
+                    if (cmdArgs.find(lst) != cmdArgs.end() && cmdArgs[lst] != argv[i]) {
+                        outWarning((string)"Command-line argument `" + lst + " " + argv[i] + "` is different from `" + lst + " " + cmdArgs[lst] +  "` in checkpoint!");
+                        mismatch = true;
+                    }
+                }
+            }
+        }
+        if (mismatch) {
+            outError("Command-line differs from checkpoint!\nAdd -ckp_rerun option if you really want to rerun the analysis and overwrite all output files.\n");
+        }
+        command = "";
+        num_cmds = "";
+    }
+    
+    int nargc = argc;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-ckp_rerun") == 0) {
+            nargc--;
+            continue;
+        }
+        command += string(" ") + argv[i];
+    }
+    int num = nargc;
+    while (num > 0) {
+        num_cmds += (num % 10) + '0';
+        num /= 10;
+    }
+    reverse(num_cmds.begin(), num_cmds.end());
+    CKP_SAVE(command);
+    CKP_SAVE(num_cmds);
+    int seed = params.ran_seed;
+    CKP_SAVE(seed);
+    CKP_SAVE(cur_time);
+
+    // check for incompatible version
+    string version;
+    stringstream sversion;
+    sversion << iqtree_VERSION_MAJOR << "." << iqtree_VERSION_MINOR << iqtree_VERSION_PATCH;
+    version = sversion.str();
+    CKP_SAVE(version);
+    checkpoint->endStruct();
 	// call the main function
 	if (params.tree_gen != NONE) {
 		generateRandomTree(params);
@@ -2370,7 +2488,7 @@ int main(int argc, char *argv[])
 			if (params.second_align)
 				computeMulProb(params);
 		} else {
-			runPhyloAnalysis(params);
+			runPhyloAnalysis(params, checkpoint);
 		}
 	} else if (params.ngs_file || params.ngs_mapped_reads) {
 		runNGSAnalysis(params);
@@ -2431,6 +2549,9 @@ int main(int argc, char *argv[])
 	time(&cur_time);
 	cout << "Date and Time: " << ctime(&cur_time);
 
+    try{
+    delete checkpoint;
+    }catch(int err_num){}
 	finish_random();
 	return EXIT_SUCCESS;
 }

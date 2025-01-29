@@ -31,6 +31,7 @@
 #include "optimization.h"
 #include "model/rateheterogeneity.h"
 #include "phyloanalysis.h"
+#include "checkpoint.h"
 
 const double MIN_BRANCH_LEN = 0.000001; // NEVER TOUCH THIS CONSTANT AGAIN PLEASE!
 const double MAX_BRANCH_LEN = 100.0;
@@ -251,7 +252,7 @@ Phylogenetic Tree class
 
         @author BUI Quang Minh, Steffen Klaere, Arndt von Haeseler <minh.bui@univie.ac.at>
  */
-class PhyloTree : public MTree, public Optimization {
+class PhyloTree : public MTree, public Optimization, public CheckpointFactory {
 
 	friend class PhyloSuperTree;
 	friend class PhyloSuperTreePlen;
@@ -278,6 +279,21 @@ public:
             destructor
      */
     virtual ~PhyloTree();
+
+    /**
+        start structure for checkpointing
+    */
+    virtual void startCheckpoint();
+
+    /** 
+        save object into the checkpoint
+    */
+    virtual void saveCheckpoint();
+
+    /** 
+        restore object from the checkpoint
+    */
+    virtual void restoreCheckpoint();
 
     /**
             copy the phylogenetic tree structure into this tree, override to take sequence names

@@ -9,6 +9,7 @@
 #define CANDIDATESET_H_
 #include "tools.h"
 #include "alignment.h"
+#include "checkpoint.h"
 #include <stack>
 
 struct CandidateTree {
@@ -21,7 +22,7 @@ struct CandidateTree {
 /**
  * Candidate tree set, sorted in ascending order of scores, i.e. the last element is the highest scoring tree
  */
-class CandidateSet : public multimap<double, CandidateTree> {
+class CandidateSet : public multimap<double, CandidateTree>, public CheckpointFactory {
 
 public:
     /**
@@ -30,6 +31,16 @@ public:
 	CandidateSet(int limit, int max_candidates, Alignment *aln);
 
 	CandidateSet();
+
+    /**
+        save object into the checkpoint
+    */
+    virtual void saveCheckpoint();
+
+    /**
+        restore object from the checkpoint
+    */
+    virtual void restoreCheckpoint();
 
     /**
      * return randomly one candidate tree from max_candidate
@@ -106,6 +117,7 @@ public:
      *  best score in the set
      */
     double bestScore;
+    string bestTreeString;
 
     /**
      *  maximum number of candidate trees

@@ -31,6 +31,7 @@
 #include "node.h"
 #include "splitset.h"
 #include "mtree.h"
+#include "checkpoint.h"
 
 
 class MTreeSet;
@@ -42,7 +43,7 @@ SplitGraph class
 
 @author BUI Quang Minh, Steffen Klaere, Arndt von Haeseler
 */
-class SplitGraph : public vector<Split*>
+class SplitGraph : public vector<Split*>, public CheckpointFactory
 {
 public:
 
@@ -71,6 +72,16 @@ public:
 	*/
     void init(Params &params);
 	
+    /** 
+        save object into the checkpoint
+    */
+    virtual void saveCheckpoint();
+
+    /** 
+        restore object from the checkpoint
+    */
+    virtual void restoreCheckpoint();
+
 	/**
 		if no taxa block found, but the sets block is present, then 
 		this function will be invoked. It takes the taxa names from the sets block.
@@ -309,7 +320,7 @@ public:
 		@return TRUE if the distance matrix presents for circular splits graph
 		@param mat distance matrix
 	*/
-	bool checkCircular(matrix(double) &mat);
+	bool checkCircular(mmatrix(double) &mat);
 
 	/**
 		get the ID of the taxon around the circle in a circular splits graph
@@ -359,14 +370,14 @@ public:
 		calculate the distance matrix
 		@param dist (OUT) distance matrix
 	*/
-	void calcDistance(matrix(double) &dist);
+	void calcDistance(mmatrix(double) &dist);
 
 	/**
 		calculate the distance matrix, based on the taxa_order
 		@param dist (OUT) distance matrix
 		@param taxa_order an order of taxa
 	*/
-	void calcDistance(matrix(double) &dist, vector<int> &taxa_order);
+	void calcDistance(mmatrix(double) &dist, vector<int> &taxa_order);
 
 
 protected:

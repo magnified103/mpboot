@@ -1169,7 +1169,7 @@ void computeInitialTree(Params &params, IQTree &iqtree, string &dist_file, int &
 
 		resetBranches(iqtree.pllInst);
 		pllTreeToNewick(iqtree.pllInst->tree_string, iqtree.pllInst, iqtree.pllPartitions, iqtree.pllInst->start->back,
-				PLL_TRUE, PLL_TRUE, PLL_FALSE, PLL_FALSE, PLL_FALSE, PLL_SUMMARIZE_LH, PLL_FALSE, PLL_FALSE);
+				params.print_branch_lengths, PLL_TRUE, PLL_FALSE, PLL_FALSE, PLL_FALSE, PLL_SUMMARIZE_LH, PLL_FALSE, PLL_FALSE);
 		iqtree.readTreeString(string(iqtree.pllInst->tree_string));
 		iqtree.initializeAllPartialPars();
 		iqtree.clearAllPartialLH();
@@ -1279,7 +1279,7 @@ int initCandidateTreeSet(Params &params, IQTree &iqtree, int numInitTrees) {
 				pllComputeRandomizedStepwiseAdditionParsimonyTree(iqtree.pllInst, iqtree.pllPartitions, params.sprDist);
 
 	        pllTreeToNewick(iqtree.pllInst->tree_string, iqtree.pllInst, iqtree.pllPartitions,
-					iqtree.pllInst->start->back, PLL_TRUE, PLL_TRUE, PLL_FALSE, PLL_FALSE, PLL_FALSE,
+					iqtree.pllInst->start->back, params.print_branch_lengths, PLL_TRUE, PLL_FALSE, PLL_FALSE, PLL_FALSE,
 					PLL_SUMMARIZE_LH, PLL_FALSE, PLL_FALSE);
 			curParsTree = string(iqtree.pllInst->tree_string);
         } else {
@@ -1742,6 +1742,7 @@ void runTreeReconstruction(Params &params, string &original_model, IQTree &iqtre
     // Update best tree
     iqtree.candidateTrees.clear(); // Diep added
     iqtree.setBestTree(initTree, iqtree.curScore);
+    iqtree.restoreCheckpoint();
     cout << "Current best tree score: " << (params.maximum_parsimony ? -iqtree.bestScore : iqtree.bestScore) << endl << endl;
     iqtree.candidateTrees.update(initTree, iqtree.curScore);
 
@@ -1761,7 +1762,15 @@ void runTreeReconstruction(Params &params, string &original_model, IQTree &iqtre
         double initTime = getCPUTime();
 
         if (!params.user_file && (params.start_tree == STT_PARSIMONY || params.start_tree == STT_PLL_PARSIMONY)) {
-        	int numDup = initCandidateTreeSet(params, iqtree, numInitTrees);
+
+            if (!iqtree.getCheckpoint()->getBool("finishedCandidateSet")) {
+                initCandidateTreeSet(params, iqtree, numInitTrees);
+                iqtree.saveCheckpoint();
+                iqtree.getCheckpoint()->putBool("finishedCandidateSet", true);
+                iqtree.getCheckpoint()->dump();
+            } else {
+                cout << "CHECKPOINT: Candidate tree set restored, best LogL: " << iqtree.bestScore << endl;
+            }
         	assert(iqtree.candidateTrees.size() != 0);
         	cout << "Finish initializing candidate tree set. ";
         	cout << "Number of distinct locally optimal trees: " << iqtree.candidateTrees.size() << endl;
@@ -2176,7 +2185,10 @@ void convertAlignment(Params &params, IQTree *iqtree) {
 /**********************************************************
  * TOP-LEVEL FUNCTION
  ***********************************************************/
-void runPhyloAnalysis(Params &params) {
+void runPhyloAnalysis(Params &params, Checkpoint *checkpoint) {
+    checkpoint->putBool("finished", false);
+    checkpoint->setDumpInterval(params.checkpoint_dump_interval);
+
 	Alignment *alignment;
 	IQTree *tree;
 
@@ -2214,6 +2226,7 @@ void runPhyloAnalysis(Params &params) {
 
 	}
 
+    tree->setCheckpoint(checkpoint);
 
 	string original_model = params.model_name;
 
@@ -2324,6 +2337,8 @@ void runPhyloAnalysis(Params &params) {
 		runStandardBootstrap(params, original_model, alignment, tree);
 	}
 
+    checkpoint->putBool("finished", true);
+    checkpoint->dump(true);
     delete tree->aln;
 	delete tree;
 }

@@ -457,7 +457,7 @@ void MExtTree::createBootstrapSupport(vector<string> &taxname, MTreeSet &trees, 
 	}	
 }
 
-void MExtTree::createCluster(NodeVector &taxa, matrix(int) &clusters, Node *node, Node *dad) {
+void MExtTree::createCluster(NodeVector &taxa, mmatrix(int) &clusters, Node *node, Node *dad) {
 	if (node == NULL) node = root;
 	FOR_NEIGHBOR_IT(node, dad, it) {
 		// if both end-nodes are bifurcating

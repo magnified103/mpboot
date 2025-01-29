@@ -50,8 +50,46 @@ void SPRMoves::add(PhyloNode *prune_node, PhyloNode *prune_dad, PhyloNode *regra
  PhyloTree class
  ****************************************************************************/
 
-PhyloTree::PhyloTree() : MTree() {
+PhyloTree::PhyloTree() : MTree(), CheckpointFactory() {
     init();
+}
+
+void PhyloTree::startCheckpoint() {
+    checkpoint->startStruct("PhyloTree");
+}
+
+
+void PhyloTree::saveCheckpoint() {
+    startCheckpoint();
+//    StrVector leafNames;
+//    getTaxaName(leafNames);
+//    CKP_VECTOR_SAVE(leafNames);
+    string newick = PhyloTree::getTreeString();
+    CKP_SAVE(newick);
+//    CKP_SAVE(curScore);
+    endCheckpoint();
+    CheckpointFactory::saveCheckpoint();
+}
+
+void PhyloTree::restoreCheckpoint() {
+    CheckpointFactory::restoreCheckpoint();
+    startCheckpoint();
+//    StrVector leafNames;
+//    if (CKP_VECTOR_RESTORE(leafNames)) {
+//        if (leafNames.size() +(int)rooted != leafNum)
+//            outError("Alignment mismatched from checkpoint!");
+//
+//        StrVector taxname;
+//        getTaxaName(taxname);
+//        for (int i = 0; i < leafNames.size(); i++)
+//            if (taxname[i] != leafNames[i])
+//                outError("Sequence name " + taxname[i] + " mismatched from checkpoint");
+//    }    
+    string newick;
+    if (CKP_RESTORE(newick)) {
+        PhyloTree::readTreeString(newick);
+    }
+    endCheckpoint();
 }
 
 void PhyloTree::init() {
@@ -547,7 +585,7 @@ void setBitsAll(UINT* &bit_vec, int num) {
  * A|C|G|T -> 15
  */
 UINT dna_state_map[128];
-UINT bin_state_map[2];
+UINT bin_state_map[3];
 UINT prot_state_map[128];
 /*
  * this will recompute for 2 DNA states as input and map to result of Fitch algorithm:
@@ -567,6 +605,7 @@ UINT bin_fitch_step[16];
 void precomputeFitchInfo() {
 	bin_state_map[0] = 1; // '0'
 	bin_state_map[1] = 2; // '1'
+	bin_state_map[2] = 1+2; // STATE_UNKNOWN
 
 	dna_state_map[0] = 1; // A
 	dna_state_map[1] = 2; // C

@@ -143,6 +143,39 @@ double randomLen(Params &params) {
     return len;
 }
 
+std::istream& safeGetline(std::istream& is, std::string& t)
+{
+    t.clear();
+
+    // The characters in the stream are read one-by-one using a std::streambuf.
+    // That is faster than reading them one-by-one using the std::istream.
+    // Code that uses streambuf this way must be guarded by a sentry object.
+    // The sentry object performs various tasks,
+    // such as thread synchronization and updating the stream state.
+
+    std::istream::sentry se(is, true);
+    std::streambuf* sb = is.rdbuf();
+
+    for(;;) {
+        int c = sb->sbumpc();
+        switch (c) {
+        case '\n':
+            return is;
+        case '\r':
+            if(sb->sgetc() == '\n')
+                sb->sbumpc();
+            return is;
+        case EOF:
+            // Also handle the case when the last line has no line ending
+            if(t.empty())
+                is.setstate(std::ios::eofbit);
+            return is;
+        default:
+            t += (char)c;
+        }
+    }
+}
+
 //From Tung
 
 string convertIntToString(int number) {
@@ -556,6 +589,14 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.fusing_pars = false;
     params.fusing_numsrc = 1;
     params.fusing_ratio = 20;
+    params.print_all_checkpoints = false;
+    params.ignore_checkpoint = true;
+    params.checkpoint_dump_interval = 60;
+    params.ckp_rerun = false;
+    params.tbr_pars = false;
+    params.tbr_mintrav = 1;
+    params.tbr_maxtrav = 5;
+    params.tbr_better = false;
     params.tree_gen = NONE;
     params.user_file = NULL;
     params.out_prefix = NULL;
@@ -882,6 +923,30 @@ void parseArg(int argc, char *argv[], Params &params) {
 				verbose_mode = VB_DEBUG;
 				continue;
 			}
+            if (strcmp(argv[cnt], "-ckp") == 0) {
+                params.ignore_checkpoint = false;
+                cout << "Note that checkpoint currently only works with normal treesearch and normal bootstrap!\n";
+				continue;
+			}
+            if (strcmp(argv[cnt], "-ckp_all") == 0) {
+                params.ignore_checkpoint = false;
+                params.print_all_checkpoints = true;
+                cout << "Note that checkpoint currently only works with normal treesearch and normal bootstrap!\n";
+				continue;
+			}
+            if (strcmp(argv[cnt], "-ckp_rerun") == 0) {
+                params.ignore_checkpoint = false;
+                params.ckp_rerun = true;
+				continue;
+			}
+			if (strcmp(argv[cnt], "-ckptime") == 0) {
+				cnt++;
+				if (cnt >= argc)
+					throw "Use -ckptime <checkpoint_time_interval_in_seconds>";
+				params.checkpoint_dump_interval = convert_int(argv[cnt]);
+				continue;
+			}
+
 			if (strcmp(argv[cnt], "-k") == 0) {
 				cnt++;
 				if (cnt >= argc)
@@ -2419,6 +2484,29 @@ void parseArg(int argc, char *argv[], Params &params) {
                 params.fusing_ratio = convert_int(argv[cnt]);
                 continue;
             }
+
+            if (strcmp(argv[cnt], "-tbr_pars") == 0) {
+                params.tbr_pars = true;
+                continue;
+            }
+            if (strcmp(argv[cnt], "-tbr_mintrav") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use -tbr_mintrav <mintrav>";
+                params.tbr_mintrav = convert_int(argv[cnt]);
+                continue;
+            }
+            if (strcmp(argv[cnt], "-tbr_maxtrav") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use -tbr_maxtrav <maxtrav>";
+                params.tbr_maxtrav = convert_int(argv[cnt]);
+                continue;
+            }
+            if (strcmp(argv[cnt], "-tbr_better") == 0) {
+                params.tbr_better = true;
+                continue;
+            }
 			if(strcmp(argv[cnt], "-sitepars") == 0){
             	params.test_site_pars = true;
             	continue;
@@ -3508,6 +3596,10 @@ double computePValueChiSquare(double x, int df) /* x: obtained chi-square value,
         return (s);
 }
 
+void trimString(string &str) {
+    str.erase(0, str.find_first_not_of(" \n\r\t"));
+    str.erase(str.find_last_not_of(" \n\r\t")+1);
+}
 
 int calculateSequenceHash(string &seq) {
 	const static int modular = 1000000007;

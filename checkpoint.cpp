@@ -6,164 +6,509 @@
  */
 
 #include "checkpoint.h"
+#include "gzstream.h"
+#include "timeutil.h"
+#include "tools.h"
+#include <cstdio>
 
-/*
- * The following parameters have been saved for checkpoint in IQPNNI
- *
-Number iterations: 200
-Maximum number iterations: 2000
-Current number iterations: 139
-Probability of deleting a sequence: 0.5
-Number representatives: 4
-Stopping rule (0: YES, 1: YES_MIN_ITER, 2: YES_MAX_ITER, 3: NO): 3
-Type of data (0:NUCLEOTIDE, 1:AMINO_ACID): 0
-Substitution model (0:HKY85, 1: TN93, 2:GTR, 3:WAG, 4:JTT, 5:VT, 6:MtREV24, 7:Blosum62, 8:Dayhoff, 9:rtREV, 10: User-defined): 0
-Frequency of Base A: 0.248672
-Frequency of Base C: 0.261687
-Frequency of Base G: 0.250996
-Frequency of Base T: 0.238645
-Type of parameters (0:ESTIMATE,  1:USER_DEFINED, 2: EQUAL): 0
-Transition/transversion ratito: 0.766912
-Type of parameters (0:ESTIMATE,  1:USER_DEFINED): 0
-Pyridimine/purine ratito: 1
-Type of parameters (0:ESTIMATE,  1:USER_DEFINED): 0
-Transition rate from A to G: -1
-Transition rate from C to T: -1
-Transversion rate from A to C: -1
-Transversion rate from A to T: -1
-Transversion rate from C to G: -1
-Transversion rate from G to T: -1
-Type of parameters (0:ESTIMATE,  1:USER_DEFINED): 0
-Type of rate heterogeneity (0:UNIFORM, 1:SITE_SPECIFIC, 2:GAMMA): 0
-Number rates: 1
-Gamma distribution parameter alpha: 1
-Type of parameters (0:ESTIMATE,  1:USER_DEFINED): 0
-Invariant type (0: NONE, 1:ESTIMATE, 2: USER_DEFINED): 0
-Proportion of invariable sites: 0
-Out group sequence: 0
-Bootstrap sample: 0
-Current bootstrap sample: 0
-Build consensus: 0
-Current best log-likelihood: -11833.35062
-Elapsed time: 23
-Finished: 0
- */
+extern Params* globalParam;
+const char* CKP_HEADER = "--- # MPBoot Checkpoint ver >= 2";
 
-Checkpoint::Checkpoint() {
-	filename = "";
+Checkpoint::Checkpoint()
+{
+    ignore = false;
+    filename = "";
+    prev_dump_time = 0;
+    dump_interval = 60; // dumping at most once per 60 seconds
+    dump_count = 0;
+    struct_name = "";
+    compression = true;
+    header = CKP_HEADER;
 }
 
-void Checkpoint::setFileName(string filename) {
-	this->filename = filename;
+Checkpoint::~Checkpoint()
+{
 }
-void Checkpoint::load() {
-	assert(filename != "");
+
+void Checkpoint::setFileName(string filename)
+{
+    this->filename = filename;
+}
+
+void Checkpoint::load(istream& in)
+{
+    string line;
+    string struct_name;
+    size_t pos;
+    int listid = 0;
+    while (!in.eof()) {
+        safeGetline(in, line);
+        pos = line.find('#');
+        if (pos != string::npos)
+            line.erase(pos);
+        line.erase(line.find_last_not_of("\n\r\t") + 1);
+        //            trimString(line);
+        if (line.empty())
+            continue;
+        if (line[0] != ' ') {
+            struct_name = "";
+        }
+        //            trimString(line);
+        line.erase(0, line.find_first_not_of(" \n\r\t"));
+        if (line.empty())
+            continue;
+        pos = line.find(": ");
+        if (pos != string::npos) {
+            // mapping
+            (*this)[struct_name + line.substr(0, pos)] = line.substr(pos + 2);
+        } else if (line[line.length() - 1] == ':') {
+            // start a new struct
+            line.erase(line.length() - 1);
+            trimString(line);
+            struct_name = line + CKP_SEP;
+            listid = 0;
+            continue;
+        } else {
+            // collection
+            (*this)[struct_name + convertIntToString(listid)] = line;
+            listid++;
+        }
+    }
+}
+
+bool Checkpoint::load()
+{
+    if (ignore)
+        return true;
+    assert(filename != "");
+    if (!fileExists(filename))
+        return false;
     try {
-        ifstream in;
+        igzstream in;
         // set the failbit and badbit
         in.exceptions(ios::failbit | ios::badbit);
         in.open(filename.c_str());
-        string line;
-        getline(in, line);
-        if (line != "Checkpoint file for IQ-TREE")
-        	throw ("Invalid checkpoint file");
         // remove the failbit
         in.exceptions(ios::badbit);
-        while (!in.eof()) {
-        	getline(in, line);
-        	size_t pos = line.find(" := ");
-        	if (pos == string::npos)
-        		throw "':=' is expected between key and value";
-        	(*this)[line.substr(0, pos)] = line.substr(pos+3);
+        string line;
+        if (!safeGetline(in, line)) {
+            in.close();
+            return false;
         }
+        if (line != header)
+            throw("Invalid checkpoint file " + filename);
+        // call load from the stream
+        load(in);
         in.clear();
         // set the failbit again
         in.exceptions(ios::failbit | ios::badbit);
         in.close();
-    } catch (ios::failure &) {
+        return true;
+    } catch (ios::failure&) {
         outError(ERR_READ_INPUT);
-    } catch (const char *str) {
+    } catch (const char* str) {
         outError(str);
-    } catch (string &str) {
+    } catch (string& str) {
         outError(str);
+    }
+    return false;
+}
+
+void Checkpoint::setCompression(bool compression)
+{
+    this->compression = compression;
+}
+
+/**
+    set the header line to overwrite the default header
+    @param header header line
+*/
+void Checkpoint::setHeader(string header)
+{
+    this->header = "--- # " + header;
+}
+
+void Checkpoint::setDumpInterval(double interval)
+{
+    dump_interval = interval;
+}
+
+void Checkpoint::dump(ostream& out)
+{
+    string struct_name;
+    size_t pos;
+    int listid = 0;
+    for (iterator i = begin(); i != end(); i++) {
+        if ((pos = i->first.find(CKP_SEP)) != string::npos) {
+            if (struct_name != i->first.substr(0, pos)) {
+                struct_name = i->first.substr(0, pos);
+                out << struct_name << ':' << endl;
+                listid = 0;
+            }
+            // check if key is a collection
+            out << ' ' << i->first.substr(pos + 1) << ": " << i->second << endl;
+        } else
+            out << i->first << ": " << i->second << endl;
     }
 }
 
-void Checkpoint::commit() {
-	assert(filename != "");
+void Checkpoint::dump(bool force)
+{
+    if (ignore)
+        return;
+    if (filename == "")
+        return;
+
+    if (!force && getRealTime() < prev_dump_time + dump_interval) {
+        return;
+    }
+    prev_dump_time = getRealTime();
+    string filename_tmp = filename + ".tmp";
+    if (fileExists(filename_tmp)) {
+        outWarning("MPBoot was killed while writing temporary checkpoint file " + filename_tmp);
+        outWarning("You should increase checkpoint interval from the default 60 seconds");
+        outWarning("via -ckptime option to avoid too frequent checkpoint for large datasets");
+    }
     try {
-        ofstream out;
-        out.exceptions(ios::failbit | ios::badbit);
-        out.open(filename.c_str());
-        out << "Checkpoint file for IQ-TREE" << endl;
-        for (iterator i = begin(); i != end(); i++)
-        	out << i->first << " := " << i->second << endl;
-        out.close();
-    } catch (ios::failure &) {
+        ostream* out;
+        if (compression)
+            out = new ogzstream(filename_tmp.c_str());
+        else
+            out = new ofstream(filename_tmp.c_str());
+        out->exceptions(ios::failbit | ios::badbit);
+        *out << header << endl;
+        // call dump stream
+        dump(*out);
+        if (compression)
+            ((ogzstream*)out)->close();
+        else
+            ((ofstream*)out)->close();
+        delete out;
+        //        cout << "Checkpoint dumped" << endl;
+        if (fileExists(filename)) {
+            if (std::remove(filename.c_str()) != 0)
+                outError("Cannot remove file ", filename);
+        }
+        if (std::rename(filename_tmp.c_str(), filename.c_str()) != 0)
+            outError("Cannot rename file ", filename_tmp);
+    } catch (ios::failure&) {
         outError(ERR_WRITE_OUTPUT, filename.c_str());
     }
+    if (globalParam->print_all_checkpoints) {
+        // Feature request by Nick Goldman
+        dump_count++;
+        filename_tmp = (string)globalParam->out_prefix + "." + convertIntToString(dump_count) + ".ckp.gz";
+        try {
+            ostream* out;
+            if (compression)
+                out = new ogzstream(filename_tmp.c_str());
+            else
+                out = new ofstream(filename_tmp.c_str());
+            out->exceptions(ios::failbit | ios::badbit);
+            *out << header << endl;
+            // call dump stream
+            dump(*out);
+            if (compression)
+                ((ogzstream*)out)->close();
+            else
+                ((ofstream*)out)->close();
+            delete out;
+        } catch (ios::failure&) {
+            outError(ERR_WRITE_OUTPUT, filename_tmp.c_str());
+        }
+    } else {
+        // check that the dumping time is too long and increase dump_interval if necessary
+        double dump_time = getRealTime() - prev_dump_time;
+        if (dump_time * 20 > dump_interval) {
+            dump_interval = ceil(dump_time * 20);
+            cout << "NOTE: " << dump_time << " seconds to dump checkpoint file, increase to "
+                 << dump_interval << endl;
+        }
+    }
 }
 
-bool Checkpoint::containsKey(string key) {
-	return (find(key) != end());
+bool Checkpoint::hasKey(string key)
+{
+    return (find(struct_name + key) != end());
+}
+
+bool Checkpoint::hasKeyPrefix(string key_prefix)
+{
+    string prefix = key_prefix;
+    if (!struct_name.empty()) {
+        prefix = struct_name + key_prefix;
+    }
+    auto i = lower_bound(prefix);
+    if (i != end()) {
+        if (i->first.compare(0, prefix.size(), prefix) == 0)
+            return true;
+    }
+    return false;
+}
+
+int Checkpoint::eraseKeyPrefix(string key_prefix)
+{
+    int count = 0;
+    iterator first_it = lower_bound(key_prefix);
+    iterator i;
+    for (i = first_it; i != end(); i++) {
+        if (i->first.compare(0, key_prefix.size(), key_prefix) == 0)
+            count++;
+        else
+            break;
+    }
+    if (count)
+        erase(first_it, i);
+    return count;
+}
+
+int Checkpoint::keepKeyPrefix(string key_prefix)
+{
+    map<string, string> newckp;
+    int count = 0;
+    erase(begin(), lower_bound(key_prefix));
+
+    for (iterator i = begin(); i != end(); i++) {
+        if (i->first.compare(0, key_prefix.size(), key_prefix) == 0)
+            count++;
+        else {
+            erase(i, end());
+            break;
+        }
+    }
+    return count;
+}
+
+/*-------------------------------------------------------------
+ * series of get function to get value of a key
+ *-------------------------------------------------------------*/
+
+bool Checkpoint::getBool(string key, bool& ret)
+{
+    string value;
+    if (!get(key, value))
+        return false;
+    if (value == "true")
+        ret = true;
+    else if (value == "false")
+        ret = false;
+    else
+        outError("Invalid boolean value " + value + " for key " + key);
+    return true;
+}
+
+bool Checkpoint::getBool(string key)
+{
+    bool ret;
+    if (!getBool(key, ret))
+        return false;
+    return ret;
+}
+
+/*-------------------------------------------------------------
+ * series of put function to put pair of (key,value)
+ *-------------------------------------------------------------*/
+
+void Checkpoint::putBool(string key, bool value)
+{
+    if (value)
+        put(key, "true");
+    else
+        put(key, "false");
+}
+
+/*-------------------------------------------------------------
+ * nested structures
+ *-------------------------------------------------------------*/
+void Checkpoint::startStruct(string name)
+{
+    struct_name = struct_name + name + CKP_SEP;
 }
 
 /**
- * series of get functions
- */
-
-template<class T>
-void Checkpoint::get(string key, T& value) {
-	assert(containsKey(key));
-	stringstream ss((*this)[key]);
-	ss >> value;
+    end the current struct
+*/
+void Checkpoint::endStruct()
+{
+    size_t pos = struct_name.find_last_of(CKP_SEP, struct_name.length() - 2);
+    if (pos == string::npos)
+        struct_name = "";
+    else
+        struct_name.erase(pos + 1);
 }
 
-bool Checkpoint::getBool(string key) {
-	assert(containsKey(key));
-	if ((*this)[key] == "1") return true;
-	return false;
+void Checkpoint::startList(int nelem)
+{
+    list_element.push_back(-1);
+    if (nelem > 0)
+        list_element_precision.push_back((int)ceil(log10(nelem)));
+    else
+        list_element_precision.push_back(0);
 }
 
-char Checkpoint::getChar(string key) {
-	assert(containsKey(key));
-	return (*this)[key][0];
+void Checkpoint::setListElement(int id)
+{
+    list_element.back() = id;
+    stringstream ss;
+    ss << setw(list_element_precision.back()) << setfill('0') << list_element.back();
+    struct_name += ss.str() + CKP_SEP;
 }
 
-double Checkpoint::getDouble(string key) {
-	assert(containsKey(key));
-	return convert_double((*this)[key].c_str());
-
+void Checkpoint::addListElement()
+{
+    list_element.back()++;
+    if (list_element.back() > 0) {
+        size_t pos = struct_name.find_last_of(CKP_SEP, struct_name.length() - 2);
+        assert(pos != string::npos);
+        struct_name.erase(pos + 1);
+    }
+    stringstream ss;
+    ss << setw(list_element_precision.back()) << setfill('0') << list_element.back();
+    //    ss << list_element.back();
+    struct_name += ss.str() + CKP_SEP;
 }
 
-int Checkpoint::getInt(string key) {
-	assert(containsKey(key));
-	return convert_int((*this)[key].c_str());
+void Checkpoint::endList()
+{
+    assert(!list_element.empty());
 
+    if (list_element.back() >= 0) {
+        size_t pos = struct_name.find_last_of(CKP_SEP, struct_name.length() - 2);
+        assert(pos != string::npos);
+        struct_name.erase(pos + 1);
+    }
+
+    list_element.pop_back();
+    list_element_precision.pop_back();
 }
 
-/**
- * series of put functions
- */
-
-template<class T>
-void Checkpoint::put(string key, T value) {
-	stringstream ss;
-	ss << value;
-	(*this)[key] = ss.str();
+template <typename U, typename V>
+void Checkpoint::saveMap(const string& key, const unordered_map<U, V>& map)
+{
+    if (ignore)
+        return;
+    startStruct(key);
+    put("size", toString(map.size()));
+    int index = 0;
+    for (const auto& pair : map) {
+        startStruct(toString(index));
+        put("key", toString(pair.first));
+        put("value", toString(pair.second));
+        endStruct();
+        index++;
+    }
+    endStruct();
 }
 
-template<class T>
-void Checkpoint::putArray(string key, int num, T* value) {
-	stringstream ss;
-	for (int i = 0; i < num; i++) {
-		if (i > 0) ss << ',';
-		ss << value[i];
-	}
-	(*this)[key] = ss.str();
+template <typename U, typename V>
+void Checkpoint::restoreMap(const string& key, unordered_map<U, V>& map)
+{
+    if (ignore)
+        return;
+    map.clear();
+    startStruct(key);
+    int size;
+    if (!get("size", size)) {
+        endStruct();
+        return;
+    }
+    for (int i = 0; i < size; i++) {
+        startStruct(toString(i));
+        std::string keyStr, valueStr;
+        if (get("key", keyStr) && get("value", valueStr)) {
+            U keyU = fromString<U>(keyStr);
+            V valueV = fromString<V>(valueStr);
+            map[keyU] = valueV;
+        }
+        endStruct();
+    }
+    endStruct();
 }
 
-
-Checkpoint::~Checkpoint() {
+void Checkpoint::getSubCheckpoint(Checkpoint* target, string partial_key)
+{
+    int len = partial_key.length();
+    for (auto it = lower_bound(partial_key); it != end() && it->first.substr(0, len) == partial_key; it++) {
+        target->put(it->first.substr(len + 1), it->second);
+    }
 }
 
+void Checkpoint::putSubCheckpoint(Checkpoint* source, string partial_key, bool overwrite)
+{
+    if (!partial_key.empty())
+        startStruct(partial_key);
+    for (auto it = source->begin(); it != source->end(); it++) {
+        if (overwrite || !hasKey(it->first))
+            put(it->first, it->second);
+    }
+    if (!partial_key.empty())
+        endStruct();
+}
+
+void Checkpoint::transferSubCheckpoint(Checkpoint* target, string partial_key, bool overwrite)
+{
+    int len = partial_key.length();
+    for (auto it = lower_bound(partial_key); it != end() && it->first.substr(0, len) == partial_key; it++) {
+        if (overwrite || !target->hasKey(it->first))
+            target->put(it->first, it->second);
+    }
+}
+
+template <typename T>
+string Checkpoint::toString(const T& value)
+{
+    stringstream ss;
+    ss << value;
+    return ss.str();
+}
+
+template <typename T>
+T Checkpoint::fromString(const string& str)
+{
+    stringstream ss(str);
+    T value;
+    ss >> value;
+    return value;
+}
+
+/*-------------------------------------------------------------
+ * CheckpointFactory
+ *-------------------------------------------------------------*/
+
+CheckpointFactory::CheckpointFactory()
+{
+    checkpoint = NULL;
+}
+
+void CheckpointFactory::setCheckpoint(Checkpoint* checkpoint)
+{
+    this->checkpoint = checkpoint;
+}
+
+Checkpoint* CheckpointFactory::getCheckpoint()
+{
+    return checkpoint;
+}
+
+void CheckpointFactory::startCheckpoint()
+{
+    checkpoint->startStruct("CheckpointFactory");
+}
+
+void CheckpointFactory::saveCheckpoint()
+{
+    // do nothing
+}
+
+void CheckpointFactory::restoreCheckpoint()
+{
+    // do nothing
+}
+
+void CheckpointFactory::endCheckpoint()
+{
+    checkpoint->endStruct();
+}
+
+template void Checkpoint::saveMap<string, int>(const string&, const unordered_map<string, int>&);
+template void Checkpoint::restoreMap<string, int>(const string&, unordered_map<string, int>&);

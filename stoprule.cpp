@@ -20,7 +20,7 @@
 #include "stoprule.h"
 #include "timeutil.h"
 
-StopRule::StopRule()
+StopRule::StopRule() : CheckpointFactory()
 {
 //	nTime_ = 0;
 	predicted_iteration = 0;
@@ -33,7 +33,26 @@ StopRule::StopRule()
 	min_correlation = 0.99;
 	step_iteration = 100;
 	start_real_time = -1.0;
+	cur_iteration = 1;
 	max_run_time = -1.0;
+}
+
+void StopRule::saveCheckpoint() {
+    checkpoint->startStruct("StopRule");
+    CKP_SAVE(cur_iteration);
+    CKP_SAVE(start_real_time);
+    CKP_VECTOR_SAVE(time_vec);
+    checkpoint->endStruct();
+    CheckpointFactory::saveCheckpoint();
+}
+
+void StopRule::restoreCheckpoint() {
+    CheckpointFactory::restoreCheckpoint();
+    checkpoint->startStruct("StopRule");
+    CKP_RESTORE(cur_iteration);
+    CKP_RESTORE(start_real_time);
+    CKP_VECTOR_RESTORE(time_vec);
+    checkpoint->endStruct();
 }
 
 void StopRule::initialize(Params &params) {
@@ -100,7 +119,7 @@ bool StopRule::meetStopCondition(int cur_iteration, double cur_correlation) {
 	return false;
 }
 
-double StopRule::getRemainingTime(int cur_iteration, double cur_correlation) {
+double StopRule::getRemainingTime(int cur_it, double cur_correlation) {
 	double realtime_secs = getRealTime() - start_real_time;
 	int niterations;
 	switch (stop_condition) {
@@ -116,12 +135,12 @@ double StopRule::getRemainingTime(int cur_iteration, double cur_correlation) {
 		niterations = getLastImprovedIteration() + unsuccess_iteration;
 		break;
 	case SC_BOOTSTRAP_CORRELATION:
-		niterations = ((cur_iteration+step_iteration-1)/step_iteration)*step_iteration;
+		niterations = ((cur_it+step_iteration-1)/step_iteration)*step_iteration;
 		if (cur_correlation >= min_correlation)
 			niterations = getLastImprovedIteration() + unsuccess_iteration;
 		break;
 	}
-	return (niterations - cur_iteration) * realtime_secs / (cur_iteration - 1);
+	return (niterations - cur_it) * realtime_secs / (cur_it - 1);
 }
 
 //void StopRule::setStopCondition(STOP_CONDITION sc) {
