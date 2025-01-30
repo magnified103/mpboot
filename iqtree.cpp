@@ -2559,6 +2559,16 @@ string IQTree::doNNISearch(int& nniCount, int& nniSteps)
                     initializeAllPartialPars();
                     clearAllPartialLH();
                     curScore = -computeParsimony();
+
+                    pllOptimizeSprParsimony(pllInst, pllPartitions,
+                                            params->spr_mintrav, 100000000, this);
+                    pllTreeToNewick(pllInst->tree_string, pllInst, pllPartitions, pllInst->start->back, PLL_TRUE,
+                                    PLL_TRUE, 0, 0, 0, PLL_SUMMARIZE_LH, 0, 0);
+
+                    readTreeString(pllInst->tree_string);
+                    initializeAllPartialPars();
+                    clearAllPartialLH();
+                    curScore = -computeParsimony();
                 }
             }
             // ----------------- Key step: ask PLL to run SPR/TBR hill-climbing
