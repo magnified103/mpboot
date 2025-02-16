@@ -589,6 +589,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.fusing_pars = false;
     params.fusing_numsrc = 1;
     params.fusing_ratio = 20;
+    params.fusing_spr_rad = 20;
     params.print_all_checkpoints = false;
     params.ignore_checkpoint = true;
     params.checkpoint_dump_interval = 60;
@@ -2482,6 +2483,14 @@ void parseArg(int argc, char *argv[], Params &params) {
                     throw "Use " + string(argv[cnt]) + " <number of SPR/TBR per one fusing iteration>";
                 }
                 params.fusing_ratio = convert_int(argv[cnt]);
+                continue;
+            }
+            if(strcmp(argv[cnt], "-fusing_spr_rad") == 0) {
+                cnt++;
+                if (cnt >= argc) {
+                    throw "Use " + string(argv[cnt]) + " <radius>";
+                }
+                params.fusing_spr_rad = convert_int(argv[cnt]);
                 continue;
             }
 
