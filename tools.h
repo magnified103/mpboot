@@ -1557,6 +1557,8 @@ struct Params {
     /* number of fusing source trees */
     int fusing_numsrc;
     int fusing_ratio;
+    /* SPR after fusing */
+    bool fusing_spr;
     /* tree fusing SPR radius */
     int fusing_spr_rad;
     /*
